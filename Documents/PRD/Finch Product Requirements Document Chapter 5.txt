@@ -1,0 +1,386 @@
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+
+Chapter 5 — AI Assistant & Intelligent Features
+5.1 Overview
+
+The AI Assistant is the defining feature of Finch. It transforms the application from a traditional ERP into an intelligent business operating system.
+
+Unlike conventional AI chatbots, Finch AI understands the user's business data, including orders, inventory, customers, sales trends, and reports. Its role is to provide context-aware insights, automate repetitive work, and help users make better business decisions.
+
+Version 1.0 Scope
+
+The AI Assistant will:
+
+Answer business questions
+Generate reports
+Summarize business performance
+Explain charts
+Generate invoices
+Forecast sales
+Recommend inventory actions
+5.2 Product Vision
+
+Finch AI should feel like hiring an experienced business analyst who is available 24/7.
+
+The AI should not simply respond to prompts—it should actively assist users by identifying trends, highlighting risks, and suggesting next steps.
+
+5.3 Design Principles
+
+The AI Assistant must adhere to the following principles:
+
+Context-Aware
+
+Responses should use the user's business data whenever possible.
+
+Action-Oriented
+
+Every answer should conclude with practical recommendations.
+
+Transparent
+
+The AI should clearly indicate when a response is based on actual business data versus general knowledge.
+
+Trustworthy
+
+The AI must never fabricate business metrics or make unsupported claims.
+
+Explainable
+
+Charts, forecasts, and recommendations should include plain-language explanations that users without technical expertise can understand.
+
+5.4 AI Capabilities
+Capability 1 — Business Chat
+
+Users can ask questions in natural language.
+
+Example Questions
+"How did my business perform today?"
+"Which products sold the most this month?"
+"Which customers haven't ordered recently?"
+"Show me low-stock products."
+"What is my inventory worth?"
+"Which products should I reorder?"
+Expected Response
+
+The AI should provide:
+
+Direct answer
+Supporting data
+Charts (when appropriate)
+Recommendations
+Capability 2 — Business Summary
+
+The AI generates daily summaries including:
+
+Revenue
+Orders
+Customer activity
+Inventory health
+Top-selling products
+Low-performing products
+Key insights
+Recommended actions
+Example
+
+Revenue increased by 14% compared to yesterday. Product "Wireless Mouse" generated the highest sales. Three products are approaching low stock. Customer growth continues to improve. Consider replenishing office accessories before the weekend.
+
+Capability 3 — Report Generation
+
+The AI can generate professional reports on demand.
+
+Supported Reports
+Sales Report
+Profit & Loss Report
+Inventory Report
+Customer Report
+Forecast Report
+Export Formats
+PDF
+CSV
+Excel
+Capability 4 — Invoice Assistant
+
+The AI assists in invoice creation.
+
+Functions include:
+
+Professional descriptions
+Payment terms
+Due date suggestions
+Customer notes
+Invoice summaries
+
+The final invoice includes:
+
+Company logo
+QR code
+Tax information
+Signature area
+Payment terms
+Capability 5 — Chart Explanation
+
+When viewing dashboards or reports, users can ask:
+
+"Explain this chart."
+
+The AI should describe:
+
+What the chart shows
+Why the trend matters
+Possible causes
+Recommended actions
+Capability 6 — Forecasting
+
+Finch uses a hybrid forecasting system.
+
+Components
+
+Statistical Engine
+
+Time-series forecasting
+Seasonal trend analysis
+
+Business Rules
+
+Inventory constraints
+Historical demand
+Product lifecycle
+
+GPT-5.5
+
+Human-readable explanations
+Business recommendations
+Forecast Outputs
+Next 7 days
+Next 30 days
+Next 90 days
+Capability 7 — Inventory Recommendations
+
+The AI monitors inventory and recommends:
+
+Products to reorder
+Suggested quantities
+Estimated stock-out dates
+Overstock warnings
+5.5 AI Architecture
+User Question
+        │
+        ▼
+Prompt Builder
+        │
+        ▼
+Business Context Loader
+        │
+        ▼
+Data Retrieval Layer
+        │
+        ▼
+GPT-5.5
+        │
+        ▼
+Formatter
+        │
+        ▼
+Charts + Answer + Recommendations
+5.6 Context Retrieval
+
+Before sending a request to GPT-5.5, Finch gathers relevant business information such as:
+
+Orders
+Customers
+Products
+Inventory
+Reports
+Forecasts
+Dashboard metrics
+
+Only the minimum required data should be sent to the AI service to protect privacy and reduce costs.
+
+5.7 Prompt Framework
+
+Every AI request follows a structured prompt.
+
+System Prompt
+
+Defines:
+
+Finch's identity
+Response format
+Tone
+Business rules
+Safety constraints
+Context Section
+
+Includes only relevant business information.
+
+Example:
+
+Revenue
+Inventory levels
+Customer metrics
+Sales history
+User Prompt
+
+The user's question or request.
+
+Example:
+
+"Summarize today's sales."
+
+5.8 Response Format
+
+Every response should follow this structure:
+
+Summary
+
+Direct answer.
+
+Insights
+
+Important observations.
+
+Recommendations
+
+Suggested next actions.
+
+Supporting Data
+
+Relevant metrics.
+
+Optional Visualization
+
+Chart or table when applicable.
+
+5.9 AI User Interface
+
+The AI Assistant screen consists of:
+
+---------------------------------------------------
+ Conversation List
+---------------------------------------------------
+
+ Chat Window
+
+---------------------------------------------------
+
+ Suggested Prompts
+
+---------------------------------------------------
+
+ Attach Report
+
+ Export Conversation
+
+---------------------------------------------------
+Suggested Prompts
+
+When the AI opens, display suggestions such as:
+
+How is my business performing?
+Generate today's report.
+Which products should I reorder?
+Explain today's revenue.
+Forecast next month's sales.
+Show inventory insights.
+5.10 AI Memory
+
+The AI maintains conversation history.
+
+History includes:
+
+User prompts
+AI responses
+Timestamps
+
+Users can:
+
+Search conversations
+Rename conversations
+Delete conversations
+Export conversations
+
+Business data is not modified based on chat history.
+
+5.11 AI Safety
+
+The AI must never:
+
+Modify business records without explicit confirmation.
+Delete data automatically.
+Invent financial figures.
+Reveal sensitive information outside the authenticated user's scope.
+Execute actions without user approval.
+5.12 AI Limitations
+
+The AI should gracefully acknowledge when:
+
+Internet connectivity is unavailable.
+Insufficient business data exists.
+A request cannot be completed.
+The question falls outside Finch's supported capabilities.
+
+Example:
+
+"I don't have enough historical sales data to generate a reliable forecast yet."
+
+5.13 Offline Behavior
+
+When offline:
+
+Chat is disabled.
+AI history remains accessible.
+Previously generated reports can be viewed.
+A clear banner indicates that AI features require an internet connection.
+5.14 Performance Requirements
+AI response should begin streaming within 2 seconds under normal network conditions.
+Complete responses should typically finish within 10 seconds.
+Report generation should complete in under 15 seconds.
+Context preparation should take less than 500 milliseconds.
+5.15 Logging & Analytics
+
+For quality improvement, Finch records:
+
+Prompt ID
+Timestamp
+Response duration
+Success or failure
+Token usage
+Model version
+
+Actual business data should not be logged beyond what is necessary for diagnostics.
+
+5.16 Acceptance Criteria
+
+The AI Assistant is considered complete when it can:
+
+Answer natural-language business questions accurately.
+Generate all supported reports.
+Explain dashboard charts.
+Produce business summaries.
+Generate professional invoices.
+Recommend inventory actions.
+Forecast sales using the hybrid forecasting system.
+Maintain conversation history.
+Export reports and conversations.
+Clearly indicate when AI features are unavailable offline.
+5.17 Future Enhancements (Not in v1.0)
+
+Planned AI capabilities include:
+
+Voice conversations
+AI agents that automate repetitive tasks
+Email drafting and replies
+Meeting summaries
+OCR for receipts and invoices
+Natural-language database editing (with approval)
+Multi-agent collaboration (Sales, Finance, Inventory specialists)
+Predictive anomaly detection
+Personalized business coaching
+Industry-specific AI knowledge packs
+Chapter Summary
+
+The AI Assistant is the cornerstone of Finch's value proposition. It combines GPT-5.5 with business context, statistical forecasting, and structured business rules to deliver meaningful, actionable insights rather than generic chatbot responses. Its design emphasizes trust, explainability, and productivity while preserving user control and data privacy.

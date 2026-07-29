@@ -1,0 +1,595 @@
+Finch UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 17 — User Flows, Microinteractions & Interaction Patterns
+17.1 Purpose
+
+This chapter defines how users interact with Finch from the moment they launch the application until they complete their tasks. While previous chapters described individual screens, this chapter focuses on the experience between screens.
+
+Every interaction should feel:
+
+Fast
+Predictable
+Intelligent
+Consistent
+Delightful
+
+The interaction model should minimize friction while maximizing productivity for business owners.
+
+17.2 UX Principles
+
+Every workflow in Finch follows five principles:
+
+Minimal Clicks
+
+The most common business tasks should require as few steps as possible.
+
+Examples:
+
+Create an order in under 60 seconds.
+Find a customer in under 5 seconds.
+Generate a report in two clicks.
+Context First
+
+Users should never lose context while switching between modules.
+
+Examples:
+
+Opening a customer from an order preserves the current order.
+AI automatically understands the active page.
+Returning from Reports restores previous filters.
+Smart Defaults
+
+Finch automatically selects sensible defaults.
+
+Examples:
+
+Current date for invoices.
+Default currency.
+Most recent customer.
+Preferred report range.
+Progressive Disclosure
+
+Advanced options remain hidden until needed.
+
+Example:
+
+The Add Product dialog initially shows only required fields, with an "Advanced Options" section for additional settings.
+
+Immediate Feedback
+
+Every user action provides instant visual confirmation.
+
+Examples:
+
+Save confirmation
+Loading indicators
+Success toasts
+Inline validation
+17.3 Primary Navigation Flow
+
+Users move through Finch using the left sidebar.
+
+Dashboard
+     │
+     ▼
+Orders
+     │
+     ▼
+Inventory
+     │
+     ▼
+Customers
+     │
+     ▼
+Reports
+     │
+     ▼
+Settings
+
+Navigation should be instantaneous, with previously visited pages loaded from cache where possible.
+
+17.4 Application Startup Flow
+Launch Finch
+      │
+      ▼
+Splash Screen
+      │
+      ▼
+License Check
+      │
+      ▼
+Authentication Check
+      │
+      ▼
+Local Database Load
+      │
+      ▼
+Cloud Sync (Background)
+      │
+      ▼
+Dashboard
+
+Target startup time:
+
+Under 3 seconds
+
+17.5 Authentication Flow
+Launch Application
+        │
+        ▼
+Login Screen
+        │
+        ▼
+Enter Credentials
+        │
+        ▼
+Two-Factor Authentication (If Enabled)
+        │
+        ▼
+Load User Profile
+        │
+        ▼
+Dashboard
+
+Users may also create an account or recover a password from the login screen.
+
+17.6 Onboarding Flow
+
+First-time users are guided through an interactive onboarding process.
+
+Welcome
+     │
+     ▼
+Company Setup
+     │
+     ▼
+Theme Selection
+     │
+     ▼
+Import Existing Data (Optional)
+     │
+     ▼
+Dashboard Tour
+     │
+     ▼
+First AI Conversation
+     │
+     ▼
+Finish
+
+Users can skip onboarding at any point and revisit it later from Settings.
+
+17.7 Dashboard Workflow
+
+Typical workflow:
+
+Dashboard
+      │
+      ▼
+View KPIs
+      │
+      ▼
+Review AI Insights
+      │
+      ▼
+Open Relevant Module
+
+Dashboard widgets should support click-through navigation.
+
+17.8 Order Creation Flow
+Orders
+      │
+      ▼
+New Order
+      │
+      ▼
+Select Customer
+      │
+      ▼
+Add Products
+      │
+      ▼
+Review Totals
+      │
+      ▼
+Save Order
+      │
+      ▼
+Generate Invoice
+      │
+      ▼
+Return to Orders
+
+Estimated completion time:
+
+Less than 60 seconds
+
+17.9 Inventory Management Flow
+Inventory
+      │
+      ▼
+Search Product
+      │
+      ▼
+Adjust Stock
+      │
+      ▼
+Save
+      │
+      ▼
+Dashboard Updates
+      │
+      ▼
+Cloud Sync
+
+Changes should immediately update related reports and dashboard metrics.
+
+17.10 Customer Management Flow
+Customers
+      │
+      ▼
+Select Customer
+      │
+      ▼
+View Profile
+      │
+      ▼
+Edit Information
+      │
+      ▼
+Save
+      │
+      ▼
+Profile Updates
+
+Purchase history and AI insights refresh automatically.
+
+17.11 Report Generation Flow
+Reports
+      │
+      ▼
+Select Report
+      │
+      ▼
+Choose Date Range
+      │
+      ▼
+Generate Report
+      │
+      ▼
+AI Summary
+      │
+      ▼
+Export (Optional)
+
+Charts and KPI cards update together to maintain consistency.
+
+17.12 AI Interaction Flow
+Open AI Assistant
+       │
+       ▼
+Type Prompt
+       │
+       ▼
+AI Processes Context
+       │
+       ▼
+Streaming Response
+       │
+       ▼
+Suggested Actions
+       │
+       ▼
+Follow-up Conversation
+
+Responses should begin streaming within 500 milliseconds where possible.
+
+17.13 Search Flow
+
+Global search is available from every major module.
+
+Ctrl + K
+      │
+      ▼
+Search
+      │
+      ▼
+Results
+      │
+      ▼
+Navigate Directly
+
+Search supports:
+
+Orders
+Customers
+Products
+Reports
+Settings
+AI Conversations
+17.14 Import Flow
+Import
+     │
+     ▼
+Choose File
+     │
+     ▼
+Preview
+     │
+     ▼
+Map Columns
+     │
+     ▼
+Validation
+     │
+     ▼
+Import Complete
+
+Validation errors should be displayed before any data is imported.
+
+17.15 Export Flow
+Export
+     │
+     ▼
+Choose Format
+     │
+     ▼
+Generate File
+     │
+     ▼
+Preview (Optional)
+     │
+     ▼
+Save File
+
+Supported formats:
+
+PDF
+CSV
+Excel
+17.16 Backup Flow
+Settings
+      │
+      ▼
+Backup
+      │
+      ▼
+Choose Folder
+      │
+      ▼
+Create Backup
+      │
+      ▼
+Verification
+      │
+      ▼
+Success
+
+Backups should display progress and completion status.
+
+17.17 Offline Synchronization Flow
+Internet Lost
+       │
+       ▼
+Offline Banner
+       │
+       ▼
+Continue Working
+       │
+       ▼
+Queue Changes
+       │
+       ▼
+Internet Restored
+       │
+       ▼
+Automatic Sync
+       │
+       ▼
+Sync Complete
+
+Users should never lose work because of temporary connectivity issues.
+
+17.18 Error Recovery Flow
+Error
+   │
+   ▼
+Explain Problem
+   │
+   ▼
+Suggest Recovery
+   │
+   ▼
+Retry
+   │
+   ▼
+Success
+
+Every recoverable error should provide a clear path forward.
+
+17.19 Confirmation Patterns
+
+Use confirmation dialogs only for destructive or irreversible actions.
+
+Require confirmation for:
+
+Deleting records
+Restoring backups
+Deactivating licenses
+Bulk deletes
+
+Avoid unnecessary confirmations for reversible actions like theme changes.
+
+17.20 Microinteractions
+
+Finch uses subtle microinteractions to improve feedback.
+
+Examples:
+
+Button ripple on click
+Card elevation on hover
+Sidebar expansion on hover
+Progress indicators during uploads
+Animated checkmarks on success
+Smooth drawer transitions
+AI typing indicator
+Live KPI number counting
+Table row highlight on selection
+
+Animations should feel responsive, not distracting.
+
+17.21 Feedback Patterns
+
+Every action should produce one of the following feedback types:
+
+Action	Feedback
+Save	Success toast
+Delete	Confirmation dialog + toast
+Sync	Progress indicator
+Import	Progress + summary
+Export	Download confirmation
+AI Request	Streaming response
+Validation Error	Inline error message
+
+Feedback should appear immediately after the action.
+
+17.22 Keyboard-First Experience
+
+Finch is optimized for power users.
+
+Key shortcuts include:
+
+Shortcut	Action
+Ctrl + K	Command Palette
+Ctrl + Shift + A	Open AI Assistant
+Ctrl + N	Create New Item
+Ctrl + F	Search Current Module
+Ctrl + S	Save
+Ctrl + P	Print
+Ctrl + E	Export
+Ctrl + ,	Settings
+Esc	Close Dialog
+
+Every major workflow should be completable without using a mouse.
+
+17.23 Accessibility Interaction Patterns
+
+Interaction guidelines include:
+
+Logical tab order
+Visible keyboard focus
+Screen reader announcements
+Motion reduction support
+Color-independent status indicators
+Descriptive error messages
+Accessible drag-and-drop alternatives
+
+Accessibility behavior should remain consistent across all modules.
+
+17.24 Motion & Transition Guidelines
+
+Motion should communicate changes in state.
+
+Interaction	Duration
+Hover	120 ms
+Button Press	100 ms
+Drawer	220 ms
+Modal	220 ms
+Page Transition	250 ms
+Toast	180 ms
+AI Panel	250 ms
+
+Motion should never block user input.
+
+17.25 User Journey Examples
+Daily Business Review
+Launch Finch
+      │
+      ▼
+Dashboard
+      │
+      ▼
+Review KPIs
+      │
+      ▼
+Read AI Summary
+      │
+      ▼
+Open Reports
+      │
+      ▼
+Export Report
+Create a New Sale
+Orders
+     │
+     ▼
+New Order
+     │
+     ▼
+Select Customer
+     │
+     ▼
+Add Products
+     │
+     ▼
+Save
+     │
+     ▼
+Generate Invoice
+Restock Inventory
+Inventory
+      │
+      ▼
+Low Stock Alert
+      │
+      ▼
+Adjust Stock
+      │
+      ▼
+Save
+      │
+      ▼
+Inventory Updated
+Ask AI for Business Advice
+Open AI
+      │
+      ▼
+Ask Question
+      │
+      ▼
+Receive Insights
+      │
+      ▼
+Take Suggested Action
+17.26 Developer Implementation Guidelines
+
+Interaction patterns should:
+
+Use reusable React hooks for navigation, notifications, dialogs, and synchronization.
+Be fully typed with TypeScript.
+Use shared design tokens and animation utilities.
+Preserve navigation state between pages.
+Support keyboard shortcuts consistently.
+Handle offline and online transitions gracefully.
+Avoid duplicate interaction logic across modules.
+17.27 Acceptance Criteria
+
+This chapter is complete when:
+
+All primary user journeys are clearly defined.
+Navigation is fast and predictable.
+AI interactions feel contextual and seamless.
+Offline workflows prevent data loss.
+Microinteractions provide immediate and meaningful feedback.
+Keyboard-first workflows are fully supported.
+Motion and accessibility guidelines are consistently applied.
+Error recovery and confirmations follow a unified interaction model.
+Chapter Summary
+
+The User Flows, Microinteractions & Interaction Patterns chapter defines how users experience Finch beyond individual screens. By combining efficient workflows, contextual AI, responsive feedback, subtle animations, and accessibility-first interactions, Finch delivers a polished desktop experience that feels intuitive, reliable, and professional. These patterns ensure users can focus on running their business while the software remains predictable, fast, and supportive.

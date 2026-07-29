@@ -1,0 +1,618 @@
+Finch Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 5 — Electron Desktop Architecture
+5.1 Purpose
+
+This chapter defines the Electron architecture for Finch, including process responsibilities, Inter-Process Communication (IPC), security model, native operating system integration, lifecycle management, auto-updates, and desktop-specific functionality.
+
+Electron serves as the desktop runtime that enables Finch to provide a modern, high-performance Windows desktop experience while leveraging web technologies.
+
+5.2 Design Goals
+
+The Electron architecture is designed to achieve:
+
+Native desktop experience
+Maximum security
+High performance
+Low memory consumption
+Offline-first functionality
+Secure communication
+Easy maintenance
+Future cross-platform compatibility
+5.3 Electron Architecture Overview
+
+Electron consists of three isolated processes.
+
+                 Electron Application
+
+                 ┌─────────────────┐
+                 │  Main Process   │
+                 └────────┬────────┘
+                          │
+                     Secure IPC
+                          │
+          ┌───────────────┴───────────────┐
+          │                               │
+          ▼                               ▼
+  Preload Script                 Renderer Process
+ (Secure Bridge)                React + TypeScript
+                                         │
+                                  Finch UI Modules
+
+Each process has a clearly defined responsibility and must not perform tasks assigned to another process.
+
+5.4 Main Process
+
+The Main Process is responsible for managing the desktop application and interacting with the operating system.
+
+Responsibilities include:
+
+Application startup
+Window creation
+Window lifecycle
+Native dialogs
+File system operations
+Printing
+Auto updates
+Backup creation
+License validation
+Secure IPC handlers
+Logging
+Crash recovery
+
+The Main Process must not contain any UI code.
+
+5.5 Renderer Process
+
+The Renderer Process hosts the React application.
+
+Responsibilities include:
+
+UI rendering
+User interactions
+Navigation
+Forms
+Dashboard
+AI interface
+Data visualization
+State management
+Notifications
+
+The Renderer Process must never access Node.js APIs directly.
+
+5.6 Preload Process
+
+The Preload Process provides a secure bridge between the Renderer and Main processes.
+
+Responsibilities:
+
+Expose approved APIs
+Validate IPC requests
+Restrict operating system access
+Prevent arbitrary code execution
+
+Example:
+
+window.finch.files.exportPDF()
+
+window.finch.backup.create()
+
+window.finch.updater.check()
+
+window.finch.license.activate()
+
+Only explicitly approved APIs may be exposed.
+
+5.7 Window Architecture
+
+Version 1.0 uses a single-window interface.
+
+Main Window
+
+├── Sidebar
+├── Top Navigation
+├── Main Content
+├── Notification Drawer
+└── Status Bar
+
+Additional modal windows include:
+
+Login
+Settings
+Backup
+Print Preview
+License Activation
+File Picker
+5.8 Window Configuration
+
+Default configuration:
+
+Property	Value
+Width	1440 px
+Height	900 px
+Minimum Width	1200 px
+Minimum Height	700 px
+Resizable	Yes
+Maximizable	Yes
+Fullscreen	Optional
+Frameless	No (v1.0)
+Transparent	No
+
+The application should remember the user's preferred window size and position.
+
+5.9 Window Lifecycle
+Application Launch
+
+↓
+
+Create Main Window
+
+↓
+
+Initialize Preload
+
+↓
+
+Load React App
+
+↓
+
+Authenticate User
+
+↓
+
+Display Dashboard
+
+↓
+
+Application Running
+
+↓
+
+Window Close
+
+↓
+
+Save State
+
+↓
+
+Exit
+5.10 Electron Security
+
+Security settings:
+
+contextIsolation: true
+
+nodeIntegration: false
+
+sandbox: true
+
+enableRemoteModule: false
+
+webSecurity: true
+
+These settings are mandatory for all production builds.
+
+5.11 Content Security Policy (CSP)
+
+A strict Content Security Policy must be enforced.
+
+Allowed sources:
+
+Local application assets
+Supabase
+OpenAI endpoints (through Edge Functions)
+GitHub Releases (updates)
+
+Inline scripts and remote code execution are prohibited.
+
+5.12 Inter-Process Communication (IPC)
+
+IPC enables secure communication between Renderer and Main processes.
+
+Flow:
+
+Renderer
+
+↓
+
+IPC Invoke
+
+↓
+
+Main Process
+
+↓
+
+Native API
+
+↓
+
+Result
+
+↓
+
+Renderer
+
+Every IPC request must:
+
+Validate input
+Validate permissions
+Handle exceptions
+Return typed responses
+5.13 Approved IPC Channels
+
+Examples:
+
+app:get-version
+
+app:get-platform
+
+backup:create
+
+backup:restore
+
+files:open
+
+files:save
+
+files:export
+
+license:activate
+
+updater:check
+
+window:minimize
+
+window:maximize
+
+window:close
+
+printer:print
+
+No dynamic IPC channel creation is permitted.
+
+5.14 Native File System Access
+
+All file system operations occur in the Main Process.
+
+Supported operations:
+
+Open file
+Save file
+Export PDF
+Export Excel
+Create backup
+Restore backup
+Select folder
+
+The Renderer Process requests these operations through IPC.
+
+5.15 Printing & PDF Generation
+
+Printing supports:
+
+Invoices
+Reports
+Inventory lists
+Customer summaries
+
+Flow:
+
+React View
+
+↓
+
+Generate HTML
+
+↓
+
+Electron Print API
+
+↓
+
+Printer
+
+OR
+
+Save PDF
+
+PDF generation should preserve layout consistency across systems.
+
+5.16 File Dialogs
+
+Native dialogs are used for:
+
+Import CSV
+Import Excel
+Export reports
+Backup selection
+Restore selection
+Company logo upload
+
+All dialogs should use the operating system's native interface.
+
+5.17 Auto Updates
+
+Electron Updater handles application updates.
+
+Source:
+
+GitHub Releases (v1.0)
+
+Update flow:
+
+Launch
+
+↓
+
+Check for Updates
+
+↓
+
+Update Available?
+
+↓
+
+Download
+
+↓
+
+Verify Signature
+
+↓
+
+Prompt User
+
+↓
+
+Restart
+
+↓
+
+Install
+
+Critical security updates may require mandatory installation.
+
+5.18 Crash Recovery
+
+Unexpected application termination should trigger:
+
+Error logging
+Crash report generation
+Safe restart
+Recovery of unsaved local state where possible
+
+Users should receive a clear message explaining that the application encountered an issue and has recovered.
+
+5.19 Offline Operation
+
+Electron must continue operating without internet access.
+
+Offline functionality includes:
+
+Orders
+Inventory
+Customers
+Reports
+Local search
+Settings
+Printing
+Backups
+
+Unavailable while offline:
+
+AI Assistant
+Cloud synchronization
+License activation
+Password recovery
+5.20 Background Processes
+
+Background services include:
+
+Sync monitoring
+Update checking
+Notification scheduling
+Backup operations
+Log rotation
+
+These tasks should avoid blocking the UI thread.
+
+5.21 Application Lifecycle Events
+
+Supported lifecycle events:
+
+ready
+
+activate
+
+before-quit
+
+will-quit
+
+window-all-closed
+
+second-instance
+
+Each event should have dedicated handlers where required.
+
+5.22 Single Instance Lock
+
+Finch should allow only one running instance.
+
+Flow:
+
+Launch
+
+↓
+
+Instance Exists?
+
+↓
+
+Yes
+
+↓
+
+Focus Existing Window
+
+↓
+
+Exit New Instance
+
+↓
+
+No
+
+↓
+
+Launch Normally
+5.23 Deep Linking (Future)
+
+Reserved for future functionality.
+
+Examples:
+
+finch://orders/123
+
+finch://customers/52
+
+finch://reports/monthly
+5.24 Native Notifications
+
+Windows notifications should support:
+
+Low stock alerts
+Daily sales summary
+Update availability
+Backup completion
+Synchronization status
+
+Notifications should be actionable where appropriate.
+
+5.25 Native Menus
+
+Version 1.0 includes:
+
+File
+
+Edit
+
+View
+
+Window
+
+Help
+
+Menus should support standard Windows keyboard shortcuts.
+
+5.26 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + N	New Order
+Ctrl + S	Save
+Ctrl + P	Print
+Ctrl + F	Search
+Ctrl + B	Backup
+Ctrl + R	Refresh Dashboard
+Ctrl + ,	Open Settings
+Ctrl + Shift + A	Open AI Assistant
+F11	Toggle Fullscreen
+5.27 Logging
+
+The Main Process uses Pino for structured logging.
+
+Log categories:
+
+Application
+IPC
+Updates
+Printing
+Backups
+Licensing
+Synchronization
+Errors
+
+Sensitive information must never be logged.
+
+5.28 Performance Requirements
+Operation	Target
+Cold Launch	< 3 seconds
+Warm Launch	< 2 seconds
+Window Creation	< 500 ms
+IPC Response	< 50 ms
+File Export	< 3 seconds
+Backup Creation	< 10 seconds
+Update Check	< 2 seconds
+5.29 Error Handling
+
+All Electron operations should return standardized responses.
+
+Example:
+
+{
+  success: true,
+  data: {},
+  error: null
+}
+
+Failure example:
+
+{
+  success: false,
+  error: {
+    code: "FILE_EXPORT_FAILED",
+    message: "Unable to export report."
+  }
+}
+
+The Renderer should display user-friendly messages while detailed diagnostics remain in logs.
+
+5.30 Packaging
+
+Electron Builder produces the Windows installer.
+
+Output formats:
+
+NSIS Installer (.exe)
+Portable executable (optional)
+
+The installer should:
+
+Create desktop shortcuts
+Create Start Menu entries
+Register uninstall information
+Preserve user data during upgrades
+5.31 Code Signing
+
+All production releases must be digitally signed.
+
+Benefits:
+
+Improved user trust
+Reduced SmartScreen warnings
+Verified software integrity
+
+Unsigned builds are permitted only for development and testing.
+
+5.32 Acceptance Criteria
+
+The Electron implementation is considered complete when:
+
+The application launches successfully on supported Windows versions.
+IPC communication is secure and validated.
+Native file operations function correctly.
+Printing and PDF export are reliable.
+Auto-updates work through GitHub Releases.
+Single-instance enforcement is operational.
+Offline functionality remains fully usable.
+Security settings comply with Electron best practices.
+Chapter Summary
+
+This chapter defines Finch's Electron desktop architecture, covering process separation, secure IPC, native Windows integration, file handling, printing, updates, lifecycle management, and desktop security. By enforcing strict process boundaries and leveraging Electron's native capabilities, Finch delivers a secure, responsive, and maintainable desktop application while preserving its offline-first philosophy.

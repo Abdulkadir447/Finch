@@ -1,0 +1,576 @@
+Finch UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 12 — Customers Module Screen Specification
+12.1 Purpose
+
+The Customers module is the Customer Relationship Management (CRM) center of Finch. It allows business owners to manage customer information, monitor purchase behavior, maintain communication records, and gain AI-powered insights into customer value and retention.
+
+The module is designed to transform customer data into meaningful business intelligence while keeping daily customer management simple and efficient.
+
+Its guiding principles are:
+
+Organization — Keep all customer information in one place.
+Relationships — Understand customer history and engagement.
+Insights — Use AI to identify trends and opportunities.
+Efficiency — Complete common customer tasks with minimal clicks.
+12.2 Objectives
+
+The Customers module enables users to:
+
+Add new customers
+Edit customer profiles
+Delete customers
+Search and filter customer records
+View purchase history
+Record customer notes
+Track spending and activity
+Import and export customer data
+Receive AI-generated customer insights
+Operate offline with automatic cloud synchronization
+12.3 Screen Layout
+
+The Customers module uses a split-view layout optimized for browsing and reviewing customer information.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Customers Header                                                            │
+├───────────────────────┬─────────────────────────────────────────────────────┤
+│                       │                                                     │
+│ Customer List         │ Customer Profile                                   │
+│                       │                                                     │
+│ Search                │ Personal Details                                   │
+│ Filters               │ Purchase History                                   │
+│                       │ Notes                                               │
+│                       │ AI Insights                                         │
+│                       │ Activity Timeline                                  │
+│                       │                                                     │
+└───────────────────────┴─────────────────────────────────────────────────────┘
+
+The customer list remains visible while viewing individual customer details.
+
+12.4 Page Header
+
+The page header includes:
+
+Left
+
+Customers title
+Total customer count
+
+Center
+
+Global customer search
+
+Right
+
+Add Customer
+Import
+Export
+AI Assistant
+
+Example:
+
+Customers
+
+1,245 Customers
+
+[ Search Customers ]
+
+Import
+
+Export
+
++ Add Customer
+
+🤖
+12.5 Customer Dashboard
+
+Above the customer list, Finch displays four KPI cards.
+
+┌────────────┬────────────┬────────────┬────────────┐
+│ Customers  │ New        │ Returning  │ Lifetime   │
+│            │ Customers  │ Customers  │ Value      │
+└────────────┴────────────┴────────────┴────────────┘
+
+Each KPI card includes:
+
+Icon
+Current value
+Percentage change
+Mini trend graph
+12.6 Customer List
+
+Each customer row displays:
+
+Field	Description
+Avatar	Profile picture or initials
+Name	Customer name
+Email	Primary email
+Phone	Contact number
+Last Purchase	Date
+Total Orders	Number of completed orders
+Lifetime Value	Total spending
+Status	Active / Inactive
+
+Rows support sorting and multi-selection.
+
+12.7 Customer Profile Panel
+
+Selecting a customer opens the profile panel.
+
+Sections include:
+
+Personal Information
+Contact Details
+Purchase History
+Outstanding Balance (if applicable)
+Notes
+Timeline
+AI Insights
+
+The profile updates instantly when another customer is selected.
+
+12.8 Personal Information
+
+Displays:
+
+Avatar
+Full Name
+Email
+Phone Number
+Address
+Company (optional)
+Registration Date
+
+Quick actions:
+
+Edit Customer
+Copy Contact
+Email Customer (Gmail Integration)
+12.9 Purchase History
+
+Displays all customer purchases.
+
+Each entry includes:
+
+Order Number
+Purchase Date
+Total Amount
+Payment Status
+Order Status
+
+Example:
+
+#1045
+
+July 5, 2026
+
+₦45,000
+
+Paid
+
+Completed
+
+Clicking an order opens it in the Orders module.
+
+12.10 Customer Spending Summary
+
+Displays:
+
+Total Spending
+Average Order Value
+Number of Orders
+Last Purchase
+First Purchase
+Most Purchased Category
+
+Charts visualize spending trends over time.
+
+12.11 Customer Notes
+
+Users can add unlimited notes.
+
+Example:
+
+Customer prefers WhatsApp communication.
+
+Interested in premium products.
+
+Requested invoice copies by email.
+
+Each note records:
+
+Author
+Date
+Time
+
+Notes are searchable.
+
+12.12 Activity Timeline
+
+Shows customer-related events chronologically.
+
+Example:
+
+Customer Created
+
+↓
+
+First Purchase
+
+↓
+
+Invoice Sent
+
+↓
+
+Payment Received
+
+↓
+
+Latest Purchase
+
+Timeline entries cannot be edited.
+
+12.13 AI Customer Insights
+
+AI analyzes customer behavior.
+
+Example recommendations:
+
+High-value customer—consider loyalty rewards.
+Customer has not purchased in 60 days.
+Buying frequency has increased by 25%.
+Recommend Product X based on purchase history.
+Customer is likely to make another purchase within two weeks.
+
+Users can ask questions such as:
+
+Which customers spend the most?
+Which customers haven't returned recently?
+Who is likely to purchase next month?
+12.14 Add Customer Flow
+Customers
+
+↓
+
+Add Customer
+
+↓
+
+Enter Details
+
+↓
+
+Save
+
+↓
+
+Customer Created
+
+↓
+
+Dashboard Updates
+
+Required fields:
+
+Full Name
+
+Optional fields:
+
+Email
+Phone
+Address
+Company
+Notes
+Profile Photo
+
+The process should take less than one minute.
+
+12.15 Edit Customer
+
+Users can update:
+
+Contact information
+Address
+Notes
+Company
+Avatar
+
+Changes synchronize immediately across Finch.
+
+12.16 Search Experience
+
+Search supports:
+
+Name
+Email
+Phone
+Company
+Notes
+
+Results update in real time.
+
+Target response time:
+
+Under 150 milliseconds
+
+12.17 Filtering
+
+Supported filters:
+
+Status
+
+Active
+Inactive
+
+Purchase Activity
+
+Purchased Today
+Purchased This Week
+Purchased This Month
+
+Lifetime Value
+
+Registration Date
+
+Company
+
+Multiple filters may be applied simultaneously.
+
+12.18 Customer Segmentation
+
+Version 1.0 automatically groups customers into:
+
+New Customers
+Returning Customers
+High-Value Customers
+Inactive Customers
+
+Future versions may allow custom segments.
+
+12.19 Bulk Actions
+
+Multiple customers can be selected.
+
+Available actions:
+
+Export
+Delete
+Add Note
+Send Email (Gmail)
+Assign Tag (future)
+
+Destructive actions require confirmation.
+
+12.20 Import Customers
+
+Supported formats:
+
+CSV
+Excel
+
+Workflow:
+
+Select File
+
+↓
+
+Preview
+
+↓
+
+Map Columns
+
+↓
+
+Import
+
+↓
+
+Summary
+
+Duplicate detection should occur before importing.
+
+12.21 Export Customers
+
+Supported formats:
+
+CSV
+Excel
+PDF
+
+Export options:
+
+Entire customer database
+Filtered customers
+Selected customers
+12.22 Notifications
+
+Customer notifications include:
+
+New customer added
+Customer updated
+Import completed
+Export completed
+AI recommendation available
+
+Notifications link directly to the relevant customer profile.
+
+12.23 Empty State
+
+When no customers exist:
+
+Display:
+
+Illustration
+Welcome message
+Add Customer button
+AI suggestion
+
+Example:
+
+No customers yet.
+
+Add your first customer or import an existing customer list from Excel or CSV.
+
+12.24 Loading State
+
+Loading sequence:
+
+KPI cards
+Customer list
+Profile panel
+Purchase history
+AI insights
+
+Skeleton placeholders preserve layout stability.
+
+12.25 Error State
+
+Example:
+
+Unable to load customers.
+
+[Retry]
+
+Continue Offline
+
+Previously cached customer data remains accessible whenever possible.
+
+12.26 Offline Behavior
+
+Available offline:
+
+Add customers
+Edit customers
+Delete customers
+Search
+Filter
+View purchase history
+Export customer data
+
+Unavailable:
+
+AI Assistant
+Gmail integration
+Cloud synchronization
+
+All offline changes are queued and synchronized automatically when internet connectivity is restored.
+
+12.27 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + N	Add Customer
+Ctrl + F	Search Customers
+Ctrl + S	Save Customer
+Ctrl + E	Export Customers
+Ctrl + I	Import Customers
+Ctrl + Shift + A	Ask AI
+Delete	Delete Selected Customer
+Esc	Close Drawer
+12.28 Animations
+
+Animations include:
+
+Customer selection highlight
+Profile drawer slide
+KPI hover effects
+Timeline fade-in
+AI insights reveal
+Success notifications
+
+Animation duration:
+
+180–220 milliseconds
+
+Animations should enhance feedback while maintaining responsiveness.
+
+12.29 Accessibility
+
+The Customers module supports:
+
+Keyboard-only navigation
+Screen readers
+High-contrast mode
+Zoom up to 200%
+Visible focus indicators
+Accessible tables and forms
+
+Customer status should never rely on color alone.
+
+12.30 Performance Targets
+Metric	Target
+Customers Page Load	<2 seconds
+Search Results	<150 ms
+Save Customer	<500 ms
+Profile Switch	<100 ms
+Timeline Load	<300 ms
+Table Scroll	60 FPS
+12.31 Developer Component Structure
+CustomersPage
+├── CustomersHeader
+├── CustomerKPIs
+├── SearchBar
+├── FilterBar
+├── CustomerTable
+│   ├── CustomerRow
+│   └── ContextMenu
+├── CustomerProfilePanel
+│   ├── PersonalInfoCard
+│   ├── PurchaseHistoryCard
+│   ├── SpendingSummaryCard
+│   ├── NotesCard
+│   ├── TimelineCard
+│   └── AIInsightsCard
+├── AddCustomerDialog
+├── ImportWizard
+├── ExportDialog
+└── FloatingAI
+
+Each component should:
+
+Be independently testable.
+Support loading, empty, and error states.
+Follow Finch design tokens.
+Support both Light and Dark themes.
+Synchronize between SQLite (local) and Supabase (cloud).
+12.32 Acceptance Criteria
+
+The Customers module is complete when:
+
+Users can create, edit, and manage customer records efficiently.
+Customer profiles display complete purchase history and activity.
+AI provides meaningful customer insights and recommendations.
+Search, filtering, and segmentation perform reliably.
+Import and export workflows support CSV, Excel, and PDF.
+Offline operation and synchronization function correctly.
+Accessibility and performance targets are met.
+All components integrate seamlessly with Orders, Reports, AI Assistant, and the Dashboard.
+Chapter Summary
+
+The Customers module serves as Finch's CRM, giving business owners a complete view of every customer relationship. Through a split-view interface, purchase history, AI-powered insights, and offline-first capabilities, users can manage customer information efficiently while making informed decisions to improve retention, increase customer lifetime value, and strengthen business relationships.

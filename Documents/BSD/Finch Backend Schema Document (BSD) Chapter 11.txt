@@ -1,0 +1,432 @@
+Finch Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 11 — Payment Management Schema
+11.1 Purpose
+
+The Payment Management module is responsible for recording, processing, tracking, and reconciling all financial transactions within Finch. It supports multiple payment methods, partial payments, refunds, payment history, AI-assisted financial insights, and offline payment recording while maintaining complete auditability.
+
+Every payment belongs to exactly one business and is linked to one or more orders.
+
+11.2 Objectives
+
+The Payment Management module must:
+
+Record all payments.
+Support multiple payment methods.
+Support partial payments.
+Support multiple payments for one order.
+Process refunds.
+Track payment history.
+Generate payment receipts.
+Support offline payment recording.
+Synchronize efficiently.
+Integrate with AI analytics and reporting.
+11.3 Architecture
+Customer
+     │
+     ▼
+Order
+     │
+     ▼
+Payment
+     │
+ ┌───┼────────┬─────────┐
+ ▼   ▼        ▼         ▼
+Receipt Refund Reports AI
+
+Payments are the financial link between Orders and Reports.
+
+11.4 Core Tables
+Table	Purpose
+payments	Main payment records
+payment_methods	Available payment methods
+payment_transactions	Individual transaction records
+payment_refunds	Refund information
+payment_receipts	Receipt metadata
+payment_history	Payment activity timeline
+payment_reconciliation	Reconciliation records
+11.5 Payments Table
+Table: payments
+Column	Type
+id	UUID
+business_id	UUID
+order_id	UUID
+customer_id	UUID
+payment_number	TEXT
+payment_method_id	UUID
+payment_status	TEXT
+amount	NUMERIC
+currency	TEXT
+payment_date	TIMESTAMPTZ
+received_by	UUID
+notes	TEXT
+created_at	TIMESTAMPTZ
+updated_at	TIMESTAMPTZ
+deleted_at	TIMESTAMPTZ
+version	INTEGER
+
+Each payment receives a unique payment number.
+
+Example:
+
+PAY-2026-000031
+11.6 Payment Methods
+
+Version 1 supports:
+
+Method	Supported
+Cash	✔
+Bank Transfer	✔
+
+Future methods:
+
+POS Terminal
+Credit Card
+Debit Card
+Mobile Money
+PayPal
+Flutterwave
+Stripe
+
+New methods can be added without changing the schema.
+
+11.7 Payment Methods Table
+Table: payment_methods
+Column	Type
+id	UUID
+business_id	UUID (NULL for system methods)
+method_name	TEXT
+description	TEXT
+active	BOOLEAN
+created_at	TIMESTAMPTZ
+
+Businesses may enable or disable supported payment methods.
+
+11.8 Payment Status
+
+Payment lifecycle:
+
+Pending
+
+↓
+
+Partially Paid
+
+↓
+
+Paid
+
+Alternative paths:
+
+Pending
+
+↓
+
+Cancelled
+
+or
+
+Paid
+
+↓
+
+Refunded
+
+Every status change is stored permanently.
+
+11.9 Partial Payments
+
+A single order may have multiple payments.
+
+Example:
+
+Order Total
+
+₦100,000
+
+↓
+
+₦40,000
+
+↓
+
+₦30,000
+
+↓
+
+₦30,000
+
+↓
+
+Paid
+
+The order automatically updates its payment status based on the total received.
+
+11.10 Payment Transactions
+Table: payment_transactions
+
+Stores every financial transaction.
+
+Column	Type
+id	UUID
+payment_id	UUID
+transaction_reference	TEXT
+amount	NUMERIC
+transaction_type	TEXT
+transaction_date	TIMESTAMPTZ
+status	TEXT
+
+Transaction types:
+
+Payment
+Refund
+Adjustment
+11.11 Bank Transfers
+
+For bank transfers, Finch stores:
+
+Reference Number
+Bank Name
+Account Name
+Transfer Date
+Verification Status
+
+This information supports reconciliation and auditing.
+
+11.12 Refund Processing
+
+Refunds are stored separately.
+
+Table: payment_refunds
+
+Stores:
+
+Original Payment
+Refund Amount
+Refund Reason
+Approved By
+Refund Date
+Notes
+
+Refunds update the associated payment and order status automatically.
+
+11.13 Payment Receipts
+Table: payment_receipts
+
+Stores receipt metadata.
+
+Fields include:
+
+Receipt Number
+Payment ID
+Generated Date
+PDF URL
+Email Status
+
+Receipt files are stored in Supabase Storage.
+
+11.14 Receipt Generation
+
+Workflow:
+
+Payment Completed
+
+↓
+
+Generate Receipt
+
+↓
+
+Ask User to Save
+
+↓
+
+Ask User if They Want It Emailed
+
+↓
+
+Store Receipt
+
+This follows the workflow you specified during the application flow design.
+
+11.15 Payment History
+Table: payment_history
+
+Every payment event is recorded.
+
+Example timeline:
+
+Payment Created
+
+↓
+
+Verified
+
+↓
+
+Receipt Generated
+
+↓
+
+Refund Issued
+
+Each event records:
+
+User
+Timestamp
+Previous Status
+New Status
+11.16 Payment Reconciliation
+Table: payment_reconciliation
+
+Stores reconciliation results.
+
+Fields:
+
+Business
+Payment
+Reconciliation Date
+Status
+Difference Amount
+Notes
+
+This table supports future accounting integrations.
+
+11.17 AI Financial Insights
+
+The AI Assistant can:
+
+Detect unusual payment patterns.
+Identify overdue balances.
+Summarize daily revenue.
+Forecast cash flow.
+Detect duplicate payments.
+Recommend follow-up actions for unpaid orders.
+Generate payment summaries.
+
+AI insights are based on payment and order history.
+
+11.18 Relationships
+payments
+     │
+     ├── payment_methods
+     ├── payment_transactions
+     ├── payment_refunds
+     ├── payment_receipts
+     ├── payment_history
+     └── payment_reconciliation
+
+Payments also relate directly to:
+
+Orders
+Customers
+Reports
+Notifications
+AI Analytics
+11.19 Synchronization
+
+Payment synchronization includes:
+
+New payments
+Payment updates
+Refunds
+Receipt generation
+Transaction history
+Reconciliation records
+
+Only modified records are synchronized to keep the synchronization payload compact.
+
+11.20 Security
+
+Payment information is protected using:
+
+Authentication
+Business ownership
+Role permissions
+Row Level Security (RLS)
+
+Only authorized users may record, modify, or refund payments.
+
+Sensitive financial information is encrypted where appropriate.
+
+11.21 Performance
+
+Indexes should exist on:
+
+business_id
+order_id
+customer_id
+payment_number
+payment_method_id
+payment_status
+payment_date
+transaction_reference
+
+These indexes support fast payment lookup, reconciliation, reporting, and dashboard summaries.
+
+11.22 Audit Logging
+
+The following payment events are recorded:
+
+Payment created
+Payment updated
+Payment received
+Partial payment recorded
+Payment cancelled
+Refund processed
+Receipt generated
+Receipt emailed
+Bank transfer verified
+AI financial recommendation accepted
+
+Each audit record includes the acting user, timestamp, affected business, and related payment.
+
+11.23 Offline Behavior
+
+The Payment module supports offline operation.
+
+Users can:
+
+Record cash payments.
+Record bank transfers.
+Generate receipts.
+View payment history.
+Process eligible refunds (subject to business rules).
+
+Offline payments are stored in SQLite and synchronized automatically when connectivity is restored. Any conflicts are resolved using the application's conflict resolution workflow.
+
+11.24 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all payment-related tables.
+Allow multiple payments per order to support partial payments.
+Keep transactions, refunds, receipts, and reconciliation records in separate normalized tables.
+Generate payment numbers automatically using the configured numbering settings.
+Store receipt PDFs in Supabase Storage and reference them by URL.
+Ensure payment status updates automatically based on transaction totals.
+Protect all payment data with Row Level Security (RLS).
+Record every financial event in the audit log.
+11.25 Acceptance Criteria
+
+The Payment Management Schema is complete when:
+
+Payments support cash and bank transfer.
+Multiple payments can be applied to a single order.
+Partial payment status is calculated correctly.
+Refunds update payment and order records automatically.
+Receipts are generated and stored successfully.
+Users are prompted to save and optionally email receipts.
+Payment reconciliation records can be created.
+AI generates payment insights.
+Offline payment recording synchronizes correctly.
+All payment data is secured by RLS and fully audited.
+11.26 Chapter Summary
+
+The Payment Management Schema provides the financial backbone of Finch's sales system. It supports secure payment recording, partial payments, bank transfers, refunds, receipt generation, reconciliation, and AI-powered financial insights while maintaining complete auditability and offline-first functionality. Its normalized design, flexible payment model, and integration with Orders, Reports, Customers, and AI ensure that Finch is ready to support both small businesses today and more advanced financial workflows in future enterprise releases.

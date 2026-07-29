@@ -1,0 +1,46 @@
+{
+  "app": {
+    "name": "Finch",
+    "tagline": "Your Business, Smarter.",
+    "environment": "testing",
+    "version": "1.0.0",
+    "debug": true
+  },
+  "api": {
+    "baseUrl": "http://localhost:8000",
+    "timeoutMs": 10000
+  },
+  "database": {
+    "driver": "sqlite+aiosqlite",
+    "host": "localhost",
+    "port": 0,
+    "name": "finch_test.db"
+  },
+  "sync": {
+    "enabled": false,
+    "mode": "disabled",
+    "intervalSeconds": 0
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "assistEnabled": false
+  },
+  "features": {
+    "dashboard": true,
+    "orders": true,
+    "inventory": true,
+    "customers": true,
+    "aiAssistant": false,
+    "reports": true,
+    "cloudSync": false
+  },
+  "ui": {
+    "defaultTheme": "light",
+    "sidebarCollapsed": false,
+    "commandPaletteShortcut": "Ctrl+K"
+  },
+  "logging": {
+    "level": "warning"
+  }
+}

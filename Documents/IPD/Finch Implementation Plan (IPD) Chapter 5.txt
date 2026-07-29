@@ -1,0 +1,400 @@
+Finch Implementation Plan (IPD)
+
+Document: Implementation Plan Document (IPD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 5 — Authentication & Business Setup
+5.1 Purpose
+
+This chapter defines the complete implementation of Finch's authentication system and first-time business setup. It covers user registration, login, business creation, company profile configuration, session management, onboarding, and security validation.
+
+The objective is to provide a secure, intuitive, and efficient onboarding experience that allows users to begin managing their business with minimal friction.
+
+5.2 Objectives
+
+The Authentication & Business Setup module must:
+
+Support secure user registration.
+Authenticate users using JWT.
+Restore previous sessions.
+Guide new users through business setup.
+Support multiple businesses per user.
+Verify user identity.
+Assign business ownership.
+Initialize default data.
+Launch interactive onboarding.
+Prepare the dashboard for immediate use.
+5.3 Development Order
+
+This module must be implemented in the following sequence:
+
+Authentication Backend
+
+↓
+
+Registration UI
+
+↓
+
+Login UI
+
+↓
+
+Business Setup Wizard
+
+↓
+
+Session Manager
+
+↓
+
+Business Switcher
+
+↓
+
+Interactive Onboarding
+
+↓
+
+Testing
+
+↓
+
+AI Review
+
+↓
+
+Documentation
+
+↓
+
+Merge
+
+Each step must be completed before starting the next.
+
+5.4 Feature 1 — User Registration
+Objective
+
+Allow users to create a secure Finch account.
+
+Tasks
+Create registration form.
+Validate all required fields.
+Hash passwords using Argon2id (or bcrypt fallback).
+Store user record.
+Send email verification request (future-ready if email service is unavailable during initial development).
+Create default user preferences.
+Initialize audit log.
+Required Fields
+First Name
+Last Name
+Email Address
+Password
+Confirm Password
+Validation Rules
+Email must be unique.
+Password must meet security policy.
+Password confirmation must match.
+Required fields cannot be empty.
+5.5 Feature 2 — Login
+Objective
+
+Authenticate existing users securely.
+
+Tasks
+Create login screen.
+Validate credentials.
+Generate JWT session.
+Register device.
+Restore previous session if valid.
+Log successful and failed attempts.
+Redirect authenticated users appropriately.
+UI Components
+Email input
+Password input
+Show/Hide password
+Remember me
+Forgot password
+Sign In button
+Create Account button
+5.6 Feature 3 — First-Time Business Setup
+
+Following your app flow decisions, immediately after the first successful login, users are guided into the Business Setup Wizard.
+
+Workflow:
+
+Successful Login
+
+↓
+
+Business Setup Wizard
+
+↓
+
+Create Company
+
+↓
+
+Initialize Database
+
+↓
+
+Create Default Categories
+
+↓
+
+Create Default Settings
+
+↓
+
+Launch Dashboard
+
+Skipping this process is not allowed during the initial setup.
+
+5.7 Business Setup Wizard
+
+The wizard collects:
+
+Company Name
+Company Email
+Phone Number
+Business Address
+Business Type
+Currency
+Time Zone
+Tax ID (optional but recommended)
+Company Logo (optional)
+
+The wizard includes progress indicators and allows users to navigate between steps before final confirmation.
+
+5.8 Default Data Initialization
+
+Once the business is created, Finch automatically generates:
+
+Default product categories.
+Default invoice numbering.
+Default receipt numbering.
+Default payment methods.
+Default user role (Owner).
+Dashboard widgets.
+Notification preferences.
+Report templates.
+AI workspace.
+
+This allows the business to be immediately usable.
+
+5.9 Session Management
+
+The Session Manager handles:
+
+JWT generation.
+Refresh tokens.
+Secure session storage.
+Automatic restoration.
+Device registration.
+Session expiration.
+Logout.
+
+Session restoration follows your earlier requirement:
+
+Restore automatically after reopening the app.
+Generate a new secure session token after a complete system restart.
+5.10 Business Switching
+
+Users who own multiple businesses can switch between them.
+
+Workflow:
+
+Business Switch Requested
+
+↓
+
+Save Current State
+
+↓
+
+Load New Business Context
+
+↓
+
+Refresh Permissions
+
+↓
+
+Reload Dashboard
+
+↓
+
+Continue Working
+
+No additional login is required.
+
+5.11 Interactive Onboarding
+
+After business setup, the onboarding experience begins.
+
+Steps include:
+
+Welcome to Finch.
+Dashboard overview.
+Add first product.
+Add first customer.
+Create first order.
+Generate first report.
+Meet the AI Assistant.
+Learn keyboard shortcuts.
+Finish onboarding.
+
+Users may skip onboarding and revisit it later from Settings.
+
+5.12 Password Recovery
+
+Password recovery workflow:
+
+Forgot Password
+
+↓
+
+Enter Email
+
+↓
+
+Verify Identity
+
+↓
+
+Receive Reset Link
+
+↓
+
+Choose New Password
+
+↓
+
+Sign In
+
+Future enhancements may include passkeys and multi-factor authentication.
+
+5.13 Email Verification
+
+When enabled, email verification works as follows:
+
+Register
+
+↓
+
+Verification Email Sent
+
+↓
+
+User Confirms Email
+
+↓
+
+Account Activated
+
+Accounts awaiting verification have limited functionality until confirmed.
+
+5.14 Security Implementation
+
+Security measures include:
+
+Argon2id password hashing.
+JWT authentication.
+Refresh token rotation.
+HTTPS/TLS for network communication.
+Device registration.
+Failed login tracking.
+Account lockout after repeated failed attempts.
+Audit logging for all authentication events.
+5.15 Error Handling
+
+Common authentication scenarios:
+
+Scenario	Action
+Invalid credentials	Display friendly error and log attempt
+Email already exists	Prompt user to sign in
+Weak password	Show password requirements
+Expired session	Request re-authentication
+Business setup interrupted	Resume wizard on next launch
+Network unavailable	Use offline login if a valid local session exists
+5.16 Testing Checklist
+
+Each feature must be tested.
+
+Registration
+Create new account.
+Duplicate email validation.
+Password validation.
+Required field validation.
+Login
+Successful login.
+Invalid password.
+Invalid email.
+Session restoration.
+Logout.
+Business Setup
+Create business.
+Validate required fields.
+Multiple business creation.
+Default data generation.
+Onboarding
+Complete onboarding.
+Skip onboarding.
+Resume onboarding later.
+5.17 AI Code Review Checklist
+
+Before merging this module, AI reviews:
+
+Authentication security.
+Password handling.
+Session management.
+SQL injection prevention.
+Input validation.
+Business setup workflow.
+Error handling.
+UI consistency.
+Performance.
+Code readability.
+
+All high-priority recommendations must be addressed before merging.
+
+5.18 Definition of Done
+
+This module is complete when:
+
+Users can register securely.
+Users can log in successfully.
+Sessions restore automatically.
+Business setup wizard functions correctly.
+Default business data is generated.
+Multiple businesses are supported.
+Business switching works correctly.
+Interactive onboarding is available.
+Password recovery workflow is implemented.
+Authentication events are audited.
+Unit and integration tests pass.
+Documentation is complete.
+AI review is approved.
+The feature is production-ready.
+5.19 Milestone 1 Deliverable
+
+Completion of this chapter marks the end of Milestone 1.
+
+Deliverables:
+
+Functional authentication system.
+Business setup wizard.
+Session management.
+Multi-business support.
+Interactive onboarding.
+Stable release build (v0.1.0-alpha recommended for internal development).
+
+This milestone provides the first fully usable foundation of Finch.
+
+5.20 Chapter Summary
+
+This chapter implements Finch's secure authentication and onboarding experience. By combining robust account management, automatic business initialization, session restoration, multi-business support, and an interactive onboarding flow, new users can move from registration to a fully configured workspace in just a few steps. The module prioritizes security, usability, and scalability while establishing the foundation for all remaining business features.

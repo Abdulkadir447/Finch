@@ -11,9 +11,14 @@ function createWindow () {
       contextIsolation: true,
     }
   });
-  // Load Vite dev server in development, otherwise load built files
-  const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../frontend/dist/index.html')}`;
-  win.loadURL(startUrl);
+  
+  // Use absolute path to be safe
+  const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+  console.log('Loading:', indexPath);
+  win.loadFile(indexPath);
+  
+  // Open DevTools to debug
+  win.webContents.openDevTools();
 }
 
 app.whenReady().then(() => {

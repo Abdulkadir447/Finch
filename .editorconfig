@@ -1,0 +1,32 @@
+# EditorConfig — cross-language coding standards (IPD Ch1.12, TRD Ch1.12)
+# Enforces consistent style for every contributor regardless of editor.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+[*.{c,cpp,cc,h,hpp}]
+indent_size = 4
+
+[*.{sql,sql}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 80
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab

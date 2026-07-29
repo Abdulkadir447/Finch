@@ -1,0 +1,614 @@
+Finch UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 3 — User Flows & Journey Maps
+3.1 Purpose
+
+This chapter defines the complete user journeys and interaction flows for Finch Version 1.0.
+
+A user flow describes the sequence of screens, actions, decisions, and system responses required to accomplish a specific goal.
+
+Every workflow in Finch is designed to:
+
+Reduce clicks.
+Minimize cognitive load.
+Keep users in context.
+Provide immediate feedback.
+Support keyboard-first navigation.
+Allow users to recover gracefully from errors.
+3.2 User Journey Overview
+
+A typical business owner's daily workflow is:
+
+Launch Finch
+      │
+Login
+      │
+Dashboard
+      │
+Review AI Summary
+      │
+Check Notifications
+      │
+Process Orders
+      │
+Update Inventory
+      │
+Review Customers
+      │
+Generate Reports
+      │
+Ask AI Questions
+      │
+Backup Data
+      │
+Exit Application
+
+Every module is designed around this natural workflow.
+
+3.3 First-Time User Journey
+
+When Finch is launched for the first time:
+
+Launch Application
+        │
+Welcome Screen
+        │
+Create Account / Sign In
+        │
+License Activation
+        │
+Company Setup
+        │
+Theme Selection (Auto by default)
+        │
+Import Existing Data? (Optional)
+        │
+Interactive Product Tour
+        │
+Dashboard Opens
+
+Estimated setup time:
+
+Less than 5 minutes
+
+3.4 Returning User Journey
+
+Returning users experience a much shorter workflow.
+
+Launch Finch
+      │
+Automatic Authentication
+      │
+Sync Changes (if online)
+      │
+Dashboard Opens
+      │
+Resume Previous Session
+
+If offline:
+
+Launch
+      │
+Offline Mode
+      │
+Continue Working
+
+No unnecessary prompts should interrupt productivity.
+
+3.5 Dashboard Journey
+
+Purpose:
+
+Provide a complete business overview.
+
+Flow:
+
+Dashboard Opens
+      │
+Revenue Loads
+      │
+Profit Loads
+      │
+Orders Load
+      │
+Charts Load
+      │
+AI Summary Loads
+      │
+Recent Activity Loads
+
+Users can immediately:
+
+Create Order
+Add Product
+View Reports
+Ask AI
+Open Customers
+
+No additional navigation is required.
+
+3.6 AI Assistant Journey
+
+The AI Assistant is accessible globally.
+
+Example workflow:
+
+User Presses Ctrl + Shift + A
+        │
+Floating AI Opens
+        │
+User Types Question
+        │
+Context Automatically Added
+        │
+GPT-5.5 Processes Request
+        │
+AI Response Appears
+        │
+Conversation Saved
+
+The user can continue interacting with Finch while the AI generates a response.
+
+3.7 Order Management Journey
+
+Creating an order:
+
+Orders
+      │
+New Order
+      │
+Select Customer
+      │
+Add Products
+      │
+Review Totals
+      │
+Generate Invoice
+      │
+Save Order
+      │
+Inventory Updates
+      │
+Dashboard Updates
+      │
+Sync Queue Updated
+
+Target completion time:
+
+Under 60 seconds
+
+3.8 Edit Order Flow
+Orders
+      │
+Select Order
+      │
+Edit Details
+      │
+Update Items
+      │
+Save
+      │
+Totals Recalculate
+      │
+Inventory Adjusts
+
+Changes should appear immediately throughout the application.
+
+3.9 Cancel Order Flow
+Open Order
+      │
+Cancel Order
+      │
+Confirmation Dialog
+      │
+Restore Inventory
+      │
+Update Reports
+      │
+Save Changes
+
+The confirmation dialog should clearly communicate the consequences of cancellation.
+
+3.10 Inventory Journey
+
+Adding a product:
+
+Inventory
+      │
+Add Product
+      │
+Enter Details
+      │
+Save
+      │
+Product Appears
+      │
+Dashboard Updates
+
+Updating stock:
+
+Inventory
+      │
+Select Product
+      │
+Adjust Quantity
+      │
+Save
+      │
+Inventory Value Updates
+
+Expandable rows provide additional product information without leaving the page.
+
+3.11 Low Stock Journey
+Inventory
+      │
+Stock Falls Below Threshold
+      │
+Notification Appears
+      │
+AI Suggests Restocking
+      │
+User Reviews Product
+      │
+Stock Updated
+
+The AI can recommend reorder quantities based on historical trends.
+
+3.12 Customer Journey
+
+Adding a customer:
+
+Customers
+      │
+Add Customer
+      │
+Enter Information
+      │
+Save
+      │
+Customer Profile Opens
+
+Customer profile includes:
+
+Avatar
+Contact information
+Purchase history
+Notes
+Recent invoices
+3.13 Customer Purchase History
+Customer Profile
+      │
+Purchase History
+      │
+Select Order
+      │
+View Invoice
+      │
+Return to Profile
+
+Navigation should preserve scroll position and context.
+
+3.14 Report Generation Journey
+Reports
+      │
+Choose Report
+      │
+Select Date Range
+      │
+Generate
+      │
+Interactive Dashboard
+      │
+AI Summary Available
+      │
+Export PDF
+
+Report generation should complete within 2 seconds under normal conditions.
+
+3.15 Forecast Journey
+Reports
+      │
+Forecast
+      │
+Choose Period
+      │
+Generate
+      │
+AI Analysis
+      │
+Charts
+      │
+Recommendations
+
+Users can ask follow-up questions directly from the report.
+
+3.16 AI Report Analysis Journey
+Report Generated
+      │
+Ask AI
+      │
+Explain Results
+      │
+AI Summarizes Report
+      │
+User Asks Follow-up
+      │
+Conversation Saved
+
+AI should automatically understand which report is currently open.
+
+3.17 Invoice Journey
+Order Saved
+      │
+Generate Invoice
+      │
+Preview
+      │
+Edit Payment Terms
+      │
+Print
+      │
+Export PDF
+      │
+Email via Gmail
+
+Invoices should include:
+
+Company logo
+QR code
+Tax information
+Payment terms
+Signature area
+3.18 Search Journey
+
+Using Universal Search:
+
+Ctrl + K
+      │
+Search Opens
+      │
+Type Query
+      │
+Results Appear Instantly
+      │
+Press Enter
+      │
+Navigate
+
+Search supports:
+
+Orders
+Customers
+Products
+Reports
+AI History
+Settings
+3.19 Notification Journey
+Event Occurs
+      │
+Toast Notification
+      │
+Notification Center
+      │
+Click Notification
+      │
+Open Relevant Page
+
+Notifications remain available until dismissed or marked as read.
+
+3.20 Backup Journey
+Settings
+      │
+Backup
+      │
+Choose Location
+      │
+Create Backup
+      │
+Confirmation
+
+Backup progress should display:
+
+Progress bar
+Estimated time
+Success confirmation
+3.21 Restore Journey
+Settings
+      │
+Restore Backup
+      │
+Select File
+      │
+Verification
+      │
+Confirmation
+      │
+Restore
+      │
+Restart Application
+
+Users should be warned before overwriting existing data.
+
+3.22 Offline Journey
+
+When internet connectivity is lost:
+
+Internet Lost
+      │
+Offline Banner Appears
+      │
+Continue Working
+      │
+Changes Queued
+      │
+Internet Returns
+      │
+Automatic Sync
+      │
+Banner Disappears
+
+Offline mode should require no user intervention.
+
+3.23 Synchronization Journey
+Changes Made
+      │
+Queued Locally
+      │
+Internet Available
+      │
+Sync Starts
+      │
+Conflict Check
+      │
+Upload
+      │
+Confirmation
+
+If conflicts occur:
+
+Conflict Detected
+      │
+Review Differences
+      │
+Choose Version
+      │
+Continue Sync
+
+Conflict resolution should be simple and clearly explained.
+
+3.24 Keyboard Workflow
+
+Professional users should complete most tasks without touching the mouse.
+
+Example:
+
+Ctrl + K
+      │
+Search Customer
+      │
+Enter
+      │
+Ctrl + N
+      │
+Create Order
+      │
+Tab Navigation
+      │
+Ctrl + S
+
+Keyboard shortcuts should be discoverable within the Command Palette and Settings.
+
+3.25 Error Recovery Journey
+
+If an operation fails:
+
+Action
+      │
+Error
+      │
+Friendly Explanation
+      │
+Retry
+      │
+Success
+
+If recovery is not possible:
+
+Error
+      │
+Save Progress
+      │
+Provide Help Link
+
+Users should never lose data without warning.
+
+3.26 Loading Experience
+
+Instead of blank screens:
+
+Skeleton Cards
+      │
+Progressive Loading
+      │
+Interactive Content
+
+Large reports and tables should load incrementally to maintain responsiveness.
+
+3.27 Empty State Journey
+
+When a page contains no data:
+
+Illustration
+      │
+Helpful Message
+      │
+AI Suggestion
+      │
+Primary Action Button
+
+Example:
+
+"You haven't added any products yet. Let's create your first one."
+
+3.28 Session Recovery Journey
+
+If the application closes unexpectedly:
+
+Launch Finch
+      │
+Crash Detected
+      │
+Restore Previous Session?
+      │
+Yes
+      │
+Continue Working
+
+Recent unsaved work should be restored whenever possible.
+
+3.29 End-to-End Business Journey
+
+A complete daily workflow:
+
+Launch Finch
+      │
+Review Dashboard
+      │
+Read AI Summary
+      │
+Process Orders
+      │
+Update Inventory
+      │
+Check Customers
+      │
+Generate Reports
+      │
+Ask AI for Recommendations
+      │
+Create Backup
+      │
+Close Application
+
+This represents the ideal daily experience for a business owner.
+
+3.30 Acceptance Criteria
+
+The user flow design is considered complete when:
+
+Every major business task has a documented workflow.
+Navigation paths are intuitive and require minimal clicks.
+AI assistance integrates naturally into workflows.
+Offline and online scenarios are supported.
+Keyboard-first interactions are available.
+Error, loading, and empty states are clearly defined.
+Users can recover gracefully from interruptions.
+Chapter Summary
+
+This chapter defines the end-to-end journeys users will experience while using Finch. By mapping onboarding, daily operations, AI interactions, order processing, inventory management, reporting, backups, and offline synchronization, Finch ensures every workflow is intuitive, efficient, and resilient. These user flows will guide screen design, interaction design, and usability testing throughout the product's development.

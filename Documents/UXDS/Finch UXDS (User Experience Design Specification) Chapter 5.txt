@@ -1,0 +1,672 @@
+Finch UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 5 — Component Library
+5.1 Purpose
+
+This chapter defines every reusable UI component that forms the foundation of Finch's interface.
+
+Rather than designing each screen independently, Finch uses a centralized component library to ensure:
+
+Consistency
+Accessibility
+Reusability
+Faster development
+Easier maintenance
+Predictable user interactions
+
+Every screen in Finch should be assembled from these standardized components.
+
+5.2 Design Principles
+
+All components must adhere to the following principles:
+
+Consistent appearance and behavior.
+Keyboard accessible.
+Fully responsive to window resizing.
+Theme-aware (Light/Dark).
+Smoothly animated.
+Accessible (WCAG 2.1 AA).
+Built using Ant Design components, customized to match the Finch design system.
+5.3 Component Hierarchy
+Foundation
+│
+├── Colors
+├── Typography
+├── Icons
+├── Spacing
+├── Motion
+│
+Components
+│
+├── Buttons
+├── Inputs
+├── Cards
+├── Tables
+├── Navigation
+├── Forms
+├── Dialogs
+├── Charts
+├── Notifications
+│
+Patterns
+│
+├── Dashboard
+├── Orders
+├── Inventory
+├── Reports
+├── AI Assistant
+│
+Pages
+5.4 Buttons
+
+Buttons are the primary action component.
+
+Button Types
+Type	Purpose
+Primary	Main action
+Secondary	Supporting action
+Outline	Less prominent action
+Text	Minimal action
+Ghost	Overlay interfaces
+Danger	Destructive actions
+Success	Positive confirmations
+Button Sizes
+Size	Height
+Small	32px
+Medium	40px
+Large	48px
+Button States
+
+Every button supports:
+
+Default
+Hover
+Focus
+Active
+Disabled
+Loading
+
+Loading buttons replace text with a spinner while preserving width.
+
+5.5 Icon Buttons
+
+Used for compact actions.
+
+Examples:
+
+Search
+Edit
+Delete
+Refresh
+AI
+Notifications
+
+Icon buttons should always include tooltips.
+
+5.6 Floating Action Button (FAB)
+
+Reserved for high-priority actions.
+
+Examples:
+
+New Order
+Ask AI
+
+Should appear only when contextually appropriate.
+
+5.7 Text Inputs
+
+Input types include:
+
+Single-line
+Multi-line
+Password
+Search
+Currency
+Numeric
+Email
+Phone
+URL
+
+Features:
+
+Labels
+Helper text
+Validation
+Prefix/Suffix icons
+Clear button
+Character counter (where applicable)
+5.8 Search Field
+
+Global search field supports:
+
+Instant search
+Keyboard shortcuts
+Search history
+Suggestions
+Recent items
+
+Search results appear dynamically without page reload.
+
+5.9 Dropdown Menus
+
+Used for:
+
+Filters
+Actions
+Navigation
+Settings
+
+Features:
+
+Keyboard navigation
+Icons
+Searchable lists
+Multi-select (where applicable)
+5.10 Checkboxes
+
+Used for:
+
+Bulk selection
+Preferences
+Settings
+
+Support:
+
+Checked
+Unchecked
+Indeterminate
+Disabled
+5.11 Radio Buttons
+
+Used when only one option can be selected.
+
+Examples:
+
+Report type
+Theme override
+Invoice template
+5.12 Toggle Switches
+
+Used for immediate settings.
+
+Examples:
+
+Notifications
+Dark Mode
+Auto Sync
+Two-Factor Authentication
+
+Changes take effect immediately unless confirmation is required.
+
+5.13 Date Picker
+
+Used for:
+
+Reports
+Orders
+Forecasts
+Filters
+
+Supports:
+
+Single date
+Date range
+Month picker
+Year picker
+5.14 Tables
+
+Tables are one of the most important components in Finch.
+
+Primary uses:
+
+Orders
+Inventory
+Customers
+Reports
+
+Features:
+
+Sorting
+Filtering
+Pagination
+Column resizing
+Sticky headers
+Expandable rows
+Multi-select
+Context menus
+5.15 Data Grid
+
+Advanced version of the table.
+
+Supports:
+
+Thousands of rows
+Virtual scrolling
+Keyboard navigation
+Inline editing
+Bulk actions
+Export
+5.16 Cards
+
+Cards organize related information.
+
+Examples:
+
+Dashboard KPIs
+Customer summary
+AI insight
+Product overview
+
+Card sections:
+
+Header
+Content
+Footer
+Optional actions
+
+Cards elevate slightly on hover.
+
+5.17 KPI Cards
+
+Specialized dashboard cards.
+
+Examples:
+
+Revenue
+Profit
+Orders
+Inventory Value
+
+Each KPI card includes:
+
+Icon
+Title
+Value
+Trend indicator
+Comparison period
+Mini chart (optional)
+5.18 Charts
+
+Chart library:
+
+Recharts
+
+Supported charts:
+
+Line
+Area
+Bar
+Pie
+Donut
+Stacked Bar
+Forecast Projection
+
+All charts include:
+
+Tooltips
+Legends
+Export
+Theme support
+Animations
+5.19 Progress Indicators
+
+Types:
+
+Progress bar
+Circular progress
+Step indicator
+Skeleton loaders
+
+Used during:
+
+Backup
+Sync
+Imports
+AI processing
+5.20 Badges
+
+Used to indicate:
+
+Status
+Counts
+Categories
+
+Examples:
+
+Low Stock
+Paid
+Pending
+Completed
+5.21 Tags
+
+Tags classify data.
+
+Examples:
+
+VIP Customer
+High Priority
+Wholesale
+Retail
+
+Tags are color-coded according to semantic meaning.
+
+5.22 Avatars
+
+Used for:
+
+Customers
+User profile
+
+Fallback:
+
+Initials displayed if no image is available.
+
+Supports:
+
+Circular
+Square
+Grouped avatars (future)
+5.23 Sidebar
+
+Navigation component.
+
+Characteristics:
+
+Icon-only by default.
+Expands on hover.
+Smooth animation.
+Current page indicator.
+Tooltip support.
+
+The sidebar remains fixed during navigation.
+
+5.24 Top Navigation Bar
+
+Contains:
+
+Logo
+Current page
+Search
+Notifications
+AI shortcut
+User profile
+Window controls
+
+Remains visible across all pages.
+
+5.25 Breadcrumbs
+
+Displayed only when deeper navigation exists.
+
+Example:
+
+Dashboard > Orders > Order #1038
+5.26 Command Palette
+
+Shortcut:
+
+Ctrl + K
+
+Supports:
+
+Search
+Commands
+Navigation
+Recently used actions
+Keyboard-only operation
+
+Inspired by Linear, VS Code, and Cursor.
+
+5.27 Floating AI Assistant
+
+One of Finch's signature components.
+
+Features:
+
+Floating docked panel
+Draggable within screen bounds
+Resizable
+Conversation history
+Markdown rendering
+Code blocks
+Tables
+Charts (future)
+Suggested prompts
+Context awareness
+
+The AI panel should never block critical workflows.
+
+5.28 Notifications
+
+Two notification systems:
+
+Toast
+
+Used for:
+
+Success
+Errors
+Warnings
+Sync status
+
+Appears at the top-right of the application.
+
+Notification Center
+
+Stores:
+
+Daily sales summaries
+AI completions
+Low stock alerts
+Backup notifications
+Updates
+
+Notifications can be marked as read or cleared.
+
+5.29 Modals
+
+Used only when user focus is required.
+
+Examples:
+
+Delete confirmation
+Restore backup
+License activation
+Export options
+
+Modal sizes:
+
+Small
+Medium
+Large
+Fullscreen
+5.30 Drawers
+
+Slide-in panels.
+
+Examples:
+
+Customer details
+Product information
+Filters
+Quick edit
+
+Preferred over modals for non-blocking workflows.
+
+5.31 Tabs
+
+Used to organize related content.
+
+Examples:
+
+Customer:
+
+Overview
+Orders
+Notes
+
+Reports:
+
+Dashboard
+PDF Preview
+Export
+5.32 Accordion
+
+Expandable content.
+
+Used for:
+
+Inventory details
+FAQs
+Advanced settings
+
+Only one section expands by default unless configured otherwise.
+
+5.33 Context Menu
+
+Right-click menus are supported throughout the application.
+
+Examples:
+
+Order:
+
+Open
+Edit
+Duplicate
+Print
+Delete
+
+Context menus should adapt to the selected item.
+
+5.34 Tooltips
+
+Every icon-only action should provide a tooltip.
+
+Tooltips should:
+
+Appear within 300 ms.
+Never obscure important content.
+Support keyboard focus.
+5.35 Empty States
+
+Include:
+
+Illustration
+Title
+Description
+Primary action
+AI suggestion (when appropriate)
+
+Example:
+
+"No customers yet. Add your first customer to start tracking purchases."
+
+5.36 Error States
+
+Error components include:
+
+Icon
+Friendly explanation
+Retry button
+Optional "Learn More" link
+
+Errors should help users recover quickly.
+
+5.37 Skeleton Loaders
+
+Preferred over spinners.
+
+Examples:
+
+Cards
+Tables
+Charts
+Lists
+Customer profiles
+
+Skeletons maintain layout stability while content loads.
+
+5.38 File Upload
+
+Supports:
+
+Drag and drop
+Browse files
+Progress tracking
+Validation
+Cancel upload
+
+Accepted formats:
+
+CSV
+Excel
+PDF
+5.39 Keyboard Focus
+
+Every interactive component must provide:
+
+Visible focus ring
+Keyboard activation
+Logical tab order
+Screen reader labels
+
+Mouse interaction must never be the only way to use a component.
+
+5.40 Component States
+
+Every reusable component supports the following lifecycle:
+
+Default
+     │
+Hover
+     │
+Focus
+     │
+Active
+     │
+Loading
+     │
+Success / Error
+     │
+Disabled
+
+Transitions between states should be smooth and consistent.
+
+5.41 Component Documentation
+
+Each reusable component should include:
+
+Purpose
+Anatomy
+Variants
+States
+Accessibility requirements
+Keyboard interactions
+Usage guidelines
+Do's and Don'ts
+Code examples
+Design tokens used
+
+This documentation ensures consistency between design and implementation.
+
+5.42 Acceptance Criteria
+
+The component library is complete when:
+
+All core UI components are documented.
+Components support Light and Dark themes.
+Accessibility standards are met.
+Keyboard navigation is fully supported.
+States and variants are defined.
+Components integrate with the Finch design tokens.
+Developers can build every screen using only documented components.
+Chapter Summary
+
+This chapter defines the reusable building blocks that power Finch's interface. From buttons and forms to tables, charts, notifications, and the floating AI assistant, every component follows a consistent design language and interaction model. By standardizing these elements, Finch achieves a cohesive, scalable, and maintainable user experience while enabling efficient development and future expansion.

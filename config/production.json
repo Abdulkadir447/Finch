@@ -1,0 +1,46 @@
+{
+  "app": {
+    "name": "Finch",
+    "tagline": "Your Business, Smarter.",
+    "environment": "production",
+    "version": "1.0.0",
+    "debug": false
+  },
+  "api": {
+    "baseUrl": "https://api.finch.app",
+    "timeoutMs": 15000
+  },
+  "database": {
+    "driver": "mysql+aiomysql",
+    "host": "db.finch.app",
+    "port": 3306,
+    "name": "erp_business_db"
+  },
+  "sync": {
+    "enabled": true,
+    "mode": "background",
+    "intervalSeconds": 60
+  },
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-5.5",
+    "assistEnabled": true
+  },
+  "features": {
+    "dashboard": true,
+    "orders": true,
+    "inventory": true,
+    "customers": true,
+    "aiAssistant": true,
+    "reports": true,
+    "cloudSync": true
+  },
+  "ui": {
+    "defaultTheme": "system",
+    "sidebarCollapsed": false,
+    "commandPaletteShortcut": "Ctrl+K"
+  },
+  "logging": {
+    "level": "error"
+  }
+}

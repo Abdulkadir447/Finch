@@ -1,0 +1,570 @@
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+
+Chapter 6 — UX/UI Design System & Screen Specifications
+6.1 Purpose
+
+This chapter defines the complete visual language and interaction system for Finch. It establishes the design principles, layout rules, component library, accessibility standards, and screen specifications that will ensure a consistent, premium desktop experience.
+
+The design is inspired by modern enterprise software while maintaining Finch's own identity.
+
+6.2 Design Philosophy
+
+Finch's interface should communicate confidence, clarity, and professionalism.
+
+Every screen should make users feel in control of their business.
+
+Core Principles
+Elegant over flashy
+Simple over crowded
+Data first
+AI integrated, not distracting
+Fast interactions
+Consistent spacing
+Minimal clicks
+Premium Windows application feel
+6.3 Brand Identity
+Product Name
+
+Finch
+
+Tagline
+
+Your Business, Smarter.
+
+Brand Personality
+Professional
+Intelligent
+Reliable
+Modern
+Friendly
+Premium
+Calm
+Efficient
+6.4 Visual Style
+
+Using the branding reference you approved, Finch adopts an Enterprise Luxury aesthetic.
+
+Characteristics:
+
+Soft shadows
+Large whitespace
+Rounded corners
+Minimal borders
+Rich data visualization
+Elegant typography
+Subtle animations
+Glass-like overlays (sparingly)
+High readability
+6.5 Color System
+Primary
+Navy
+#0F172A
+
+Used for:
+
+Navigation
+Headers
+Buttons
+Charts
+Active elements
+Secondary
+Slate
+#334155
+
+Used for:
+
+Secondary buttons
+Cards
+Navigation states
+Accent
+Blue
+#2563EB
+
+Used for:
+
+Interactive elements
+Links
+Focus states
+Progress indicators
+Success
+#16A34A
+Warning
+#F59E0B
+Error
+#DC2626
+Background
+
+Light
+
+#F8FAFC
+
+Dark
+
+#0B1220
+Surface
+
+Light
+
+#FFFFFF
+
+Dark
+
+#111827
+6.6 Typography
+
+Primary Font
+
+Plus Jakarta Sans
+
+Secondary Font
+
+Geist
+
+Heading Scale
+Style	Size
+Display	48px
+H1	36px
+H2	30px
+H3	24px
+H4	20px
+H5	18px
+Body	16px
+Caption	14px
+Small	12px
+6.7 Spacing System
+
+Finch uses an 8-point grid.
+
+4
+8
+12
+16
+24
+32
+40
+48
+64
+80
+96
+
+Every component aligns to this spacing scale.
+
+6.8 Border Radius
+Component	Radius
+Buttons	10px
+Inputs	10px
+Cards	16px
+Dialogs	20px
+Charts	16px
+6.9 Elevation
+
+Three shadow levels:
+
+Level 1
+
+Cards
+
+Level 2
+
+Dropdowns
+
+Level 3
+
+Dialogs
+
+No excessive shadows.
+
+6.10 Iconography
+
+Library:
+
+Lucide Icons
+
+Reasons:
+
+Clean
+Lightweight
+Consistent
+Modern
+
+Icons should always have labels unless universally understood.
+
+6.11 Window Layout
+┌────────────────────────────────────────────────────────────┐
+│ Title Bar                                          User    │
+├───────────────┬────────────────────────────────────────────┤
+│ Sidebar       │                                            │
+│               │               Header                       │
+│ Dashboard     ├────────────────────────────────────────────┤
+│ Orders        │                                            │
+│ Inventory     │               Content                      │
+│ Customers     │                                            │
+│ AI Assistant  │                                            │
+│ Reports       │                                            │
+│ Settings      │                                            │
+└───────────────┴────────────────────────────────────────────┘
+6.12 Sidebar
+
+Always visible.
+
+Collapsed width:
+
+80px
+
+Expanded width:
+
+260px
+
+Contains:
+
+Logo
+Dashboard
+Orders
+Inventory
+Customers
+AI Assistant
+Reports
+Settings
+
+Bottom section:
+
+License Status
+Sync Status
+Theme Toggle
+6.13 Top Navigation
+
+Contains:
+
+Global Search (Ctrl + K)
+Notifications
+Sync Indicator
+AI Status
+User Avatar
+6.14 Dashboard Screen
+
+Widgets include:
+
+Today's Revenue
+Monthly Revenue
+Pending Orders
+Inventory Value
+Customer Growth
+Revenue Chart
+Inventory Chart
+Recent Orders
+AI Summary
+
+Layout follows a responsive 12-column grid.
+
+6.15 Orders Screen
+
+Sections:
+
+Left
+
+Order List
+
+Right
+
+Order Preview
+
+Top
+
+Filters
+
+Search
+
+New Order Button
+
+Bottom
+
+Pagination
+
+6.16 Order Details
+
+Tabs:
+
+Overview
+Products
+Invoice
+Timeline
+Notes
+
+Actions:
+
+Print
+Export
+Email
+Cancel
+Duplicate
+6.17 Inventory Screen
+
+Contains:
+
+Product Table
+Categories
+Stock Alerts
+Inventory Value
+Quick Add Product
+
+Quick Actions:
+
+Add Product
+Import CSV
+Adjust Stock
+6.18 Customer Screen
+
+Displays:
+
+Customer Profile
+Purchase History
+Spending Graph
+Recent Orders
+AI Customer Insights
+6.19 AI Assistant Screen
+
+The AI interface should feel like a modern productivity tool rather than a generic chatbot.
+
+Layout:
+
+Conversation History
+
+--------------------------------
+
+Chat Window
+
+--------------------------------
+
+Suggested Prompts
+
+--------------------------------
+
+Input Area
+
+Features:
+
+Markdown rendering
+Code blocks (future)
+Tables
+Charts
+Export
+Copy response
+Regenerate response
+6.20 Reports Screen
+
+Cards:
+
+Sales
+Inventory
+Profit & Loss
+Forecast
+
+Actions:
+
+Generate
+
+↓
+
+Preview
+
+↓
+
+Export
+
+↓
+
+Share (future)
+
+6.21 Settings Screen
+
+Sections:
+
+General
+
+Account
+
+Appearance
+
+Security
+
+Backup
+
+License
+
+About
+
+Each section should open within the same window to avoid disrupting the user's workflow.
+
+6.22 Buttons
+
+Primary
+
+Filled
+
+Secondary
+
+Outlined
+
+Tertiary
+
+Ghost
+
+Destructive
+
+Red
+
+Loading state required for all asynchronous actions.
+
+6.23 Inputs
+
+Support:
+
+Validation
+Prefix icons
+Suffix icons
+Password visibility
+Clear button
+Keyboard navigation
+6.24 Tables
+
+Features:
+
+Sorting
+Filtering
+Pagination
+Column resizing
+Sticky headers
+Multi-select
+Keyboard navigation
+6.25 Forms
+
+Every form includes:
+
+Required field indicators
+Inline validation
+Auto-save (where appropriate)
+Unsaved changes warning
+Keyboard shortcuts
+6.26 Dialogs
+
+Dialogs should:
+
+Focus the first interactive element automatically.
+Trap keyboard focus until closed.
+Support Escape to close (except destructive confirmations).
+Clearly distinguish primary and secondary actions.
+6.27 Empty States
+
+Every empty page should include:
+
+Illustration
+Helpful explanation
+Primary action
+AI suggestion
+
+Example:
+
+No customers yet.
+
+Add your first customer or ask Finch AI to guide you.
+
+6.28 Loading States
+
+Avoid blank screens.
+
+Use:
+
+Skeleton loaders
+Progress bars
+Spinner only when necessary
+6.29 Notifications
+
+Types:
+
+Success
+
+Information
+
+Warning
+
+Error
+
+Notifications appear in the upper-right corner and dismiss automatically after five seconds unless user interaction is required.
+
+6.30 Animations
+
+Animation duration:
+
+150–250 ms
+
+Use for:
+
+Page transitions
+Sidebar collapse
+Dialogs
+Hover effects
+Card elevation
+Charts
+
+Animations should never delay user workflows.
+
+6.31 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + K	Global Search
+Ctrl + N	New Order
+Ctrl + S	Save
+Ctrl + P	Print Invoice
+Ctrl + F	Search Current Page
+Ctrl + Shift + A	Open AI Assistant
+F1	Help
+Esc	Close Dialog
+6.32 Responsive Behavior
+
+Although Finch is a desktop-first application, it should gracefully adapt to different screen sizes.
+
+Supported resolutions:
+
+1366 × 768 (Minimum)
+1920 × 1080 (Recommended)
+2560 × 1440
+3840 × 2160 (4K)
+
+The application should support DPI scaling on Windows without visual artifacts.
+
+6.33 Accessibility
+
+The interface must meet WCAG 2.1 AA standards where applicable.
+
+Requirements include:
+
+Full keyboard navigation
+High-contrast compatibility
+Screen reader support
+Visible focus indicators
+Color is never the sole means of conveying information
+Minimum touch target size of 44×44 px for clickable controls
+6.34 Theme Support
+
+Finch includes both Light and Dark themes.
+
+Requirements:
+
+Theme changes apply instantly.
+User preference is remembered across sessions.
+Charts, icons, and illustrations adapt appropriately.
+Theme selection can follow the Windows system preference or be set manually.
+6.35 Design Tokens
+
+All colors, typography, spacing, shadows, border radii, and animation timings should be defined as reusable design tokens.
+
+This ensures consistency across the application and simplifies future maintenance or rebranding.
+
+Chapter Summary
+
+This chapter establishes Finch's complete visual and interaction design system. By defining consistent layouts, components, accessibility standards, and design tokens, it ensures every screen feels cohesive, modern, and aligned with the product's "Enterprise Luxury" identity.
+
+The design system will serve as the foundation for implementation in React + Ant Design, ensuring consistency between designers and developers.

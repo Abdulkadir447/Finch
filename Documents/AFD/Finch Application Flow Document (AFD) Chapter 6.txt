@@ -1,0 +1,576 @@
+Finch Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 6 — Orders & Invoice Management Flow
+6.1 Purpose
+
+This chapter defines the complete lifecycle of an order in Finch, from creation to completion, invoice generation, payment tracking, cancellation, and returns.
+
+The Orders module is one of the most critical workflows in Finch. Every action taken within this module directly affects:
+
+Inventory
+Customers
+Reports
+Revenue
+AI Insights
+Forecasting
+Dashboard KPIs
+Cloud Synchronization
+
+The workflow is designed to minimize manual work while maintaining complete data accuracy.
+
+6.2 Objectives
+
+The Orders module must:
+
+Allow fast order creation.
+Support draft orders.
+Prevent inventory inconsistencies.
+Generate professional invoices.
+Integrate with the AI Assistant.
+Update reports automatically.
+Work completely offline.
+Synchronize automatically with Supabase.
+6.3 High-Level Order Flow
+Dashboard
+     │
+     ▼
+Orders
+     │
+     ▼
+New Order
+     │
+     ▼
+Select Customer
+     │
+     ▼
+Add Products
+     │
+     ▼
+Review Order
+     │
+     ▼
+Save Draft
+     │
+     ▼
+Complete Order
+     │
+     ▼
+Generate Invoice
+     │
+     ▼
+Ask to Save Invoice
+     │
+     ▼
+Ask to Email Invoice
+     │
+     ▼
+Dashboard Updated
+6.4 Order States
+
+Every order exists in exactly one state.
+
+Draft
+   │
+   ▼
+Confirmed
+   │
+   ▼
+Completed
+   │
+ ┌─┴───────────┐
+ │             │
+Cancelled   Returned
+Draft
+
+Order is being created.
+
+Inventory remains unchanged.
+
+Confirmed
+
+Order has been approved.
+
+Inventory is reserved but not deducted.
+
+Completed
+
+Sale is finalized.
+
+Inventory is deducted.
+
+Revenue is recorded.
+
+Reports update.
+
+Dashboard refreshes.
+
+Cancelled
+
+Order is cancelled before completion.
+
+Inventory remains unchanged.
+
+No revenue is recorded.
+
+Returned
+
+Customer returns purchased items.
+
+Inventory increases.
+
+Reports update.
+
+Revenue adjusts.
+
+6.5 Create Order Flow
+Orders
+   │
+   ▼
+New Order
+   │
+   ▼
+Create Draft
+   │
+   ▼
+Select Customer
+   │
+   ▼
+Add Products
+   │
+   ▼
+Calculate Totals
+   │
+   ▼
+Save Draft
+
+Creating an order should take less than 60 seconds.
+
+6.6 Customer Selection
+
+The user chooses:
+
+Existing customer
+
+OR
+
+Create new customer.
+
+Flow:
+
+Select Customer
+       │
+ ┌─────┴─────┐
+ │           │
+Existing   New Customer
+ │           │
+ ▼           ▼
+Continue   Create Profile
+                │
+                ▼
+          Continue Order
+6.7 Product Selection
+
+Products are searchable by:
+
+Name
+SKU
+Barcode (future)
+Category
+
+For every selected product Finch displays:
+
+Stock available
+Unit price
+Discount
+Tax
+Quantity
+
+Totals update instantly.
+
+6.8 Stock Validation
+
+When adding products:
+
+Select Product
+      │
+      ▼
+Check Stock
+      │
+ ┌────┴─────┐
+ │          │
+Enough     Low Stock
+ │          │
+ ▼          ▼
+Continue  Warning
+
+If stock is insufficient:
+
+The order may still be saved as a draft but cannot be completed until stock is available (unless future settings allow overselling).
+
+6.9 Pricing Calculation
+
+Finch calculates automatically:
+
+Subtotal
+
+↓
+
+Discount
+
+↓
+
+Tax
+
+↓
+
+Shipping (future)
+
+↓
+
+Grand Total
+
+Calculations update in real time as the order changes.
+
+6.10 Save Draft Flow
+Draft Order
+      │
+      ▼
+Validate
+      │
+      ▼
+Save SQLite
+      │
+      ▼
+Queue Cloud Sync
+      │
+      ▼
+Return Orders
+
+Drafts never modify inventory.
+
+6.11 Completing an Order
+Draft
+  │
+  ▼
+Complete Order
+  │
+  ▼
+Validate Inventory
+  │
+  ▼
+Deduct Stock
+  │
+  ▼
+Record Revenue
+  │
+  ▼
+Update Dashboard
+  │
+  ▼
+Generate Invoice
+
+This is the point where inventory is officially deducted.
+
+6.12 Invoice Generation Flow
+
+After an order is completed:
+
+Completed Order
+        │
+        ▼
+Generate Invoice
+        │
+        ▼
+AI Reviews Layout
+        │
+        ▼
+Invoice Preview
+        │
+        ▼
+Ask User to Save
+        │
+        ▼
+Save PDF
+        │
+        ▼
+Ask to Email
+
+Invoice generation should take less than 2 seconds.
+
+6.13 Invoice Layout
+
+Invoices include:
+
+Company Logo
+Invoice Number
+Customer Information
+Products
+Quantity
+Unit Price
+Tax Information
+Payment Terms
+QR Code
+Signature Area
+Company Contact Information
+
+Invoice numbering:
+
+INV-2026-000001
+
+Numbers increment automatically.
+
+6.14 AI Invoice Assistance
+
+The AI Assistant may:
+
+Explain invoice contents.
+Suggest payment terms.
+Detect unusual pricing.
+Suggest discounts.
+Improve invoice wording.
+
+The AI never modifies an invoice automatically.
+
+User confirmation is always required.
+
+6.15 Save Invoice Flow
+
+Following your product requirements:
+
+Invoice Generated
+        │
+        ▼
+Preview
+        │
+        ▼
+Save?
+        │
+ ┌──────┴──────┐
+ │             │
+Yes           No
+ │             │
+ ▼             ▼
+Save PDF    Close Preview
+6.16 Email Invoice Flow
+
+Immediately after saving:
+
+Invoice Saved
+      │
+      ▼
+Email Customer?
+      │
+ ┌────┴─────┐
+ │          │
+Yes        No
+ │          │
+ ▼          ▼
+Send Email Finish
+
+Email uses the configured Gmail integration.
+
+Future versions may support additional email providers.
+
+6.17 Edit Order Flow
+
+Rules:
+
+Draft
+
+✔ Editable
+
+Confirmed
+
+✔ Editable
+
+Completed
+
+⚠ Limited editing
+
+Cancelled
+
+❌ Locked
+
+Returned
+
+❌ Locked
+
+Editing a completed order requires confirmation because it may affect reports and inventory.
+
+6.18 Cancel Order Flow
+Cancel Order
+      │
+      ▼
+Confirmation Dialog
+      │
+      ▼
+Cancelled
+      │
+      ▼
+Dashboard Updated
+
+If inventory was already deducted:
+
+Inventory is restored automatically.
+
+6.19 Return Flow
+Completed Order
+       │
+       ▼
+Return Requested
+       │
+       ▼
+Validate
+       │
+       ▼
+Return Inventory
+       │
+       ▼
+Adjust Revenue
+       │
+       ▼
+Reports Updated
+
+Future versions may support partial returns.
+
+6.20 Offline Order Flow
+
+When offline:
+
+Orders continue working normally.
+
+Create Order
+      │
+      ▼
+SQLite
+      │
+      ▼
+Offline Queue
+      │
+      ▼
+Internet Returns
+      │
+      ▼
+Sync Supabase
+
+Users never lose orders because of internet outages.
+
+6.21 Synchronization Flow
+Order Saved
+      │
+      ▼
+Sync Queue
+      │
+      ▼
+Internet?
+      │
+ ┌────┴─────┐
+ │          │
+Yes        No
+ │          │
+ ▼          ▼
+Upload     Wait
+
+Conflicts follow the system-wide policy:
+
+Ask the user which version to keep.
+
+6.22 Order Notifications
+
+Notifications generated include:
+
+Order Completed
+Invoice Generated
+Invoice Sent
+Payment Received (future)
+Return Processed
+Order Cancelled
+
+Clicking a notification opens the related order.
+
+6.23 AI Context Flow
+
+Whenever AI is used inside Orders:
+
+Current Order
+      │
+      ▼
+Collect Context
+      │
+      ▼
+Send GPT-5.5 Request
+      │
+      ▼
+Receive Response
+      │
+      ▼
+Display Suggestions
+
+Context includes:
+
+Customer
+Products
+Totals
+Order history
+Inventory status
+
+Sensitive information is transmitted only as required to fulfill the user's request.
+
+6.24 Error Handling
+
+Possible errors:
+
+Error	Recovery
+Product unavailable	Choose another product
+Stock insufficient	Save as draft or restock
+Invoice generation failed	Retry generation
+Email failed	Retry later
+Sync failed	Queue for later
+Database error	Restore latest valid state
+
+The system should preserve the order whenever possible.
+
+6.25 Performance Targets
+Operation	Target
+Create Draft	<1 second
+Search Products	<100 ms
+Complete Order	<2 seconds
+Generate Invoice	<2 seconds
+Save PDF	<1 second
+Email Invoice	<5 seconds
+Navigation	<150 ms
+6.26 Developer Implementation Notes
+
+Implementation guidelines:
+
+Store all order data locally in SQLite first.
+Use transactions to ensure inventory and revenue updates occur atomically.
+Queue completed orders for background synchronization with Supabase.
+Generate invoices from reusable templates supporting branding and localization.
+Integrate Gmail for email delivery with user confirmation before sending.
+Expose order events so the Dashboard, Reports, Inventory, and AI modules refresh automatically.
+Design the order state machine to support future features such as partial shipments, partial payments, and partial returns without major refactoring.
+6.27 Acceptance Criteria
+
+The Orders & Invoice Management Flow is complete when:
+
+Orders can be created, edited, and saved as drafts.
+Inventory is deducted only when an order is completed.
+Order totals are calculated accurately.
+Professional invoices are generated with company branding.
+Users are asked before invoices are saved and before they are emailed.
+Gmail integration sends invoices successfully when approved.
+Offline order creation works without data loss.
+Synchronization with Supabase occurs automatically.
+Order notifications open the related records.
+AI provides contextual assistance without making irreversible changes automatically.
+All order state transitions behave consistently and preserve data integrity.
+6.28 Chapter Summary
+
+The Orders & Invoice Management Flow defines the complete sales lifecycle within Finch, from creating a draft order to generating branded invoices, updating inventory, recording revenue, and synchronizing with the cloud. By combining offline-first operation, AI-assisted workflows, automatic reporting updates, and secure synchronization, Finch delivers a fast, reliable, and scalable order management experience suitable for growing businesses.

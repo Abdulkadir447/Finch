@@ -1,0 +1,520 @@
+Finch Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 16 — CI/CD, DevOps & Release Management
+16.1 Purpose
+
+This chapter defines the Continuous Integration (CI), Continuous Deployment (CD), DevOps workflow, release management strategy, and software delivery process for Finch.
+
+The objective is to ensure that every code change is:
+
+Automatically validated
+Securely built
+Properly tested
+Versioned
+Packaged
+Released consistently
+
+The development workflow must support both rapid iteration during development and stable production releases.
+
+16.2 DevOps Goals
+
+The DevOps strategy aims to:
+
+Automate repetitive tasks
+Reduce deployment errors
+Improve release reliability
+Ensure consistent builds
+Enable rapid rollback if required
+Support collaborative development
+Maintain complete traceability
+16.3 Development Workflow
+
+Finch follows a Git-based workflow.
+
+Feature Branch
+      │
+      ▼
+Pull Request
+      │
+      ▼
+Code Review
+      │
+      ▼
+Automated CI
+      │
+      ▼
+Merge into Develop
+      │
+      ▼
+Release Candidate
+      │
+      ▼
+Main Branch
+      │
+      ▼
+Production Release
+16.4 Repository Structure
+
+Finch uses a pnpm monorepo.
+
+finch/
+
+├── apps/
+│   ├── desktop/
+│   ├── website/               (future)
+│
+├── packages/
+│   ├── ui/
+│   ├── database/
+│   ├── api/
+│   ├── ai/
+│   ├── sync/
+│   ├── shared/
+│   ├── config/
+│
+├── docs/
+│
+├── scripts/
+│
+├── .github/
+│
+├── package.json
+│
+├── pnpm-workspace.yaml
+│
+└── turbo.json
+16.5 Git Branch Strategy
+
+Primary branches:
+
+main
+
+Production-ready code.
+
+develop
+
+Integration branch.
+
+Feature branches
+
+feature/dashboard
+
+feature/orders
+
+feature/inventory
+
+feature/ai
+
+feature/reports
+
+Bug fixes
+
+fix/login
+
+fix/sync
+
+fix/invoice
+
+Hotfixes
+
+hotfix/license
+
+hotfix/database
+
+Release branches
+
+release/v1.0
+
+release/v1.1
+16.6 Commit Message Convention
+
+Finch follows the Conventional Commits specification.
+
+Examples:
+
+feat: add inventory forecasting
+
+fix: resolve offline sync bug
+
+refactor: simplify AI context builder
+
+docs: update API documentation
+
+test: add dashboard unit tests
+
+style: improve sidebar spacing
+
+perf: optimize SQLite queries
+
+build: configure Electron updater
+
+ci: add GitHub Actions workflow
+
+chore: update dependencies
+16.7 Pull Request Requirements
+
+Every pull request must include:
+
+Summary of changes
+Linked issue or task
+Screenshots (for UI changes)
+Testing evidence
+Checklist confirming:
+Code compiles
+Tests pass
+Lint passes
+Documentation updated (if required)
+
+At least one approval is required before merging.
+
+16.8 Continuous Integration (CI)
+
+Every push and pull request triggers automated CI.
+
+Pipeline steps:
+
+Install dependencies using pnpm.
+Restore cache.
+TypeScript type checking.
+ESLint.
+Unit tests.
+Integration tests.
+Component tests.
+Build desktop application.
+Generate coverage report.
+Upload build artifacts.
+
+Any failure blocks merging.
+
+16.9 GitHub Actions
+
+GitHub Actions is used for CI/CD automation.
+
+Primary workflows:
+
+ci.yml
+
+Runs on every push and pull request.
+
+release.yml
+
+Builds production releases.
+
+nightly.yml
+
+Runs nightly automated testing.
+
+dependency-update.yml
+
+Checks dependency updates.
+
+security.yml
+
+Runs vulnerability scans.
+
+16.10 Build Pipeline
+
+Desktop build process:
+
+Install Dependencies
+↓
+
+Lint
+
+↓
+
+Type Check
+
+↓
+
+Run Tests
+
+↓
+
+Build React
+
+↓
+
+Compile Electron
+
+↓
+
+Package Installer
+
+↓
+
+Code Sign
+
+↓
+
+Publish Release
+16.11 Electron Packaging
+
+Packaging tool:
+
+electron-builder
+
+Supported output:
+
+Windows Installer (.exe)
+Portable Version (future)
+
+Installer features:
+
+Desktop shortcut
+Start Menu entry
+File associations (future)
+Automatic updates
+Uninstaller
+16.12 Code Signing
+
+Production builds should be digitally signed.
+
+Benefits:
+
+Improved user trust
+Reduced SmartScreen warnings
+Verified software integrity
+
+Unsigned builds may be used for internal testing only.
+
+16.13 Versioning Strategy
+
+Finch follows Semantic Versioning (SemVer).
+
+Format:
+
+MAJOR.MINOR.PATCH
+
+Examples:
+
+1.0.0
+
+1.1.0
+
+1.1.2
+
+2.0.0
+
+Rules:
+
+MAJOR: Breaking changes
+MINOR: New features
+PATCH: Bug fixes
+16.14 Release Types
+Alpha
+
+Internal development builds.
+
+Beta
+
+Feature-complete testing builds.
+
+Release Candidate (RC)
+
+Candidate for production.
+
+Stable
+
+Production-ready release.
+
+Hotfix
+
+Emergency production update.
+
+16.15 Auto Updates
+
+Auto-update solution:
+
+Electron Updater
+GitHub Releases (initially)
+
+Update flow:
+
+Application Starts
+↓
+
+Check for Updates
+
+↓
+
+Download Update
+
+↓
+
+Prompt User
+
+↓
+
+Install on Restart
+
+Users can defer updates if desired.
+
+16.16 Environment Configuration
+
+Separate configurations are maintained for:
+
+Environment	Purpose
+Development	Local development
+Testing	QA
+Staging	Pre-production
+Production	Live application
+
+Environment variables include:
+
+Supabase URL
+Supabase API Key
+OpenAI API Key
+Gmail OAuth credentials
+Update server URL
+Logging level
+
+Sensitive values must never be committed to version control.
+
+16.17 Secrets Management
+
+Secrets should be stored securely using:
+
+GitHub Secrets (CI)
+Local .env files (development)
+Secure environment variables (production)
+
+Examples:
+
+SUPABASE_URL
+SUPABASE_ANON_KEY
+OPENAI_API_KEY
+GMAIL_CLIENT_ID
+GMAIL_CLIENT_SECRET
+LICENSE_API_KEY
+16.18 Artifact Management
+
+Build artifacts include:
+
+Windows installer
+Source maps (restricted)
+Release notes
+Checksums
+Coverage reports
+
+Artifacts should be retained according to project retention policies.
+
+16.19 Logging & Monitoring
+
+Build pipelines should log:
+
+Build duration
+Test results
+Coverage
+Package size
+Warnings
+Errors
+
+Production monitoring should capture:
+
+Application crashes
+Sync failures
+Update failures
+AI request failures
+16.20 Release Checklist
+
+Before every production release:
+
+Feature freeze completed.
+All tests pass.
+Code review completed.
+Documentation updated.
+Release notes prepared.
+Version number updated.
+Installer generated.
+Code signing completed.
+Auto-update verified.
+Backup of production configuration completed.
+16.21 Rollback Strategy
+
+If a release introduces critical issues:
+
+Disable automatic updates (if necessary).
+Revert to the previous stable release.
+Publish a hotfix or rollback release.
+Notify users through release notes or in-app messaging.
+Investigate root cause before re-releasing.
+
+Rollback procedures should be tested periodically.
+
+16.22 Dependency Management
+
+Dependencies are managed with pnpm.
+
+Guidelines:
+
+Keep dependencies up to date.
+Remove unused packages.
+Review security advisories.
+Lock versions using the lockfile.
+Test after major upgrades.
+16.23 Documentation Requirements
+
+Every release must include:
+
+Changelog
+Release notes
+Updated TRD/PRD (if applicable)
+Migration notes (if needed)
+Known issues
+Upgrade instructions
+16.24 Metrics
+
+DevOps success metrics:
+
+Metric	Target
+Build Success Rate	>98%
+CI Pipeline Time	<10 minutes
+Deployment Success Rate	>99%
+Failed Release Rate	<2%
+Mean Time to Recovery (MTTR)	<2 hours
+Automated Test Pass Rate	>95%
+16.25 Disaster Recovery
+
+In the event of infrastructure failure:
+
+Restore repositories from GitHub.
+Restore Supabase backups.
+Restore release artifacts.
+Rebuild CI/CD environment.
+Verify application integrity before resuming deployments.
+
+Disaster recovery procedures should be documented and tested.
+
+16.26 Future Enhancements
+
+Potential future improvements include:
+
+Self-hosted update server
+Multi-platform build automation (macOS/Linux)
+Canary releases
+Feature flags
+Blue/Green deployments
+Automated performance regression detection
+AI-assisted code review
+16.27 Acceptance Criteria
+
+The CI/CD and DevOps framework is considered complete when:
+
+Source code is managed through Git with a defined branching strategy.
+CI pipelines automatically validate every change.
+Releases are versioned using SemVer.
+Production builds are packaged and signed.
+Auto-updates function correctly.
+Secrets are securely managed.
+Rollback procedures are documented.
+Release documentation is complete.
+Chapter Summary
+
+This chapter defines Finch's CI/CD, DevOps, and Release Management strategy. It covers repository organization, Git workflow, automated testing, build pipelines, packaging, versioning, code signing, deployment, auto-updates, and rollback procedures. Together, these practices provide a reliable, secure, and scalable software delivery process that supports continuous improvement while maintaining production stability.

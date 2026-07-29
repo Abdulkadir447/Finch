@@ -1,0 +1,395 @@
+Finch Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 18 — Maintenance, Support & Future Roadmap
+18.1 Purpose
+
+This chapter defines how Finch will be maintained, supported, monitored, and improved after Version 1.0 is released.
+
+The goal is to ensure that Finch remains:
+
+Reliable
+Secure
+High-performing
+Easy to maintain
+Continuously improving
+Ready for future expansion
+
+Maintenance is considered a continuous process rather than a post-release activity.
+
+18.2 Maintenance Objectives
+
+The maintenance strategy aims to:
+
+Keep the application stable.
+Resolve defects quickly.
+Deliver regular improvements.
+Maintain compatibility with dependencies.
+Improve AI capabilities.
+Protect user data.
+Extend the product lifecycle.
+18.3 Maintenance Types
+Corrective Maintenance
+
+Fix bugs discovered after release.
+
+Examples:
+
+Application crashes
+Sync failures
+Incorrect reports
+UI bugs
+Adaptive Maintenance
+
+Update Finch to remain compatible with:
+
+Windows updates
+Electron releases
+React releases
+Supabase updates
+OpenAI API changes
+Perfective Maintenance
+
+Improve existing functionality.
+
+Examples:
+
+Faster dashboard loading
+Better AI prompts
+Improved invoice design
+UI refinements
+Preventive Maintenance
+
+Reduce future issues.
+
+Examples:
+
+Refactoring
+Dependency updates
+Performance optimization
+Security improvements
+18.4 Version Lifecycle
+
+Each release follows the lifecycle below.
+
+Planning
+      │
+Development
+      │
+Testing
+      │
+Release Candidate
+      │
+Production
+      │
+Maintenance
+      │
+Next Release
+
+Every version should have a documented support period.
+
+18.5 Release Schedule
+
+Recommended release cadence:
+
+Release Type	Frequency
+Patch (Bug Fixes)	As needed (typically monthly)
+Minor Feature Release	Every 2–3 months
+Major Release	Every 12 months
+Hotfix	Immediately when required
+
+Release dates may be adjusted based on testing and business priorities.
+
+18.6 Long-Term Support (LTS)
+
+Each major version should receive:
+
+Security updates
+Critical bug fixes
+Compatibility updates
+
+Recommended support duration:
+
+12 months from the initial release date.
+
+Users should be encouraged to upgrade to newer versions before support ends.
+
+18.7 Bug Fix Policy
+
+Bug priorities:
+
+Priority	Target Resolution
+Critical	Within 24 hours
+High	Within 3 business days
+Medium	Within 7 business days
+Low	Next scheduled release
+
+Critical issues include:
+
+Data corruption
+Data loss
+Authentication failures
+Security vulnerabilities
+Application crashes preventing normal use
+18.8 Monitoring
+
+The application should monitor:
+
+Startup time
+Crash frequency
+Sync failures
+Database errors
+AI request failures
+Update failures
+Performance bottlenecks
+
+Monitoring data should be anonymized where applicable and collected only with user consent.
+
+18.9 Logging
+
+Application logs should include:
+
+Errors
+Warnings
+Synchronization events
+Update events
+Backup events
+AI request metadata (excluding sensitive prompts unless necessary for debugging)
+
+Log levels:
+
+Error
+Warn
+Info
+Debug
+Trace (development only)
+
+Logs should support troubleshooting while protecting user privacy.
+
+18.10 Performance Monitoring
+
+Performance metrics include:
+
+Metric	Target
+Startup Time	<3 seconds
+Dashboard Load	<2 seconds
+SQLite Query	<100 ms
+Sync Start	<1 second
+AI Response	<2 seconds (excluding model generation time)
+Memory Usage	<500 MB typical workload
+CPU Usage (Idle)	<5%
+
+Performance regressions should be investigated before future releases.
+
+18.11 Dependency Management
+
+Dependencies should be reviewed regularly.
+
+Maintenance activities include:
+
+Updating packages
+Removing unused dependencies
+Addressing security advisories
+Testing compatibility after upgrades
+
+Major dependency upgrades should be tested thoroughly before release.
+
+18.12 Documentation Maintenance
+
+Documentation should be updated whenever:
+
+Features are added
+APIs change
+Database schema changes
+UI changes
+Security changes
+Installation steps change
+
+Documentation includes:
+
+PRD
+TRD
+API documentation
+User guide
+Developer guide
+Release notes
+Changelog
+18.13 User Support
+
+Support channels may include:
+
+Email support
+Documentation website (future)
+In-app Help Center (future)
+Community forum (future)
+AI-powered support assistant (future)
+
+Support requests should include:
+
+Application version
+Operating system
+Error description
+Logs (if available)
+Screenshots (if applicable)
+18.14 Backup & Recovery Maintenance
+
+Users should be encouraged to:
+
+Create regular backups.
+Verify backup integrity.
+Store backups securely.
+Test restoring backups periodically.
+
+Future versions may support automated encrypted backups.
+
+18.15 Technical Debt Management
+
+Technical debt should be tracked and prioritized.
+
+Examples:
+
+Refactoring duplicated code
+Simplifying complex modules
+Improving test coverage
+Replacing deprecated APIs
+Updating architecture
+
+Each release should allocate time for technical debt reduction.
+
+18.16 Deprecation Policy
+
+Deprecated features should:
+
+Be documented.
+Continue functioning during the deprecation period.
+Display appropriate warnings (where applicable).
+Be removed only in a future major version.
+
+Users should receive advance notice before breaking changes.
+
+18.17 Roadmap
+Version 1.0
+
+Core features:
+
+Dashboard
+AI Assistant
+Orders
+Inventory
+Customers
+Reports
+Offline-first architecture
+SQLite + Supabase synchronization
+GPT-5.5 integration
+Gmail integration
+Invoice generation
+Backup and restore
+Online license activation
+Version 1.1
+
+Planned improvements:
+
+Enhanced forecasting
+Dashboard customization
+More report templates
+Performance optimizations
+Additional AI prompts
+Improved invoice customization
+Version 1.5
+
+Planned additions:
+
+Purchase Orders
+Supplier Management
+Expense Tracking
+Budget Planning
+Advanced analytics
+Barcode scanning support
+Version 2.0
+
+Major expansion:
+
+Mobile companion app
+Voice AI
+AI Agents
+Multi-company support
+Multi-warehouse support
+Team collaboration
+Role-based permissions
+Workflow automation
+Calendar integration
+Cloud backup scheduling
+Version 3.0
+
+Long-term vision:
+
+AI-powered business automation
+Predictive inventory management
+Cash-flow forecasting
+Marketing automation
+Supplier recommendations
+AI document processing
+Natural language business queries
+Enterprise integrations
+Plugin marketplace
+18.18 Success Metrics
+
+Finch should strive to achieve:
+
+Metric	Target
+Active Users	≥1,000
+Crash-Free Sessions	≥99.5%
+AI Accuracy	≥95%
+Forecast Accuracy	≥90%
+Sync Success Rate	≥99%
+User Satisfaction	≥4.5/5
+Support Response Time	<24 hours
+
+These metrics should be reviewed periodically to guide future improvements.
+
+18.19 End-of-Life (EOL) Policy
+
+When a version reaches end-of-life:
+
+Security updates cease.
+Bug fixes cease.
+Documentation remains archived.
+Users are notified to upgrade.
+Migration guidance is provided where applicable.
+
+Major versions should receive clear EOL announcements well in advance.
+
+18.20 Product Vision
+
+Finch's long-term vision is to become an AI-first business operating system for small and medium-sized businesses.
+
+The product aims to:
+
+Centralize daily business operations.
+Reduce administrative workload.
+Deliver actionable AI insights.
+Operate reliably online and offline.
+Scale from single-owner businesses to larger organizations.
+Integrate seamlessly with future business tools and services.
+
+Every future release should support this vision while maintaining a focus on simplicity, reliability, and user trust.
+
+18.21 Acceptance Criteria
+
+The maintenance and roadmap strategy is considered complete when:
+
+A clear maintenance process is defined.
+Release and support policies are established.
+Monitoring and logging strategies are implemented.
+Documentation is maintained.
+Technical debt is actively managed.
+Future roadmap is documented.
+Product vision aligns with business objectives.
+Chapter Summary
+
+This chapter concludes the Finch Technical Requirements Document by defining the long-term maintenance, support, and evolution strategy for the product. It establishes structured maintenance practices, release policies, monitoring, documentation standards, technical debt management, and a multi-version roadmap. These guidelines ensure Finch remains reliable, secure, scalable, and continuously aligned with its vision of becoming an AI-first business operating system

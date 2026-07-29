@@ -1,0 +1,399 @@
+Finch Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 10 — Customer Management Schema
+10.1 Purpose
+
+The Customer Management module is responsible for storing and managing all customer-related information within Finch. It provides a complete view of every customer by combining contact information, purchase history, financial statistics, AI-generated insights, communication history, and future loyalty features into a single unified profile.
+
+Every customer belongs to exactly one business and is protected by business isolation and Row Level Security (RLS).
+
+10.2 Objectives
+
+The Customer Management module must:
+
+Store complete customer profiles.
+Maintain customer contact information.
+Record purchase history.
+Store customer notes.
+Support customer groups.
+Prepare for future loyalty programs.
+Generate customer analytics.
+Provide AI-powered customer insights.
+Work completely offline.
+Synchronize efficiently.
+10.3 Architecture
+Business
+    │
+    ▼
+Customers
+    │
+ ┌──┼─────────┬────────┬─────────┐
+ ▼  ▼         ▼        ▼         ▼
+Orders Notes Groups Analytics AI
+
+The Customer module integrates with nearly every operational module in Finch.
+
+10.4 Core Tables
+Table	Purpose
+customers	Main customer profile
+customer_addresses	Customer addresses
+customer_notes	Internal notes
+customer_groups	Customer segmentation
+customer_group_members	Group membership
+customer_analytics	Cached customer metrics
+customer_attachments	Documents and files
+customer_activity	Customer timeline
+10.5 Customers Table
+Table: customers
+Column	Type
+id	UUID
+business_id	UUID
+customer_code	TEXT
+first_name	TEXT
+last_name	TEXT
+company_name	TEXT
+email	TEXT
+phone_number	TEXT
+status	TEXT
+preferred_contact_method	TEXT
+date_of_birth	DATE
+created_at	TIMESTAMPTZ
+updated_at	TIMESTAMPTZ
+deleted_at	TIMESTAMPTZ
+version	INTEGER
+
+Every customer receives a unique customer code within the business.
+
+Example:
+
+CUS-000124
+10.6 Customer Addresses
+Table: customer_addresses
+
+Supports multiple addresses.
+
+Column	Type
+id	UUID
+customer_id	UUID
+address_type	TEXT
+country	TEXT
+state	TEXT
+city	TEXT
+postal_code	TEXT
+address_line_1	TEXT
+address_line_2	TEXT
+created_at	TIMESTAMPTZ
+
+Address types:
+
+Home
+Business
+Shipping
+Billing
+10.7 Customer Status
+
+Customer lifecycle:
+
+Lead
+
+↓
+
+Active
+
+↓
+
+Inactive
+
+↓
+
+Archived
+
+Future CRM functionality may introduce additional statuses.
+
+10.8 Purchase History
+
+Customer purchase history is generated automatically from Orders.
+
+Metrics include:
+
+Total Orders
+Total Revenue
+Average Order Value
+First Purchase
+Latest Purchase
+Last Activity
+Total Refunds
+
+No duplicate order information is stored.
+
+10.9 Customer Notes
+Table: customer_notes
+
+Stores private business notes.
+
+Examples:
+
+Preferred products
+Payment habits
+Delivery instructions
+VIP customer
+Follow-up reminders
+
+Notes are never visible on invoices or receipts.
+
+10.10 Customer Groups
+
+Businesses may organize customers into groups.
+
+Examples:
+
+VIP Customers
+
+Wholesale
+
+Retail
+
+Corporate
+
+Returning Customers
+
+High Value
+
+Inactive Customers
+
+Groups simplify reporting and future marketing campaigns.
+
+10.11 Customer Group Members
+Table: customer_group_members
+
+Creates a many-to-many relationship.
+
+Customer
+
+↓
+
+Group Membership
+
+↓
+
+Customer Group
+
+A customer may belong to multiple groups.
+
+10.12 Customer Attachments
+
+Customers may contain:
+
+Contracts
+Images
+Identification
+Agreements
+Other documents
+
+Files are stored securely in Supabase Storage.
+
+10.13 Customer Analytics
+Table: customer_analytics
+
+Stores cached metrics.
+
+Metric
+Lifetime Value
+Average Order Value
+Orders Count
+Refund Count
+Last Purchase
+Purchase Frequency
+Days Since Last Purchase
+
+These values are recalculated automatically.
+
+10.14 AI Customer Insights
+
+The AI Assistant can:
+
+Identify high-value customers.
+Detect inactive customers.
+Predict repeat purchases.
+Recommend promotions.
+Identify customers at risk of leaving.
+Summarize customer history.
+Suggest follow-up actions.
+
+AI recommendations are generated using purchase behavior and historical trends.
+
+10.15 Customer Activity Timeline
+Table: customer_activity
+
+Records events such as:
+
+Customer created
+Profile updated
+Order placed
+Refund processed
+Note added
+Group assigned
+Attachment uploaded
+AI recommendation generated
+
+Timeline example:
+
+Customer Created
+
+↓
+
+First Purchase
+
+↓
+
+VIP Group Added
+
+↓
+
+Order Completed
+
+↓
+
+AI Recommendation
+10.16 Preferred Contact Method
+
+Supported contact methods:
+
+Email
+Phone
+SMS (future)
+WhatsApp (future)
+
+This preference guides future communication features.
+
+10.17 Customer Search
+
+Customers can be searched by:
+
+Customer Code
+Name
+Company
+Email
+Phone Number
+
+Search should support partial matches and return results instantly using indexed fields.
+
+10.18 Relationships
+customers
+     │
+     ├── customer_addresses
+     ├── customer_notes
+     ├── customer_attachments
+     ├── customer_activity
+     ├── customer_group_members
+     ├── customer_analytics
+     └── orders
+
+The Customer module is directly linked to Orders, Reports, AI, and Notifications.
+
+10.19 Synchronization
+
+Customer synchronization includes:
+
+Profile creation
+Updates
+Notes
+Group assignments
+Attachments
+Analytics refresh
+Activity events
+
+Only modified records are synchronized to minimize bandwidth.
+
+10.20 Security
+
+Customer information is protected using:
+
+Authentication
+Business ownership
+Role permissions
+Row Level Security (RLS)
+
+Sensitive customer data is encrypted where appropriate and is never shared across businesses.
+
+10.21 Performance
+
+Indexes should exist on:
+
+business_id
+customer_code
+email
+phone_number
+company_name
+last_name
+created_at
+
+Frequently accessed customer summaries should be cached locally to improve dashboard and search performance.
+
+10.22 Audit Logging
+
+The following customer events are recorded:
+
+Customer created
+Customer updated
+Customer archived
+Address added
+Note added
+Group assigned
+Attachment uploaded
+Customer restored
+AI insight accepted
+
+All events include the acting user, timestamp, and affected business.
+
+10.23 Offline Behavior
+
+The Customer module fully supports offline operation.
+
+Users can:
+
+Create customers
+Edit profiles
+Add addresses
+Write notes
+Assign groups
+View purchase history
+Search customers
+
+All changes are stored in the local SQLite database and synchronized automatically when connectivity returns.
+
+10.24 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all customer-related tables.
+Keep addresses, notes, groups, analytics, and attachments in separate normalized tables.
+Generate customer analytics asynchronously to avoid slowing transactional operations.
+Reference orders instead of duplicating purchase data.
+Store attachments in Supabase Storage and reference them by URL.
+Cache frequently accessed customer summaries locally.
+Protect all customer data with Row Level Security (RLS).
+Design the schema to support future CRM, loyalty, and marketing automation features.
+10.25 Acceptance Criteria
+
+The Customer Management Schema is complete when:
+
+Customer profiles store complete contact information.
+Multiple addresses are supported.
+Purchase history is derived from orders.
+Customer notes and attachments function correctly.
+Customer groups support many-to-many relationships.
+AI generates customer insights.
+Customer analytics are calculated automatically.
+Offline functionality works correctly.
+Synchronization uploads only modified records.
+All customer data is secured by RLS and audited.
+10.26 Chapter Summary
+
+The Customer Management Schema provides Finch with a centralized, scalable customer database that combines profile information, purchase history, analytics, notes, and AI-powered insights into a unified customer view. Its normalized design, offline-first architecture, and deep integration with Orders, Reports, and AI prepare the platform for future CRM capabilities, loyalty programs, targeted marketing, and enterprise customer relationship management while maintaining performance, security, and data isolation.

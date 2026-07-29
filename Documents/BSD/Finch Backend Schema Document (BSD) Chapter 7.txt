@@ -1,0 +1,314 @@
+Finch Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 7 — Company Settings Schema
+7.1 Purpose
+
+This chapter defines how Finch stores, manages, and applies company-wide settings. These settings control how the application behaves for a specific business, ensuring consistency across all users, devices, reports, invoices, AI interactions, and synchronization processes.
+
+Each registered business has its own independent settings, allowing multiple businesses under the same account to operate with completely different configurations.
+
+7.2 Objectives
+
+The Company Settings module must:
+
+Store business-wide preferences.
+Support localization and regional settings.
+Configure financial defaults.
+Manage invoice and receipt numbering.
+Control AI behavior.
+Configure notifications.
+Manage backup and synchronization preferences.
+Support future feature flags.
+Synchronize settings across devices.
+Remain extensible for future versions.
+7.3 Architecture
+             Business
+                │
+                ▼
+       Company Settings
+      ┌────┼────┬────┬────┐
+      ▼    ▼    ▼    ▼    ▼
+ General Finance AI Sync Notifications
+      │
+      ▼
+ Application Modules
+
+Every module reads configuration from the Company Settings service.
+
+7.4 Core Tables
+
+The Company Settings module consists of:
+
+Table	Purpose
+business_settings	General company settings
+financial_settings	Financial defaults
+numbering_settings	Invoice and receipt numbering
+ai_settings	AI configuration
+notification_settings	Notification preferences
+backup_settings	Backup configuration
+sync_settings	Synchronization settings
+feature_flags	Feature availability
+7.5 Business Settings Table
+Table: business_settings
+
+Stores general business preferences.
+
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+language	TEXT	Default language
+timezone	TEXT	Business timezone
+currency	TEXT	Default currency
+date_format	TEXT	Date format
+time_format	TEXT	12/24-hour format
+first_day_of_week	TEXT	Week start day
+created_at	TIMESTAMPTZ	Creation timestamp
+updated_at	TIMESTAMPTZ	Last modification
+7.6 Financial Settings
+Table: financial_settings
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+default_tax_rate	NUMERIC	Tax percentage
+tax_inclusive	BOOLEAN	Prices include tax
+decimal_precision	INTEGER	Decimal places
+rounding_method	TEXT	Standard, Up, Down
+default_discount	NUMERIC	Default discount
+created_at	TIMESTAMPTZ	Creation timestamp
+updated_at	TIMESTAMPTZ	Last update
+
+These settings are used by Orders, Reports, and Inventory.
+
+7.7 Invoice & Receipt Numbering
+Table: numbering_settings
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+invoice_prefix	TEXT	Example: INV
+receipt_prefix	TEXT	Example: REC
+quote_prefix	TEXT	Example: QUO
+order_prefix	TEXT	Example: ORD
+next_invoice_number	INTEGER	Auto-increment value
+next_receipt_number	INTEGER	Auto-increment value
+reset_frequency	TEXT	Never, Monthly, Yearly
+updated_at	TIMESTAMPTZ	Last update
+
+Example generated invoice:
+
+INV-2026-000125
+7.8 AI Settings
+Table: ai_settings
+
+Stores business-wide AI preferences.
+
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+ai_enabled	BOOLEAN	Enable AI
+default_model	TEXT	OpenAI model
+max_context_messages	INTEGER	Conversation history limit
+auto_summarize	BOOLEAN	Summarize long chats
+save_conversations	BOOLEAN	Store AI history
+allow_ai_reports	BOOLEAN	AI-generated reports
+updated_at	TIMESTAMPTZ	Last update
+
+These settings apply to every AI interaction within the business.
+
+7.9 Notification Settings
+Table: notification_settings
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+desktop_notifications	BOOLEAN	Enable desktop alerts
+in_app_notifications	BOOLEAN	Enable in-app alerts
+low_stock_alerts	BOOLEAN	Inventory alerts
+order_notifications	BOOLEAN	Sales notifications
+ai_notifications	BOOLEAN	AI updates
+auto_delete_after_days	INTEGER	Retention period
+updated_at	TIMESTAMPTZ	Last update
+
+Notifications are automatically removed after the configured retention period.
+
+7.10 Backup Settings
+Table: backup_settings
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+automatic_backups	BOOLEAN	Enable scheduled backups
+backup_frequency	TEXT	Daily, Weekly, Monthly
+keep_backup_count	INTEGER	Number of backups to retain
+backup_location	TEXT	Local or cloud
+encrypt_backups	BOOLEAN	Encrypt backup files
+updated_at	TIMESTAMPTZ	Last update
+
+Backups follow the retention policy defined here.
+
+7.11 Synchronization Settings
+Table: sync_settings
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+auto_sync	BOOLEAN	Enable automatic sync
+sync_interval_minutes	INTEGER	Background sync interval
+sync_on_startup	BOOLEAN	Sync when app opens
+sync_on_shutdown	BOOLEAN	Sync before exit
+conflict_strategy	TEXT	Ask User, Local Wins, Cloud Wins
+updated_at	TIMESTAMPTZ	Last update
+
+The default conflict strategy follows the application's conflict resolution workflow.
+
+7.12 Feature Flags
+Table: feature_flags
+
+Controls experimental and future features.
+
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+feature_key	TEXT	Unique identifier
+enabled	BOOLEAN	Feature status
+rollout_version	TEXT	First supported version
+updated_at	TIMESTAMPTZ	Last update
+
+Examples:
+
+advanced_reports
+
+multi_location
+
+plugin_support
+
+enterprise_dashboard
+
+realtime_collaboration
+7.13 Settings Loading Flow
+User Opens Business
+        │
+        ▼
+Load Settings
+        │
+        ▼
+Cache Locally
+        │
+        ▼
+Initialize Modules
+
+Settings are loaded once during startup and refreshed only when modified.
+
+7.14 Settings Cache
+
+Frequently used settings are cached locally.
+
+Examples:
+
+Currency
+Theme
+Tax rate
+AI preferences
+Notification preferences
+Synchronization settings
+
+Caching minimizes database queries and improves startup performance.
+
+7.15 Settings Validation
+
+Before saving, Finch validates:
+
+Supported language
+Valid timezone
+Existing currency code
+Positive tax rates
+Valid numbering prefixes
+Supported AI model
+Acceptable synchronization interval
+
+Invalid values are rejected before reaching the database.
+
+7.16 Default Values
+
+When a new business is created, default settings are generated automatically.
+
+Example defaults:
+
+Setting	Default
+Language	English
+Currency	Based on business location
+Theme	System
+Auto Sync	Enabled
+Desktop Notifications	Enabled
+AI Enabled	Enabled
+Automatic Backups	Enabled
+
+Defaults may be adjusted during the onboarding process.
+
+7.17 Relationships
+businesses
+      │
+      ├── business_settings
+      ├── financial_settings
+      ├── numbering_settings
+      ├── ai_settings
+      ├── notification_settings
+      ├── backup_settings
+      ├── sync_settings
+      └── feature_flags
+
+Each business owns exactly one configuration record in each settings table, except feature_flags, which may contain multiple entries.
+
+7.18 Security
+
+Company settings are considered sensitive business data.
+
+Only authorized users with the appropriate permission (for example, Owner or Administrator) may:
+
+Modify settings.
+Reset settings.
+Change financial defaults.
+Configure AI.
+Manage backup or synchronization options.
+
+All changes are recorded in the audit log.
+
+7.19 Performance Considerations
+
+To optimize performance:
+
+Cache settings in SQLite after the first load.
+Synchronize only modified settings.
+Batch multiple updates into a single transaction.
+Refresh cached settings immediately after successful synchronization.
+
+These strategies reduce unnecessary cloud requests.
+
+7.20 Developer Implementation Notes
+
+Implementation guidelines:
+
+Separate settings into dedicated tables to keep the schema normalized.
+Store configurable values using appropriate data types rather than free-form JSON where possible.
+Use JSONB only for settings that require flexible structures in future releases.
+Automatically create default settings when a new business is registered.
+Invalidate the local cache whenever settings change.
+Protect all settings tables with Row Level Security (RLS).
+Audit every settings modification for traceability.
+7.21 Acceptance Criteria
+
+The Company Settings Schema is complete when:
+
+Every business has default settings.
+Financial, AI, backup, synchronization, and notification settings are stored separately.
+Invoice and receipt numbering works correctly.
+Settings synchronize across devices.
+Cached settings improve startup performance.
+Unauthorized users cannot modify company settings.
+Feature flags can enable or disable future functionality.
+All changes are logged and protected by RLS.
+7.22 Chapter Summary
+
+The Company Settings Schema provides the centralized configuration layer for Finch. By organizing business preferences into specialized tables for financial rules, AI behavior, numbering, notifications, backups, synchronization, and feature flags, the backend remains modular, secure, and scalable. This design allows every registered business to operate independently while ensuring consistent behavior across all modules and preparing the platform for future enterprise capabilities.

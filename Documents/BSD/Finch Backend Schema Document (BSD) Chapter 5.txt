@@ -1,0 +1,328 @@
+Finch Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 5 — Business Management Schema
+5.1 Purpose
+
+This chapter defines how Finch manages businesses within the platform. Since a single user can own multiple registered businesses, the Business Management module acts as the central hub for organizing company information, ownership, branding, settings, tax details, licensing, and future expansion.
+
+Every business operates as an isolated tenant with its own data, users, settings, reports, inventory, customers, AI history, and cloud synchronization.
+
+5.2 Objectives
+
+The Business Management module must:
+
+Allow users to register multiple businesses.
+Keep each business completely isolated.
+Store company information.
+Store branding assets.
+Manage licensing.
+Support future multi-location businesses.
+Support future business invitations.
+Integrate with authentication and synchronization.
+Serve as the root entity for nearly all business data.
+5.3 Business Architecture
+                 User
+                   │
+                   ▼
+             Businesses
+          ┌──────┼───────┐
+          ▼      ▼       ▼
+     Company  Branding Settings
+          │
+          ▼
+ Orders Inventory Customers Reports AI
+
+Every operational module belongs to a registered business.
+
+5.4 Business Lifecycle
+Create Account
+      │
+      ▼
+Register Business
+      │
+      ▼
+Setup Wizard
+      │
+      ▼
+Business Activated
+      │
+      ▼
+Daily Operations
+      │
+      ▼
+Archive / Delete
+
+Business registration is required before users can create business data.
+
+5.5 Businesses Table
+Table: businesses
+
+Stores the primary information about each business.
+
+Column	Type	Description
+id	UUID	Primary key
+owner_id	UUID	References profiles.id
+business_name	TEXT	Registered business name
+legal_name	TEXT	Legal business name (optional)
+registration_number	TEXT	Government registration number
+tax_id	TEXT	Business tax identification number
+email	TEXT	Business email
+phone_number	TEXT	Contact phone
+website	TEXT	Business website
+status	TEXT	Active, Suspended, Archived
+created_at	TIMESTAMPTZ	Creation timestamp
+updated_at	TIMESTAMPTZ	Last update
+
+Each business is uniquely identified by a UUID.
+
+5.6 Business Address
+
+Business addresses are stored separately to support future expansion.
+
+Table: business_addresses
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+country	TEXT	Country
+state	TEXT	State or Province
+city	TEXT	City
+postal_code	TEXT	Postal/ZIP code
+address_line_1	TEXT	Primary address
+address_line_2	TEXT	Secondary address
+created_at	TIMESTAMPTZ	Creation time
+
+Separating addresses simplifies future multi-location support.
+
+5.7 Business Branding
+Table: business_branding
+
+Stores visual identity.
+
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+logo_url	TEXT	Company logo
+favicon_url	TEXT	Future web icon
+accent_color	TEXT	Primary brand color
+secondary_color	TEXT	Secondary color
+invoice_template	TEXT	Default invoice template
+receipt_template	TEXT	Default receipt template
+updated_at	TIMESTAMPTZ	Last modification
+
+Logos and branding assets are stored in Supabase Storage.
+
+5.8 Business Settings
+Table: business_settings
+
+Stores operational preferences.
+
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+currency	TEXT	Default currency
+timezone	TEXT	Business timezone
+date_format	TEXT	Preferred format
+language	TEXT	Default language
+fiscal_year_start	DATE	Fiscal year start
+low_stock_threshold	INTEGER	Inventory warning level
+auto_backup	BOOLEAN	Enable backups
+created_at	TIMESTAMPTZ	Creation time
+updated_at	TIMESTAMPTZ	Last update
+
+Settings are automatically synchronized across devices.
+
+5.9 Business Registration Flow
+User Login
+      │
+      ▼
+Business Exists?
+      │
+ ┌────┴────┐
+ │         │
+Yes       No
+ │         │
+ ▼         ▼
+Dashboard  Setup Wizard
+
+The Setup Wizard collects all required business information before activation.
+
+5.10 Multiple Businesses
+
+One account may own multiple businesses.
+
+Account
+   │
+   ├── Business A
+   ├── Business B
+   ├── Business C
+   └── Business D
+
+Switching businesses updates the active business context while maintaining the same authenticated session.
+
+5.11 Business Status
+
+Supported business states:
+
+Status	Description
+Pending	Registration incomplete
+Active	Fully operational
+Suspended	Temporarily disabled
+Archived	Read-only
+Deleted	Awaiting permanent deletion
+
+Business status affects available operations throughout the application.
+
+5.12 Licensing
+
+Every business stores its license information.
+
+Table: business_licenses
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+license_type	TEXT	One-Time Purchase
+license_key	TEXT	Encrypted license key
+activated_at	TIMESTAMPTZ	Activation date
+expires_at	TIMESTAMPTZ	Future use if subscription model is introduced
+status	TEXT	Active, Expired, Revoked
+
+Although Version 1 uses a one-time purchase model, the schema supports future subscription plans.
+
+5.13 Tax Information
+
+Business tax settings are stored separately.
+
+Table: business_tax_settings
+Column	Type	Description
+id	UUID	Primary key
+business_id	UUID	Business reference
+tax_id	TEXT	Tax identification number
+default_tax_rate	NUMERIC	Default tax percentage
+tax_inclusive	BOOLEAN	Prices include tax
+updated_at	TIMESTAMPTZ	Last modification
+
+Tax information is used during order processing and report generation.
+
+5.14 Future Multi-Location Support
+
+The schema supports future branch management.
+
+Business
+     │
+     ├── Headquarters
+     ├── Branch A
+     ├── Branch B
+     └── Branch C
+
+Each branch will eventually have:
+
+Inventory
+Staff
+Sales
+Reports
+Transfers
+
+Version 1 stores a single primary location while maintaining compatibility with future expansion.
+
+5.15 Business Ownership
+
+Ownership rules:
+
+Every business has one primary owner.
+Future versions may support ownership transfer.
+Owners have unrestricted access.
+Additional users receive permissions through roles.
+
+Ownership is managed separately from role assignments.
+
+5.16 Business Deletion
+
+Businesses use soft deletion.
+
+Delete Business
+        │
+        ▼
+Archive
+        │
+        ▼
+Retention Period
+        │
+        ▼
+Permanent Deletion
+
+During the retention period, owners may restore the business.
+
+5.17 Relationships
+businesses
+      │
+      ├── business_addresses
+      ├── business_branding
+      ├── business_settings
+      ├── business_tax_settings
+      ├── business_licenses
+      ├── users
+      ├── orders
+      ├── inventory
+      ├── customers
+      ├── reports
+      └── AI history
+
+The businesses table acts as the root entity for nearly all operational data.
+
+5.18 Row Level Security (RLS)
+
+All business tables enforce Row Level Security.
+
+Access is granted only when:
+
+The user is authenticated.
+The user belongs to the business.
+The user's role has the required permissions.
+
+This prevents unauthorized access between businesses.
+
+5.19 Performance Considerations
+
+To maintain responsiveness:
+
+Index business_id, owner_id, and status.
+Cache active business information locally.
+Synchronize only the active business by default.
+Load branding assets on demand.
+Batch business-related updates during synchronization.
+
+These optimizations reduce startup time and cloud bandwidth usage.
+
+5.20 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all business-related tables.
+Treat businesses as the root entity for business-owned data.
+Store branding assets in Supabase Storage and reference them by URL.
+Separate settings, branding, licensing, and tax information into dedicated tables to maintain normalization.
+Implement soft deletion with configurable retention periods.
+Prepare the schema for future multi-location and ownership transfer features.
+Apply RLS consistently to all business-related tables.
+5.21 Acceptance Criteria
+
+The Business Management Schema is complete when:
+
+Users can register multiple businesses.
+Each business is fully isolated.
+Company information, branding, and settings are stored correctly.
+Licensing and tax information are managed securely.
+Business switching works without requiring reauthentication.
+Soft deletion and restoration function correctly.
+Future multi-location support is accommodated.
+RLS protects all business data.
+Performance targets for business operations are achieved.
+5.22 Chapter Summary
+
+The Business Management Schema establishes the organizational foundation of Finch. Every operational module—from orders and inventory to AI conversations and reports—is anchored to a registered business, ensuring complete data isolation, security, and scalability. By separating company details, branding, licensing, settings, and tax information into dedicated tables, the schema remains clean, extensible, and ready for future enterprise capabilities such as multi-location operations, ownership transfers, and advanced collaboration.

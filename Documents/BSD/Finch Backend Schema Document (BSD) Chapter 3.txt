@@ -1,0 +1,383 @@
+Finch Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 3 — Authentication Schema
+3.1 Purpose
+
+This chapter defines the authentication architecture for Finch. Authentication is responsible for verifying user identity, protecting business data, managing user sessions, and providing secure access to all backend services.
+
+Finch uses Supabase Authentication as its identity provider while integrating with the local desktop application to provide a seamless offline-first experience.
+
+The authentication system supports:
+
+Email & Password authentication
+Google Sign-In
+Session management
+Offline login
+Multiple businesses per account
+Future multi-user organizations
+Secure synchronization
+3.2 Objectives
+
+The authentication system must:
+
+Provide secure account registration.
+Support Email and Google sign-in.
+Verify email addresses.
+Allow secure password recovery.
+Support automatic login restoration.
+Enable offline authentication using cached sessions.
+Protect every API request.
+Integrate with Row Level Security (RLS).
+Support future enterprise identity providers.
+3.3 Authentication Architecture
+                 User
+                   │
+                   ▼
+        Electron Desktop Client
+                   │
+                   ▼
+        Authentication Service
+                   │
+         ┌─────────┼─────────┐
+         ▼         ▼         ▼
+   Email Login  Google OAuth  Session Manager
+                   │
+                   ▼
+           Supabase Auth
+                   │
+                   ▼
+             PostgreSQL
+
+Supabase Auth acts as the source of truth for user identities.
+
+3.4 Authentication Providers
+
+Version 1 supports:
+
+Provider	Status
+Email + Password	Supported
+Google OAuth	Supported
+
+Future providers:
+
+Microsoft
+Apple
+GitHub
+Enterprise SSO (SAML/OIDC)
+3.5 Authentication Flow
+Application Starts
+        │
+        ▼
+Cached Session?
+        │
+   ┌────┴────┐
+   │         │
+ Yes        No
+   │         │
+   ▼         ▼
+Restore    Login Screen
+                │
+                ▼
+Authenticate
+                │
+                ▼
+Dashboard
+
+If the session is valid, users are signed in automatically.
+
+3.6 User Registration Flow
+Create Account
+       │
+       ▼
+Enter Email
+       │
+       ▼
+Create Password
+       │
+       ▼
+Verify Email
+       │
+       ▼
+Account Created
+       │
+       ▼
+Business Registration
+
+The account is not fully activated until the email address has been verified.
+
+3.7 Google Sign-In Flow
+Click Google Sign-In
+          │
+          ▼
+Google OAuth
+          │
+          ▼
+Supabase Auth
+          │
+          ▼
+User Profile Created
+          │
+          ▼
+Dashboard
+
+If this is the user's first login, Finch creates the associated user profile automatically.
+
+3.8 Password Requirements
+
+Passwords must contain:
+
+Minimum 8 characters
+At least one uppercase letter
+At least one lowercase letter
+At least one number
+At least one special character
+
+Passwords are never stored directly by Finch; they are securely managed by Supabase Auth.
+
+3.9 Email Verification
+
+New accounts require email verification.
+
+Register
+    │
+    ▼
+Verification Email
+    │
+    ▼
+User Clicks Link
+    │
+    ▼
+Verified
+
+Unverified accounts cannot create businesses or synchronize cloud data.
+
+3.10 Password Recovery
+Forgot Password
+        │
+        ▼
+Enter Email
+        │
+        ▼
+Recovery Email
+        │
+        ▼
+Reset Password
+        │
+        ▼
+Login
+
+Recovery links expire after a configurable period for security.
+
+3.11 User Profile Schema
+
+Every authenticated account has a corresponding profile.
+
+Table: profiles
+Column	Type	Description
+id	UUID	Primary key (matches Supabase Auth user ID)
+full_name	TEXT	User's full name
+email	TEXT	Primary email address
+avatar_url	TEXT	Profile image
+phone_number	TEXT	Optional contact number
+preferred_language	TEXT	Future localization support
+timezone	TEXT	User's preferred timezone
+created_at	TIMESTAMPTZ	Account creation time
+updated_at	TIMESTAMPTZ	Last profile update
+
+The profiles.id field references the authenticated user ID from Supabase Auth.
+
+3.12 Session Management
+
+Each authenticated session contains:
+
+User ID
+Access Token
+Refresh Token
+Device Identifier
+Session Start Time
+Last Activity Time
+
+Sessions are refreshed automatically while the user remains active.
+
+3.13 Offline Authentication
+
+Finch supports offline login using cached credentials.
+
+Launch Application
+        │
+        ▼
+Internet Available?
+        │
+ ┌──────┴──────┐
+ │             │
+Yes           No
+ │             │
+ ▼             ▼
+Supabase     Cached Session
+ │             │
+ ▼             ▼
+Dashboard   Dashboard
+
+Offline login is permitted only if:
+
+A valid authenticated session exists locally.
+The cached session has not expired.
+The user's account was previously authenticated online.
+3.14 Multiple Businesses
+
+A single account may own multiple registered businesses.
+
+Account
+   │
+   ├── Business A
+   ├── Business B
+   └── Business C
+
+Users can switch between businesses without signing out.
+
+Each business maintains complete data isolation.
+
+3.15 Future Multi-User Support
+
+Although Version 1 primarily targets business owners, the authentication schema supports future roles.
+
+Potential roles include:
+
+Owner
+Administrator
+Manager
+Accountant
+Cashier
+Sales Representative
+Inventory Manager
+Support Staff
+
+Role permissions are defined separately from authentication.
+
+3.16 Account Status
+
+Supported account states:
+
+Status	Description
+Pending	Awaiting email verification
+Active	Full access
+Suspended	Temporarily disabled
+Locked	Security restriction
+Deleted	Scheduled for permanent removal
+
+Only active accounts may access Finch services.
+
+3.17 Login Security
+
+Security measures include:
+
+Secure password hashing (handled by Supabase)
+HTTPS/TLS encryption
+Email verification
+Refresh token rotation
+Session expiration
+Brute-force protection
+Rate limiting
+Device-aware session management
+3.18 Authentication State Machine
+Not Authenticated
+        │
+        ▼
+Login
+        │
+        ▼
+Authenticated
+        │
+        ▼
+Session Active
+        │
+   ┌────┴────┐
+   │         │
+Logout   Session Expired
+   │         │
+   ▼         ▼
+Not Authenticated
+
+This state machine governs user authentication throughout the application lifecycle.
+
+3.19 Row Level Security (RLS)
+
+Authentication integrates directly with PostgreSQL Row Level Security.
+
+Every query must satisfy:
+
+Authenticated user
+Authorized business
+Valid permissions
+
+No business data is returned unless the user is authorized to access it.
+
+3.20 Authentication Events
+
+The system logs major authentication events:
+
+Account created
+Email verified
+Login successful
+Login failed
+Password reset requested
+Password changed
+Logout
+Session expired
+Account suspended
+
+These events are written to the audit log for security and troubleshooting.
+
+3.21 Error Handling
+Error	User Response
+Invalid email	Prompt to correct email
+Incorrect password	Display generic authentication error
+Email not verified	Prompt to verify email
+Expired session	Redirect to login
+Google authentication failed	Retry or choose another login method
+Offline without cached session	Inform user that online login is required
+
+Error messages should be informative without exposing sensitive information.
+
+3.22 Performance Targets
+Operation	Target
+Email Login	<2 seconds
+Google Sign-In	<3 seconds
+Session Restore	<500 ms
+Logout	<300 ms
+Password Reset Request	<2 seconds
+Offline Authentication	<300 ms
+3.23 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use Supabase Auth as the sole identity provider.
+Store additional user information in the profiles table, linked by the Supabase Auth user ID.
+Cache authenticated sessions securely to support offline access.
+Keep authentication logic separate from authorization and business logic.
+Integrate authentication with RLS policies on all business-owned tables.
+Never expose access tokens or refresh tokens to application logs.
+Prepare the authentication layer for future OAuth providers and enterprise SSO.
+3.24 Acceptance Criteria
+
+The Authentication Schema is complete when:
+
+Users can register using email and password.
+Google Sign-In functions correctly.
+Email verification is enforced.
+Password recovery is secure.
+Sessions restore automatically.
+Offline login works with valid cached sessions.
+Multiple businesses are supported per account.
+Future role-based access is accommodated.
+RLS protects all business data.
+Authentication performance targets are met.
+3.25 Chapter Summary
+
+The Authentication Schema establishes the secure identity foundation for Finch. By leveraging Supabase Auth, supporting both email and Google authentication, enabling offline session restoration, and integrating tightly with Row Level Security, the system provides a secure, scalable, and user-friendly authentication experience. This architecture also lays the groundwork for future enterprise identity providers, advanced access control, and multi-user collaboration while maintaining the offline-first philosophy of the application.

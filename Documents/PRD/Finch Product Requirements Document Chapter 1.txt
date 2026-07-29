@@ -1,0 +1,364 @@
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+Document Version: 1.0
+Status: Draft
+Prepared For: Finch Development Team
+Target Release: Before September 2026
+
+Chapter 1 — Executive Summary
+Overview
+
+Finch is an AI-powered, offline-first desktop business management platform built specifically for small and medium-sized businesses (SMBs). It combines the essential capabilities of Enterprise Resource Planning (ERP) software with a conversational AI assistant that helps business owners understand, manage, and grow their businesses.
+
+Unlike traditional ERP software that is often expensive, difficult to learn, and dependent on cloud connectivity, Finch focuses on simplicity, speed, and intelligence. Business owners should be able to manage daily operations from a single application while receiving AI-powered insights and recommendations without needing technical expertise.
+
+Finch is designed to become the operating system for small businesses.
+
+Product Vision
+
+"Empower every small business owner with enterprise-level intelligence through an intuitive desktop application powered by AI."
+
+Finch exists to eliminate the gap between expensive enterprise software and spreadsheets.
+
+Business owners should spend less time managing data and more time making decisions.
+
+The software should feel like hiring an intelligent business assistant rather than learning another complicated application.
+
+Mission Statement
+
+Our mission is to build the smartest desktop business management software that enables business owners to:
+
+Manage operations efficiently
+Understand business performance instantly
+Forecast future growth
+Reduce repetitive administrative work
+Make confident, data-driven decisions
+
+without requiring accounting expertise or internet connectivity for core operations.
+
+Product Positioning
+
+Finch positions itself between lightweight bookkeeping applications and enterprise ERP platforms.
+
+Traditional Software	Finch
+Spreadsheet-heavy workflows	Automated workflows
+Static reports	AI-generated insights
+Manual analysis	Intelligent recommendations
+Complex ERP systems	Simple modern interface
+Cloud dependency	Offline-first architecture
+Difficult onboarding	AI-guided experience
+Value Proposition
+
+Finch provides enterprise capabilities in a modern desktop application that remains fast, intelligent, and easy to use.
+
+Core Values
+AI-first experience
+Offline-first architecture
+Enterprise-quality design
+Fast performance
+Minimal learning curve
+Secure local ownership of data
+Product Goals
+Primary Goal
+
+Become the preferred AI business assistant for small businesses.
+
+Business Goals
+Goal 1
+
+Reduce business administration time by at least 40%.
+
+Goal 2
+
+Provide understandable AI explanations for business data.
+
+Goal 3
+
+Increase decision confidence through intelligent forecasting.
+
+Goal 4
+
+Replace spreadsheet-based workflows.
+
+Goal 5
+
+Provide a premium desktop experience comparable to modern enterprise software.
+
+Success Metrics
+User Growth
+
+Target:
+
+1,000 active users after launch
+Performance
+
+Application startup:
+
+Less than 3 seconds
+
+AI response time:
+
+Less than 2 seconds (excluding network latency)
+
+Dashboard loading:
+
+Less than 1 second
+Forecast Accuracy
+
+Target:
+
+Greater than 90% forecasting accuracy using historical business data.
+
+User Satisfaction
+
+Internal target:
+
+Intuitive enough for first-time users without formal training.
+Problem Statement
+
+Small businesses face several recurring challenges:
+
+Fragmented Information
+
+Sales data, inventory, customers, invoices, and reports are often spread across multiple spreadsheets and disconnected applications.
+
+Poor Visibility
+
+Owners frequently lack a clear understanding of:
+
+revenue trends
+inventory health
+customer value
+business performance
+Manual Processes
+
+Daily operations require repetitive tasks including:
+
+creating invoices
+checking stock
+generating reports
+calculating profits
+Limited Forecasting
+
+Most small businesses rely on intuition instead of historical data when making purchasing or inventory decisions.
+
+High Software Costs
+
+Enterprise ERP systems often require:
+
+expensive subscriptions
+consultants
+training
+complex implementation
+
+making them inaccessible to many SMBs.
+
+Solution
+
+Finch solves these challenges by combining ERP functionality with artificial intelligence.
+
+The application enables business owners to:
+
+manage inventory
+manage customers
+process orders
+generate invoices
+view dashboards
+receive business insights
+ask natural language questions
+forecast sales
+generate reports
+
+all from a single desktop application.
+
+Target Audience
+Primary Audience
+
+Small and medium-sized businesses.
+
+Business Types
+Retail stores
+E-commerce sellers
+Wholesale distributors
+Consultants
+Small agencies
+Company Size
+1–20 employees
+Annual Orders
+
+Approximately
+
+50–5,000 orders
+
+Technical Experience
+
+Users should not require technical expertise.
+
+Finch must be approachable for business owners with little to no software training.
+
+Product Principles
+
+Every feature added to Finch should satisfy these principles.
+
+Principle 1
+
+AI should reduce work, not create more.
+
+Principle 2
+
+Every screen should answer an important business question.
+
+Principle 3
+
+Speed is a feature.
+
+Every interaction should feel immediate.
+
+Principle 4
+
+Offline comes first.
+
+Core business operations must continue without internet.
+
+Principle 5
+
+Professional software should still be beautiful.
+
+The interface should communicate trust, quality, and simplicity.
+
+Core Capabilities
+
+Finch v1.0 includes five major systems.
+
+Dashboard
+
+Provides a complete overview of business health.
+
+Includes:
+
+KPI cards
+Revenue charts
+Inventory summaries
+Customer growth
+Daily sales
+Orders
+
+Complete order lifecycle management.
+
+Includes:
+
+Order creation
+Invoice generation
+Status tracking
+Search
+History
+Inventory
+
+Tracks every product and stock movement.
+
+Includes:
+
+Products
+Categories
+Low stock alerts
+Inventory valuation
+Customers
+
+Central customer database.
+
+Includes:
+
+Contact information
+Purchase history
+Spending analysis
+AI Assistant
+
+The defining feature of Finch.
+
+The AI Assistant can:
+
+Generate business reports
+Explain charts
+Summarize business performance
+Create invoices
+Answer business questions
+Forecast future sales
+Recommend inventory actions
+
+Powered by OpenAI GPT-5.5, it has access to the user's business context (with appropriate permissions) to provide relevant, actionable assistance.
+
+Technical Summary
+Platform
+
+Windows Desktop
+
+Framework
+
+Electron
+
+Frontend
+
+React
+
+TypeScript
+
+Ant Design
+
+State Management
+
+Zustand
+
+Backend
+
+Supabase
+
+Local Storage
+
+SQLite (offline cache and synchronization)
+
+AI
+
+OpenAI GPT-5.5
+
+Reporting
+
+Hybrid forecasting:
+
+Statistical forecasting
+Traditional analytics
+GPT explanations
+Authentication
+Local Account
+Cloud Account (Supabase)
+Theme
+Light Mode
+Dark Mode
+Security
+Encryption
+Two-Factor Authentication
+Password Recovery
+Manual Local Backups
+Online License Activation
+Out of Scope (v1.0)
+
+The following features are intentionally excluded from the initial release:
+
+Mobile applications
+Voice AI
+AI agents
+Multi-company support
+Multiple warehouses
+Payroll
+Accounting ledger
+Marketplace integrations beyond Gmail
+Public API
+Plugin ecosystem
+
+These will be evaluated for future versions based on user feedback and product adoption.
+
+Conclusion
+
+Finch is designed to become more than an ERP—it is an intelligent business companion. By combining offline-first reliability, enterprise-grade design, and AI-powered decision support, Finch aims to help small business owners spend less time managing data and more time growing their business.

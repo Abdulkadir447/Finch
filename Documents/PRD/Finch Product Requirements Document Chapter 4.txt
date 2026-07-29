@@ -1,0 +1,557 @@
+chapter 4
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+
+Chapter 4 — Functional Requirements & Feature Specifications (Core ERP Modules)
+4.1 Purpose
+
+This chapter defines the functional requirements for Finch's core ERP modules. It serves as the engineering specification for how each feature should behave, including business rules, acceptance criteria, edge cases, and user interactions.
+
+All requirements in this chapter are considered Must Have for Finch v1.0 unless otherwise noted.
+
+4.2 Dashboard Module
+Purpose
+
+The Dashboard is the first screen users see after logging in. It provides a real-time overview of business health and surfaces actionable insights.
+
+Goals
+Give users an overview in under 30 seconds.
+Highlight issues requiring attention.
+Provide AI-generated business summaries.
+Enable quick navigation to all major modules.
+Dashboard Layout
+-------------------------------------------------------------
+ Top Navigation
+-------------------------------------------------------------
+ Sidebar | Header
+         |
+         | KPI Cards
+         |
+         | Revenue Chart
+         | Customer Growth
+         | Inventory Value
+         |
+         | Recent Orders
+         |
+         | Low Stock Alerts
+         |
+         | AI Business Summary
+-------------------------------------------------------------
+Functional Requirements
+KPI Cards
+
+The dashboard shall display:
+
+Today's Sales
+Monthly Revenue
+Active Customers
+Pending Orders
+Inventory Value
+Low Stock Products
+Requirements
+Refresh automatically every 30 seconds.
+Update immediately after relevant data changes.
+Display comparison with previous period.
+Show percentage increase/decrease.
+Revenue Chart
+Requirements
+Daily
+Weekly
+Monthly
+Yearly
+
+User can switch time periods.
+
+Chart interactions include:
+
+Hover tooltips
+Zoom
+Export
+Customer Growth Chart
+
+Display:
+
+New customers
+Returning customers
+Growth percentage
+Inventory Value Card
+
+Shows:
+
+Total inventory value
+Products in stock
+Out-of-stock products
+Low-stock products
+Recent Orders Widget
+
+Display:
+
+Last 10 orders
+Status
+Customer
+Total
+Timestamp
+
+Clicking an order opens Order Details.
+
+AI Business Summary
+
+Automatically generated.
+
+Example:
+
+Revenue increased 12% compared to yesterday.
+
+Three products are approaching low stock.
+
+Customer retention improved by 5%.
+
+Consider reordering Product A within two days.
+
+Dashboard Acceptance Criteria
+
+The dashboard shall:
+
+Load in under 1 second.
+Display accurate KPIs.
+Continue functioning offline.
+Automatically update after synchronization.
+4.3 Orders Module
+Purpose
+
+Manage the complete lifecycle of customer orders.
+
+Order Status Workflow
+Draft
+
+↓
+
+Pending
+
+↓
+
+Confirmed
+
+↓
+
+Processing
+
+↓
+
+Completed
+
+↓
+
+Archived
+
+Orders may also become:
+
+Cancelled
+Refunded
+Order List
+
+Display columns:
+
+Order Number
+Customer
+Status
+Date
+Total
+Payment Status
+Features
+Search
+Filters
+Sorting
+Bulk actions
+Pagination
+Create Order
+User Flow
+Orders
+
+↓
+
+New Order
+
+↓
+
+Select Customer
+
+↓
+
+Add Products
+
+↓
+
+Review
+
+↓
+
+Generate Invoice
+
+↓
+
+Save
+Functional Requirements
+Customer Selection
+
+User can:
+
+Search customer
+Create new customer
+Edit customer
+Product Selection
+
+User can:
+
+Search products
+Filter categories
+View stock
+
+Prevent selecting unavailable inventory unless override is enabled in settings.
+
+Quantity Validation
+
+Rules:
+
+Cannot exceed available inventory.
+
+Unless:
+
+Allow Backorders = Enabled.
+
+Pricing
+
+Automatically calculate:
+
+Subtotal
+
+↓
+
+Discount
+
+↓
+
+Tax
+
+↓
+
+Grand Total
+
+Invoice Generation
+
+After saving:
+
+Automatically generate PDF invoice.
+
+Invoice includes:
+
+Company logo
+QR code
+Tax information
+Payment terms
+Signature area
+Offline Behavior
+
+Orders created offline shall:
+
+Save locally.
+Receive temporary ID.
+Synchronize automatically.
+Edge Cases
+
+Customer deleted
+
+↓
+
+Show archived customer.
+
+Never delete historical orders.
+
+Product discontinued
+
+↓
+
+Remain visible on historical orders.
+
+Synchronization conflict
+
+↓
+
+Prompt user.
+
+Choose:
+
+Keep Local
+Keep Cloud
+Merge
+Acceptance Criteria
+Order creation < 60 seconds.
+Invoice generation < 3 seconds.
+Offline support.
+Automatic sync.
+4.4 Inventory Module
+Purpose
+
+Track products and stock movements.
+
+Product Fields
+
+Every product contains:
+
+SKU
+Name
+Description
+Category
+Purchase Price
+Selling Price
+Stock Quantity
+Reorder Level
+Barcode (future-ready)
+Status
+Product Status
+Active
+Archived
+Out of Stock
+Inventory Dashboard
+
+Display:
+
+Total Products
+Inventory Value
+Low Stock
+Recently Updated Products
+Stock Adjustment
+
+Reasons:
+
+Purchase
+Sale
+Return
+Damage
+Manual Correction
+
+Every adjustment creates an audit log.
+
+Low Stock Alerts
+
+Triggered when:
+
+Current Stock ≤ Reorder Level
+
+Notification includes:
+
+Product
+Current quantity
+Suggested reorder quantity
+Forecasted stock-out date
+Inventory History
+
+Every change records:
+
+User
+Date
+Quantity
+Previous Value
+New Value
+Reason
+
+History cannot be edited.
+
+Inventory Valuation
+
+Support:
+
+FIFO (future)
+
+Average Cost (v1)
+
+Inventory value updates automatically.
+
+Acceptance Criteria
+Adjustments update instantly.
+Dashboard refreshes.
+Audit history immutable.
+Offline compatible.
+4.5 Customers Module
+Purpose
+
+Maintain a complete customer database.
+
+Customer Profile
+
+Fields:
+
+Name
+Email
+Phone
+Address
+Company
+Notes
+Customer Overview
+
+Display:
+
+Lifetime Value
+Total Orders
+Average Order Value
+Last Purchase
+Outstanding Balance (future)
+Purchase History
+
+Timeline includes:
+
+Orders
+Invoices
+Payments
+AI Notes
+Search
+
+Supports:
+
+Name
+Email
+Phone
+Company
+Customer Tags
+
+Examples:
+
+VIP
+Wholesale
+Returning
+High Risk
+
+Users may create custom tags.
+
+Customer Analytics
+
+Display:
+
+Spending trend
+Purchase frequency
+Preferred products
+Acceptance Criteria
+
+Customer search < 200 ms.
+
+Customer profile loads instantly.
+
+Purchase history complete.
+
+Offline supported.
+
+4.6 Notifications
+
+Version 1 includes:
+
+Daily Sales Summary
+
+Low Stock Alerts
+
+Future:
+
+AI recommendations
+Payment reminders
+Email notifications
+4.7 Global Search
+
+Universal search accessible via Ctrl + K.
+
+Searches:
+
+Orders
+Customers
+Products
+
+Results appear instantly.
+
+Future support:
+
+AI semantic search
+Reports
+Settings
+4.8 Export Features
+
+Every table supports:
+
+Export to:
+
+CSV
+Excel
+PDF
+
+Export preserves:
+
+Filters
+Sorting
+Selected columns
+4.9 Synchronization
+
+Offline changes stored locally.
+
+When online:
+
+Detect Connection
+
+↓
+
+Authenticate
+
+↓
+
+Upload Changes
+
+↓
+
+Download Updates
+
+↓
+
+Resolve Conflicts
+
+↓
+
+Refresh Dashboard
+
+Synchronization occurs automatically every five minutes and can also be triggered manually.
+
+4.10 Business Rules
+Orders
+Orders cannot contain negative quantities.
+Cancelled orders restore inventory.
+Completed orders cannot be edited directly; changes require a reversal or refund workflow.
+Inventory
+Stock cannot become negative unless backorders are enabled.
+All stock adjustments require a reason.
+Customers
+Customers cannot be permanently deleted if they have historical orders.
+Historical customer data must remain accessible.
+Dashboard
+KPIs update automatically after any completed transaction.
+Offline data is clearly marked until synchronization completes.
+4.11 Error Handling
+
+All modules must:
+
+Display user-friendly messages.
+Retry synchronization automatically.
+Preserve unsaved work.
+Log errors for diagnostics.
+
+No operation should result in silent data loss.
+
+4.12 Non-Functional Requirements for Core Modules
+Dashboard loads in under 1 second.
+Order creation completes in under 60 seconds.
+Search results appear in under 200 milliseconds.
+Core modules remain fully functional offline.
+Synchronization resumes automatically when connectivity returns.
+All user actions are logged where appropriate for auditing.
+Chapter Summary
+
+This chapter defines the functional requirements for Finch's core ERP capabilities: Dashboard, Orders, Inventory, and Customers. These modules form the operational backbone of the application, emphasizing speed, reliability, and offline-first behavior.
+
+The specifications in this chapter establish the expected behavior, business rules, and acceptance criteria that developers will use during implementation and testing.

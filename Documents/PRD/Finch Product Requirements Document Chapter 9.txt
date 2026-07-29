@@ -1,0 +1,490 @@
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+
+Chapter 9 — API Specification & Backend Services
+9.1 Purpose
+
+This chapter defines the backend architecture, API contracts, authentication, synchronization, AI services, licensing, backup services, and security requirements for Finch.
+
+Although Finch is an offline-first desktop application, the backend provides cloud synchronization, AI processing, authentication, licensing, and future integrations.
+
+9.2 Backend Overview
+
+The backend consists of independent services.
+
+                     Finch Desktop
+
+                          │
+──────────────────────── API Gateway ────────────────────────
+
+      │            │            │            │
+      ▼            ▼            ▼            ▼
+
+ Authentication   AI API    Sync API   License API
+
+      │            │            │            │
+
+      ▼            ▼            ▼            ▼
+
+ Supabase     OpenAI GPT-5.5 PostgreSQL  Licensing Server
+
+
+Every service should be independently deployable.
+
+9.3 Backend Stack
+Component	Technology
+Runtime	Node.js 22 LTS
+Framework	NestJS
+Database	PostgreSQL (Supabase)
+Authentication	Supabase Auth
+ORM	Prisma
+Validation	Zod
+AI Provider	OpenAI GPT-5.5
+File Storage	Supabase Storage
+Queue	BullMQ + Redis
+API Documentation	OpenAPI (Swagger)
+Logging	Pino
+Monitoring	Sentry
+Rate Limiting	Upstash Redis
+9.4 API Design Principles
+
+Every API must be:
+
+RESTful
+Versioned
+Stateless
+Secure
+Predictable
+Documented
+Idempotent where applicable
+
+Base URL
+
+https://api.finchapp.com/v1
+
+Future versions:
+
+/v2
+
+/v3
+9.5 Authentication
+
+Authentication uses JWT access tokens.
+
+Flow:
+
+Login
+
+↓
+
+Supabase Auth
+
+↓
+
+Access Token
+
+↓
+
+Refresh Token
+
+↓
+
+Desktop Stores Securely
+
+↓
+
+Authenticated Requests
+Headers
+Authorization: Bearer <access_token>
+9.6 Standard Response Format
+
+Success
+
+{
+  "success": true,
+  "data": {},
+  "message": "Success"
+}
+
+Failure
+
+{
+  "success": false,
+  "error": {
+    "code": "ORDER_NOT_FOUND",
+    "message": "Order does not exist."
+  }
+}
+9.7 Authentication Endpoints
+Login
+POST /auth/login
+
+Request
+
+{
+  "email": "owner@company.com",
+  "password": "password"
+}
+
+Response
+
+{
+  "accessToken": "...",
+  "refreshToken": "...",
+  "user": {}
+}
+Register
+POST /auth/register
+Logout
+POST /auth/logout
+Refresh Token
+POST /auth/refresh
+Password Recovery
+POST /auth/reset-password
+Verify Email
+POST /auth/verify-email
+9.8 Orders API
+List Orders
+GET /orders
+
+Supports
+
+Pagination
+Sorting
+Filtering
+Search
+Create Order
+POST /orders
+
+Body
+
+{
+  "customerId": "...",
+  "items": [],
+  "notes": ""
+}
+Update Order
+PUT /orders/{id}
+Delete Order
+
+Soft delete only.
+
+DELETE /orders/{id}
+Get Order
+GET /orders/{id}
+9.9 Inventory API
+Products
+GET /products
+POST /products
+PUT /products/{id}
+DELETE /products/{id}
+Categories
+GET /categories
+POST /categories
+Inventory Adjustment
+POST /inventory/adjust
+
+Example
+
+{
+  "productId":"...",
+  "quantity":5,
+  "reason":"Purchase"
+}
+9.10 Customers API
+GET /customers
+
+POST /customers
+
+PUT /customers/{id}
+
+DELETE /customers/{id}
+Customer History
+GET /customers/{id}/history
+
+Returns
+
+Orders
+Purchases
+Reports
+9.11 Reports API
+
+Generate report
+
+POST /reports/generate
+
+Request
+
+{
+  "type":"sales",
+  "range":"monthly"
+}
+
+Download
+
+GET /reports/{id}
+
+Delete
+
+DELETE /reports/{id}
+9.12 AI API
+
+The AI service communicates with GPT-5.5 through a secure backend proxy.
+
+Direct API calls from the desktop application are not permitted.
+
+Chat
+POST /ai/chat
+
+Request
+
+{
+  "conversationId":"...",
+  "message":"How did my business perform today?"
+}
+
+Response
+
+{
+  "summary":"",
+  "recommendations":[],
+  "charts":[]
+}
+Generate Report
+POST /ai/report
+Forecast
+POST /ai/forecast
+Explain Chart
+POST /ai/explain-chart
+Invoice Assistant
+POST /ai/invoice
+Conversation History
+GET /ai/history
+9.13 Synchronization API
+
+Upload changes
+
+POST /sync/upload
+
+Download changes
+
+GET /sync/download
+
+Resolve conflict
+
+POST /sync/conflict
+
+Health check
+
+GET /sync/status
+
+Sync request example
+
+{
+  "deviceId":"desktop-01",
+  "changes":[]
+}
+9.14 License API
+
+Activate
+
+POST /license/activate
+
+Validate
+
+GET /license/status
+
+Deactivate
+
+POST /license/deactivate
+
+Response
+
+{
+    "activated":true,
+    "expires":"2027-08-12"
+}
+9.15 Backup API
+
+Future cloud backups.
+
+Endpoints
+
+POST /backup/create
+
+GET /backup/list
+
+POST /backup/restore
+
+Version 1 uses local backups only, but the API is reserved for future cloud functionality.
+
+9.16 Notifications API
+GET /notifications
+
+PUT /notifications/read
+
+DELETE /notifications/{id}
+9.17 File Upload API
+
+Supports
+
+Company Logo
+CSV
+Excel
+PDF
+
+Endpoint
+
+POST /files/upload
+
+Allowed file size
+
+50 MB
+
+Supported types
+
+PNG
+JPG
+PDF
+XLSX
+CSV
+9.18 Rate Limiting
+Endpoint	Limit
+Login	5 requests/minute/IP
+AI Chat	60 requests/hour/user
+Report Generation	20 requests/hour/user
+Sync	120 requests/hour/device
+File Upload	30 requests/hour/user
+
+Exceeding the limit returns HTTP 429 Too Many Requests.
+
+9.19 Error Codes
+Code	Meaning
+AUTH001	Invalid credentials
+AUTH002	Session expired
+AUTH003	Two-factor authentication required
+ORDER001	Order not found
+PRODUCT001	Product not found
+CUSTOMER001	Customer not found
+INVENTORY001	Insufficient stock
+AI001	AI service unavailable
+AI002	AI request timed out
+SYNC001	Synchronization failed
+LICENSE001	Invalid license key
+FILE001	Unsupported file type
+9.20 HTTP Status Codes
+Status	Meaning
+200	Success
+201	Created
+204	No Content
+400	Bad Request
+401	Unauthorized
+403	Forbidden
+404	Not Found
+409	Conflict
+422	Validation Error
+429	Too Many Requests
+500	Internal Server Error
+503	Service Unavailable
+9.21 Security
+
+All APIs must enforce:
+
+HTTPS only
+JWT authentication
+Row Level Security (Supabase)
+Request validation
+SQL injection protection
+XSS protection
+CSRF protection (where applicable)
+Request logging
+Audit trails
+Rate limiting
+
+Sensitive endpoints require additional authorization checks.
+
+9.22 API Versioning
+
+Versioning is path-based.
+
+Example:
+
+/v1/orders
+
+/v2/orders
+
+Breaking changes require a new API version.
+
+Backward-compatible enhancements may be added within the same version.
+
+9.23 Webhooks (Future)
+
+Reserved events:
+
+Order Created
+Order Updated
+Inventory Low
+Report Generated
+AI Report Ready
+License Expiring
+
+Payloads will be signed to verify authenticity.
+
+9.24 Monitoring & Observability
+
+The backend should expose metrics for:
+
+Request count
+Error rate
+Average response time
+AI latency
+Synchronization success rate
+Database performance
+Queue depth
+Active users
+
+Alerts should be configured for critical failures.
+
+9.25 Background Jobs
+
+Asynchronous jobs handled by BullMQ include:
+
+AI report generation
+Forecast calculations
+Email sending (future)
+Scheduled cleanup
+Data synchronization retries
+Notification generation
+9.26 API Documentation
+
+All endpoints must be documented using OpenAPI.
+
+Documentation should include:
+
+Endpoint descriptions
+Request schemas
+Response schemas
+Authentication requirements
+Example requests
+Example responses
+Error codes
+
+An interactive Swagger UI should be available for internal development.
+
+9.27 Acceptance Criteria
+
+The backend is considered complete when:
+
+All documented endpoints are implemented.
+Authentication and authorization are enforced.
+Synchronization works reliably with offline clients.
+AI requests are securely proxied to GPT-5.5.
+Standardized responses and error handling are consistent.
+Rate limiting and logging are operational.
+API documentation is complete and up to date.
+Chapter Summary
+
+This chapter defines the backend contract that connects the Finch desktop application with cloud services. It specifies secure authentication, RESTful APIs, AI integration, synchronization, licensing, file handling, and operational requirements. By separating concerns into dedicated services and enforcing consistent API standards, Finch's backend remains secure, maintainable, and ready for future expansion.

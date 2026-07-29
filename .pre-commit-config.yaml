@@ -1,0 +1,62 @@
+repos:
+  - repo: https://github.com/pre-commit/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint
+        language: docker
+        entry: hadolint
+        file_patterns:
+          - Dockerfile*
+        types: [dockerfile]
+
+  - repo: https://github.com/pre-commit/black
+    rev: 23.11.0
+    hooks:
+      - id: black
+        language_version: python3
+        AdditionalArgs: --line-length 100
+
+  - repo: https://github.com/pre-commit/ruff-pre-commit
+    rev: 0.4.2
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_args:
+          - --ignore-missing-imports
+          - --strict
+
+  - repo: https://github.com/pre-commit/pylint
+    rev: pylint-3.2.5
+    hooks:
+      - id: pylint
+        additional_args:
+          - --disable=all
+          - --enable=unnecessary-duplicate-code
+          - --good-names
+          - --no-import-black
+
+  - repo: https://github.com/pre-commit/check-yaml
+    rev: v1.6.0
+    hooks:
+      - id: check-yaml
+        additional_args: [--unsafe]
+
+  - repo: https://github.com/pre-commit/jsonlint
+    rev: v1.4.0
+    hooks:
+      - id: jsonlint
+        additional_args: [--allows-Trailing-Commas]
+
+  - repo: local
+    hooks:
+      - id: enforce-conventional-commits
+        name: Enforce Conventional Commits
+        entry: bash -c 'commitlint -E HUSKY_GIT_PARAMS'
+        language: system
+        types: [text]
+        stages: [commit]

@@ -1,0 +1,560 @@
+Finch UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 2 — Information Architecture
+2.1 Purpose
+
+This chapter defines the Information Architecture (IA) for Finch Version 1.0.
+
+Information Architecture determines how information is organized, structured, connected, and presented throughout the application. A well-designed IA ensures users can quickly find what they need with minimal cognitive effort.
+
+Finch follows a task-oriented architecture, where navigation is based on the user's daily workflow rather than technical categories.
+
+2.2 Design Objectives
+
+The Information Architecture should:
+
+Minimize navigation depth.
+Prioritize frequently used features.
+Support rapid task switching.
+Reduce unnecessary clicks.
+Scale as new modules are introduced.
+Maintain consistency across all sections.
+Support keyboard-first navigation.
+2.3 Navigation Structure
+
+Version 1.0 consists of five primary business modules and several global utilities.
+
+Finch
+
+├── Dashboard
+│
+├── AI Assistant
+│
+├── Orders
+│
+├── Inventory
+│
+├── Customers
+│
+├── Reports
+│
+├── Search
+│
+├── Notifications
+│
+├── Settings
+│
+└── Profile
+
+Every primary module is accessible directly from the sidebar.
+
+2.4 Global Navigation
+
+Global navigation remains available regardless of the active module.
+
+It consists of:
+
+Sidebar
+Title Bar
+Command Palette
+Universal Search
+Notifications
+Floating AI Assistant
+Profile Menu
+
+This ensures users can access essential functions from anywhere within the application.
+
+2.5 Sidebar Navigation
+
+The sidebar is the primary navigation mechanism.
+
+Default State
+
+Collapsed.
+
+Displays icons only.
+
+🏠
+🤖
+📦
+📊
+👥
+📈
+Expanded State
+
+Expands smoothly on hover.
+
+🏠 Dashboard
+
+🤖 AI Assistant
+
+📦 Orders
+
+📦 Inventory
+
+👥 Customers
+
+📈 Reports
+
+Expansion animation should complete within approximately 180–220 ms.
+
+2.6 Navigation Hierarchy
+
+Navigation follows a maximum depth of three levels.
+
+Example:
+
+Dashboard
+
+↓
+
+Reports
+
+↓
+
+Sales Report
+
+Users should never navigate more than three levels deep.
+
+2.7 Primary Modules
+Dashboard
+
+Purpose:
+
+Business overview.
+
+Contains:
+
+KPIs
+Charts
+AI Summary
+Recent Activity
+Quick Actions
+AI Assistant
+
+Purpose:
+
+Business intelligence.
+
+Capabilities:
+
+Ask questions
+Generate reports
+Explain charts
+Forecast sales
+Summarize business performance
+Draft emails
+Generate invoices
+
+Accessible globally as a floating assistant.
+
+Orders
+
+Purpose:
+
+Manage customer orders.
+
+Subsections:
+
+All Orders
+Pending
+Processing
+Completed
+Cancelled
+
+Primary actions:
+
+Create Order
+Edit Order
+Generate Invoice
+Print
+Export
+Inventory
+
+Purpose:
+
+Manage products and stock.
+
+Subsections:
+
+Products
+Categories
+Low Stock
+Stock History
+
+Primary actions:
+
+Add Product
+Update Stock
+Import
+Export
+Customers
+
+Purpose:
+
+Manage customer information.
+
+Subsections:
+
+All Customers
+Active Customers
+Recent Customers
+
+Customer profile includes:
+
+Avatar
+Contact Information
+Purchase History
+Notes
+Reports
+
+Purpose:
+
+Business analytics.
+
+Report categories:
+
+Profit & Loss
+Sales
+Inventory
+Forecasts
+
+Viewing options:
+
+Interactive Dashboard
+PDF Preview
+Export
+2.8 Secondary Navigation
+
+Each module may include local navigation.
+
+Example:
+
+Orders
+
+Orders
+
+All
+
+Pending
+
+Processing
+
+Completed
+
+Cancelled
+
+Secondary navigation should appear beneath the page header or within a tab system.
+
+2.9 Breadcrumbs
+
+Breadcrumbs are used only when necessary.
+
+Example:
+
+Dashboard
+
+>
+
+Orders
+
+>
+
+Order #1204
+
+They should not appear on top-level pages.
+
+2.10 Title Bar
+
+Version 1.0 uses a custom title bar.
+
+Components include:
+
+Application Logo
+Current Page Title
+Global Search
+Notifications
+User Profile
+Window Controls (Minimize, Maximize, Close)
+
+The title bar should remain fixed while content scrolls.
+
+2.11 Universal Search
+
+Universal Search enables users to quickly locate:
+
+Orders
+Customers
+Products
+Reports
+AI Conversations
+Settings
+
+Accessible through:
+
+Ctrl + K
+
+Search results should appear in grouped categories with keyboard navigation.
+
+2.12 Command Palette
+
+The Command Palette provides keyboard-first access to application functionality.
+
+Examples:
+
+Create Order
+
+Open Reports
+
+Add Customer
+
+Generate Invoice
+
+Ask AI
+
+Backup Database
+
+Open Settings
+
+The Command Palette should support fuzzy search and recent commands.
+
+2.13 Floating AI Assistant
+
+The AI Assistant is available globally.
+
+Characteristics:
+
+Floating panel.
+Can be minimized.
+Remembers conversation history.
+Understands current module context.
+Does not interrupt the user's workflow.
+
+Users can continue working while the AI processes requests.
+
+2.14 Notification Center
+
+Notifications are available through:
+
+Toast notifications
+Notification Center
+
+Supported notification types:
+
+Daily sales summaries
+Low stock alerts
+Backup completion
+Sync status
+AI task completion
+System updates
+
+Notifications are categorized and searchable.
+
+2.15 Settings Architecture
+
+Settings are grouped into logical sections.
+
+Settings
+
+├── Appearance
+
+├── Company
+
+├── AI
+
+├── Notifications
+
+├── Integrations
+
+├── Backup
+
+├── Sync
+
+├── License
+
+└── About
+
+Each category should be accessible directly without nested menus where possible.
+
+2.16 User Profile
+
+The profile menu includes:
+
+Profile
+Company Information
+Appearance
+Keyboard Shortcuts
+Settings
+Sign Out
+
+Future versions may include team switching.
+
+2.17 Page Layout Structure
+
+Every page follows a consistent structure.
+
+Title Bar
+
+↓
+
+Page Header
+
+↓
+
+Toolbar
+
+↓
+
+Content Area
+
+↓
+
+Optional Details Panel
+
+↓
+
+Status Bar
+
+Consistency across modules improves learnability and efficiency.
+
+2.18 Content Hierarchy
+
+Information is prioritized using four levels.
+
+Primary
+
+Critical business metrics.
+
+Examples:
+
+Revenue
+Profit
+Orders
+Secondary
+
+Supporting analytics.
+
+Examples:
+
+Customer Growth
+Inventory Value
+Tertiary
+
+Contextual details.
+
+Examples:
+
+Notes
+Tags
+Metadata
+Utility
+
+Administrative actions.
+
+Examples:
+
+Export
+Print
+Share
+2.19 Dashboard Widget Priority
+
+Widgets are ordered according to business importance.
+
+Profit
+Revenue
+Orders
+Inventory
+Customer Growth
+Forecast
+AI Insights
+Recent Activity
+Tasks
+Calendar
+
+The layout should emphasize the highest-priority metrics using larger cards and more prominent placement.
+
+2.20 Empty State Architecture
+
+When a section contains no data, it should display:
+
+A branded illustration
+A concise explanation
+AI-generated suggestions (when applicable)
+A primary call-to-action (e.g., "Add Your First Product")
+
+Empty states should encourage users toward the next meaningful action.
+
+2.21 Error State Architecture
+
+Errors should include:
+
+Clear title
+Human-readable explanation
+Suggested resolution
+Retry button
+Help link (future)
+
+Technical details should remain hidden unless in developer mode.
+
+2.22 Loading State Architecture
+
+Instead of generic spinners, Finch should prioritize:
+
+Skeleton loaders
+Progressive content loading
+Smooth transitions
+
+Loading indicators should preserve layout stability and reduce perceived waiting time.
+
+2.23 Responsive Window Behavior
+
+Although desktop-only, Finch should adapt to different window sizes.
+
+Supported layouts:
+
+Window Size	Behavior
+Small	Sidebar collapses, less important panels hide
+Medium	Standard layout
+Large	Additional panels and expanded content visible
+Ultra-wide	Multi-column layouts where appropriate
+
+The interface should remain usable even when resized.
+
+2.24 Future Information Architecture
+
+The architecture is designed to accommodate additional modules without disrupting existing navigation.
+
+Future additions may include:
+
+Suppliers
+Expenses
+Purchase Orders
+Warehouses
+Team Management
+AI Agents
+Marketing
+Mobile Device Sync
+Plugin Marketplace
+
+These modules should integrate seamlessly into the existing navigation hierarchy.
+
+2.25 Acceptance Criteria
+
+The Information Architecture is considered complete when:
+
+Primary navigation is consistent across all modules.
+Navigation depth does not exceed three levels.
+Global features are always accessible.
+Keyboard navigation is fully supported.
+Content hierarchy is clear and consistent.
+Empty, loading, and error states are standardized.
+The architecture supports future expansion without major redesign.
+Chapter Summary
+
+This chapter establishes the structural foundation of Finch's user experience by defining how users navigate, locate information, and move through the application. A clear hierarchy, consistent navigation patterns, and scalable organization ensure that Finch remains intuitive and efficient as new features are added. The Information Architecture provides the framework upon which all subsequent UI components, screens, and interactions will be built.

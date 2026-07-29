@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Finch ERP - Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#d3e4fe",
+                        "surface": "#f7f9fb",
+                        "surface-tint": "#565e74",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#131b2e",
+                        "inverse-primary": "#bec6e0",
+                        "on-primary-container": "#7c839b",
+                        "on-tertiary-container": "#75859d",
+                        "secondary-fixed-dim": "#b9c7e0",
+                        "on-surface": "#191c1e",
+                        "primary-fixed": "#dae2fd",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-secondary-fixed-variant": "#3a485c",
+                        "on-secondary-fixed": "#0d1c2f",
+                        "surface-dim": "#d8dadc",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-low": "#f2f4f6",
+                        "inverse-on-surface": "#eff1f3",
+                        "outline": "#76777d",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#515f74",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#d5e3fd",
+                        "primary": "#000000",
+                        "on-background": "#191c1e",
+                        "inverse-surface": "#2d3133",
+                        "surface-container-highest": "#e0e3e5",
+                        "tertiary-container": "#0b1c30",
+                        "surface-bright": "#f7f9fb",
+                        "surface-variant": "#e0e3e5",
+                        "surface-container-high": "#e6e8ea",
+                        "on-secondary-container": "#57657b",
+                        "on-primary-fixed": "#131b2e",
+                        "secondary-container": "#d5e3fd",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface-container": "#eceef0",
+                        "background": "#f7f9fb",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "base": "8px",
+                        "lg": "48px",
+                        "margin-desktop": "64px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "title-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "label-md": ["Geist"],
+                        "code-sm": ["Geist"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "title-md": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "code-sm": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-surface font-body-md text-on-surface min-h-screen relative overflow-hidden flex items-center justify-center selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- Atmospheric Background -->
+<div class="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+<div class="absolute inset-0 w-full h-full bg-cover bg-center opacity-30 mix-blend-luminosity" data-alt="A highly detailed, ultra-premium abstract architectural interior rendering in soft daylight. Minimalist design featuring sweeping curves, smooth white marble surfaces, and gentle, pristine gradients of natural light and shadow. The atmosphere is serene, expensive, and impeccably clean, designed as a calm, high-end backdrop for enterprise software. Soft diffused lighting emphasizes premium materials without any distracting elements or clutter." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBtkwx1Hgu8NqYeP4rtPuDj14VuGjS2U4MjwyIBvcbpO8shulPr0V4JUdf8n98ifzaZ7lhF6K6H_-i1LPaXE9vNTP66XRYlhqwpUXW1YYYcJgT0rHHUTZ5bf9jfARwMKM69MMQD89lW_doS0Wzuf71oTmZgzWAq8lznZZi_m1A2mZPSnHdV-l3QnemQey4Qw64hsRl97BynJTaygBZ6Oq2Dk6NVT5UfW1x1X8qw9sX9EQt3iSdxLi85jqM_yJnI05ZdtG6LXlrMtjQk')"></div>
+<!-- Glassmorphic diffuser -->
+<div class="absolute inset-0 bg-surface/70 backdrop-blur-[60px]"></div>
+<!-- Subtle gradient blobs for depth -->
+<div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary-fixed/20 rounded-full blur-[100px] mix-blend-multiply opacity-50"></div>
+<div class="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-secondary-fixed/20 rounded-full blur-[120px] mix-blend-multiply opacity-50"></div>
+</div>
+<!-- Login Container -->
+<main class="relative z-10 w-full max-w-[440px] px-margin-mobile md:px-0">
+<!-- Premium Glass Card -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-2xl shadow-[0px_12px_32px_rgba(15,23,42,0.08)] border border-outline-variant/30 rounded-xl p-lg flex flex-col items-center">
+<!-- Branding -->
+<div class="flex items-center gap-sm mb-lg">
+<div class="w-10 h-10 rounded-DEFAULT bg-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-primary" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+</div>
+<span class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight">Finch ERP</span>
+</div>
+<!-- Header -->
+<div class="text-center w-full mb-md">
+<h1 class="font-title-md text-title-md text-on-surface mb-xs">Welcome back</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Sign in to access your enterprise dashboard.</p>
+</div>
+<!-- Form -->
+<form class="w-full flex flex-col gap-md" onsubmit="event.preventDefault();">
+<!-- Inputs Group -->
+<div class="flex flex-col gap-sm">
+<!-- Email Input -->
+<div class="flex flex-col gap-xs group">
+<label class="font-label-md text-label-md text-on-surface-variant group-focus-within:text-primary transition-colors" for="email">Work Email</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant group-focus-within:text-primary transition-colors text-[20px]">mail</span>
+<input class="w-full h-11 pl-10 pr-4 rounded-DEFAULT border border-outline-variant/50 bg-surface-container-lowest/50 text-body-md text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary focus:bg-surface-container-lowest transition-all duration-200" id="email" placeholder="name@company.com" required="" type="email"/>
+</div>
+</div>
+<!-- Password Input -->
+<div class="flex flex-col gap-xs group">
+<div class="flex justify-between items-center">
+<label class="font-label-md text-label-md text-on-surface-variant group-focus-within:text-primary transition-colors" for="password">Password</label>
+<a class="font-label-md text-label-md text-secondary hover:text-primary transition-colors" href="#">Forgot?</a>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant group-focus-within:text-primary transition-colors text-[20px]">key</span>
+<input class="w-full h-11 pl-10 pr-10 rounded-DEFAULT border border-outline-variant/50 bg-surface-container-lowest/50 text-body-md text-on-surface placeholder:text-outline-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary focus:bg-surface-container-lowest transition-all duration-200" id="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant hover:text-on-surface transition-colors flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[20px]">visibility_off</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Remember Me & Actions -->
+<div class="flex items-center gap-2 mt-xs">
+<input class="w-4 h-4 rounded-sm border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 bg-surface-container-lowest cursor-pointer transition-colors" id="remember" type="checkbox"/>
+<label class="font-body-md text-body-md text-on-surface-variant cursor-pointer select-none" for="remember">Remember this device</label>
+</div>
+<!-- Submit Button -->
+<button class="w-full h-12 mt-xs rounded-DEFAULT bg-gradient-to-b from-primary to-primary-container text-on-primary font-label-md text-label-md shadow-[0_2px_8px_rgba(0,0,0,0.12)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.18)] hover:from-primary-container hover:to-primary active:scale-[0.98] transition-all duration-200 border-t border-white/20 flex items-center justify-center gap-2 group relative overflow-hidden" type="submit">
+<span class="relative z-10 flex items-center gap-2">
+                        Log in to workspace
+                        <span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform duration-300">arrow_forward</span>
+</span>
+<!-- Shimmer effect on hover -->
+<div class="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 z-0"></div>
+</button>
+</form>
+<!-- Footer / SSO -->
+<div class="w-full mt-lg pt-md border-t border-outline-variant/20 flex flex-col items-center gap-md">
+<span class="font-label-md text-label-md text-on-surface-variant/70">Or continue with</span>
+<div class="flex gap-sm w-full">
+<button class="flex-1 h-10 rounded-DEFAULT border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-label-md text-label-md transition-colors flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined text-[18px]">vpn_key</span>
+                        SSO
+                    </button>
+<button class="flex-1 h-10 rounded-DEFAULT border border-outline-variant/50 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface font-label-md text-label-md transition-colors flex items-center justify-center gap-2" type="button">
+<span class="material-symbols-outlined text-[18px]">shield_person</span>
+                        Security Key
+                    </button>
+</div>
+</div>
+</div>
+<!-- System Status -->
+<div class="mt-md text-center flex items-center justify-center gap-2 opacity-70">
+<div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+<span class="font-label-md text-label-md text-on-surface-variant">All systems operational</span>
+</div>
+</main>
+<style>
+        @keyframes shimmer {
+            100% {
+                transform: translateX(100%);
+            }
+        }
+    </style>
+</body></html>

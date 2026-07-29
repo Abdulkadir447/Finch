@@ -1,0 +1,506 @@
+Finch Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 14 — AI Prompt Library & Prompt Engineering Framework
+14.1 Purpose
+
+This chapter defines the complete AI Prompt Engineering Framework used by Finch. It establishes how prompts are created, managed, versioned, tested, and maintained to ensure that Finch's AI delivers accurate, reliable, and consistent responses across all business workflows.
+
+The framework is designed to support GPT-5.5 while remaining flexible enough to accommodate future AI models with minimal changes.
+
+14.2 Objectives
+
+The AI Prompt Framework must:
+
+Produce accurate business insights.
+Generate structured and predictable outputs.
+Minimize hallucinations.
+Maintain consistent response quality.
+Support reusable prompt templates.
+Allow version-controlled prompt updates.
+Adapt to future AI models without major refactoring.
+14.3 Prompt Architecture
+
+Every AI request is built from reusable components rather than a single static prompt.
+
+User Request
+      │
+      ▼
+Context Builder
+      │
+      ▼
+Prompt Template
+      │
+      ▼
+Business Context
+      │
+      ▼
+Formatting Rules
+      │
+      ▼
+Output Schema
+      │
+      ▼
+Safety Rules
+      │
+      ▼
+OpenAI GPT-5.5
+14.4 Prompt Components
+
+Every prompt consists of six sections.
+
+1. System Prompt
+
+Defines Finch's personality, responsibilities, and behavior.
+
+2. Context
+
+Business information relevant to the request.
+
+3. User Request
+
+The user's actual question or instruction.
+
+4. Rules
+
+Formatting, restrictions, and validation instructions.
+
+5. Output Schema
+
+Defines how the response should be structured.
+
+6. Metadata
+
+Includes:
+
+Prompt Version
+Timestamp
+Language
+Module
+Feature
+14.5 Master System Prompt
+
+Every request begins with a master system prompt.
+
+Example:
+
+You are Finch AI.
+
+You are an intelligent business assistant.
+
+Your purpose is to help business owners understand their business,
+analyze performance, forecast trends, explain reports,
+generate invoices, and recommend actionable improvements.
+
+Always prioritize accuracy.
+
+Never invent financial values.
+
+If information is missing, clearly state what additional data is required.
+
+Keep explanations concise, professional, and actionable.
+
+Format responses using Markdown unless a JSON schema is requested.
+14.6 Context Injection
+
+The Context Builder provides only the data required for the current task.
+
+Possible context includes:
+
+Company information
+Sales data
+Inventory data
+Customer statistics
+Reports
+Forecast history
+Previous conversation (if relevant)
+Date range
+Currency
+
+Context should be minimized to reduce token usage and improve privacy.
+
+14.7 Prompt Versioning
+
+Each prompt template has a version identifier.
+
+Example:
+
+Business Analysis v1.0
+
+Sales Forecast v1.2
+
+Invoice Assistant v2.0
+
+Changes to prompts should be tracked in version control with release notes.
+
+14.8 Prompt Categories
+
+Finch Version 1.0 includes the following prompt categories:
+
+Business Analysis
+Dashboard Insights
+Sales Analysis
+Inventory Analysis
+Customer Analysis
+Profit & Loss Summary
+Report Summary
+Forecast Generation
+Chart Explanation
+Invoice Assistant
+Email Drafting
+General Business Chat
+14.9 Business Analysis Prompt
+
+Purpose:
+
+Analyze the overall health of a business.
+
+Inputs:
+
+Revenue
+Expenses
+Profit
+Orders
+Customers
+Inventory
+
+Output:
+
+Executive summary
+Strengths
+Weaknesses
+Risks
+Opportunities
+Recommended actions
+14.10 Sales Analysis Prompt
+
+Purpose:
+
+Analyze sales performance.
+
+Context:
+
+Daily sales
+Monthly sales
+Revenue trends
+Best-selling products
+
+Output:
+
+Sales summary
+Growth analysis
+Top performers
+Underperforming products
+Recommendations
+14.11 Inventory Analysis Prompt
+
+Purpose:
+
+Evaluate inventory health.
+
+Context:
+
+Current stock
+Low-stock items
+Stock value
+Product movement
+
+Output:
+
+Inventory summary
+Critical shortages
+Overstocked items
+Restocking recommendations
+14.12 Customer Analysis Prompt
+
+Purpose:
+
+Understand customer behavior.
+
+Context:
+
+Customer count
+Lifetime value
+Repeat purchases
+Purchase frequency
+
+Output:
+
+Customer growth
+Retention insights
+High-value customers
+Churn risks
+Suggested engagement strategies
+14.13 Profit & Loss Summary Prompt
+
+Purpose:
+
+Summarize financial performance.
+
+Context:
+
+Revenue
+Expenses
+Gross profit
+Net profit
+
+Output:
+
+Executive summary
+Financial highlights
+Risks
+Improvement opportunities
+14.14 Forecast Prompt
+
+Purpose:
+
+Generate business forecasts.
+
+Context:
+
+Historical sales
+Historical revenue
+Seasonal trends
+Inventory
+Customer growth
+
+Output:
+
+Predicted values
+Confidence score
+Assumptions
+Risks
+Recommended actions
+
+Forecasts should distinguish between AI interpretation and historical trend analysis.
+
+14.15 Chart Explanation Prompt
+
+Purpose:
+
+Explain visual business data.
+
+Supported charts:
+
+Revenue Over Time
+Inventory Value
+Customer Growth
+Sales by Category
+Monthly Profit
+
+Output:
+
+Trend description
+Significant changes
+Potential causes
+Business recommendations
+14.16 Invoice Assistant Prompt
+
+Purpose:
+
+Assist with invoice creation and communication.
+
+Capabilities:
+
+Generate payment reminder emails
+Explain invoice details
+Summarize outstanding balances
+Draft customer messages
+
+The AI must not modify invoice totals or tax calculations.
+
+14.17 Report Summary Prompt
+
+Purpose:
+
+Summarize generated reports.
+
+Supported reports:
+
+Profit & Loss
+Inventory
+Sales
+Forecasts
+
+Output:
+
+Executive summary
+Key metrics
+Positive trends
+Risks
+Recommendations
+14.18 Email Drafting Prompt
+
+Purpose:
+
+Draft professional business emails.
+
+Supported emails:
+
+Invoice delivery
+Payment reminders
+Customer follow-ups
+Stock inquiries
+General business communication
+
+Emails should maintain a professional tone and avoid unsupported claims.
+
+14.19 Output Formats
+
+The AI supports the following response formats:
+
+Markdown
+
+Default for conversational responses.
+
+JSON
+
+Used for structured outputs consumed by the application.
+
+Tables
+
+Used for comparisons and summaries.
+
+Bullet Lists
+
+Used for recommendations and action items.
+
+14.20 Structured Output Schemas
+
+Structured responses should define:
+
+Required fields
+Data types
+Validation rules
+
+Example:
+
+{
+  "summary": "string",
+  "recommendations": [
+    {
+      "title": "string",
+      "priority": "high | medium | low",
+      "description": "string"
+    }
+  ],
+  "confidence": 0.95
+}
+
+The application should validate structured outputs before use.
+
+14.21 Prompt Safety Rules
+
+Every prompt must include instructions to:
+
+Avoid fabricating business data.
+Clearly identify assumptions.
+Request additional information when required.
+Avoid providing legal or tax advice as definitive guidance.
+Respect user privacy.
+Stay within the requested scope.
+14.22 Hallucination Prevention
+
+Strategies include:
+
+Context grounding.
+Explicit data references.
+Structured prompts.
+Output validation.
+Confidence indicators (where appropriate).
+
+The AI should acknowledge uncertainty instead of guessing.
+
+14.23 Prompt Optimization
+
+Prompt templates should be:
+
+Concise
+Modular
+Reusable
+Version-controlled
+Easy to test
+
+Avoid duplicated instructions across templates.
+
+14.24 Prompt Testing
+
+Each prompt should be tested with:
+
+Valid business data
+Missing data
+Empty datasets
+Large datasets
+Invalid requests
+Edge cases
+
+Regression testing should ensure updates do not degrade response quality.
+
+14.25 Quality Metrics
+
+Prompt quality should be measured by:
+
+Metric	Target
+Accuracy	>95%
+Hallucination Rate	<2%
+Response Consistency	>95%
+User Satisfaction	>90%
+Formatting Errors	<1%
+
+Metrics should be monitored as part of ongoing quality assurance.
+
+14.26 Prompt Storage
+
+Prompt templates should be stored as version-controlled files.
+
+Suggested structure:
+
+/prompts
+    system.md
+    business-analysis.md
+    sales-analysis.md
+    inventory-analysis.md
+    customer-analysis.md
+    forecast.md
+    report-summary.md
+    chart-explanation.md
+    invoice-assistant.md
+    email-drafting.md
+
+Prompts should not be hardcoded into application logic.
+
+14.27 Future Prompt Categories
+
+Future releases may include prompts for:
+
+AI Agents
+Voice AI
+Marketing Campaigns
+Financial Planning
+Purchase Order Generation
+Supplier Analysis
+Fraud Detection
+Expense Optimization
+Cash Flow Forecasting
+
+The framework is designed to accommodate these additions without major architectural changes.
+
+14.28 Acceptance Criteria
+
+The prompt framework is considered complete when:
+
+All business workflows use standardized prompt templates.
+Prompt versions are tracked.
+Context is injected dynamically.
+Structured outputs are validated.
+Safety rules are consistently applied.
+Prompt quality metrics meet targets.
+Prompt files are maintainable and reusable.
+Chapter Summary
+
+This chapter defines Finch's AI Prompt Library and Prompt Engineering Framework. By using modular prompt templates, dynamic context injection, version control, structured outputs, and rigorous testing, Finch delivers reliable, consistent, and maintainable AI-powered business assistance. The framework also provides a strong foundation for future capabilities such as AI agents, voice interaction, and advanced automation.

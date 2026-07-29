@@ -1,0 +1,577 @@
+Finch Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 12 — Database Schema & Data Dictionary
+12.1 Purpose
+
+This chapter defines the complete database schema for Finch Version 1.0.
+
+It serves as the single source of truth for every database object used by the application, including:
+
+SQLite Local Database
+Supabase PostgreSQL Database
+Table definitions
+Relationships
+Constraints
+Indexes
+Data types
+Views
+Triggers
+Naming conventions
+Entity relationships
+
+SQLite and PostgreSQL use nearly identical schemas to simplify synchronization.
+
+12.2 Database Architecture
+                 Finch Desktop
+
+              SQLite Database
+                    │
+          Sync Engine (Offline First)
+                    │
+              Supabase PostgreSQL
+
+SQLite is the operational database.
+
+Supabase PostgreSQL acts as the synchronized cloud database.
+
+12.3 Database Naming Standards
+Tables
+
+Plural
+
+Examples
+
+customers
+
+orders
+
+products
+Columns
+
+Snake case
+
+created_at
+
+updated_at
+
+company_id
+Primary Keys
+
+Always
+
+id
+
+Type
+
+UUID
+Foreign Keys
+customer_id
+
+product_id
+
+company_id
+
+order_id
+Timestamps
+created_at
+
+updated_at
+
+deleted_at
+Boolean Fields
+
+Prefix
+
+is_
+
+has_
+
+can_
+
+Example
+
+is_active
+
+has_backup
+
+can_sync
+12.4 Common Columns
+
+Every business table includes
+
+Column	Type	Description
+id	UUID	Primary Key
+created_at	TIMESTAMP	Record creation
+updated_at	TIMESTAMP	Last modification
+deleted_at	TIMESTAMP NULL	Soft delete
+sync_status	TEXT	Sync state
+version	INTEGER	Optimistic locking
+12.5 Entity Relationship Diagram (ERD)
+Company
+│
+├── Users
+│
+├── Customers
+│
+├── Products
+│     │
+│     └── Inventory
+│
+├── Orders
+│      │
+│      └── Order Items
+│
+├── Reports
+│
+├── Forecasts
+│
+├── AI History
+│
+├── Notifications
+│
+└── Settings
+12.6 users
+
+Purpose
+
+Stores authenticated business owners.
+
+Column	Type	Nullable	Description
+id	UUID	No	Primary Key
+email	TEXT	No	Email Address
+full_name	TEXT	No	User Name
+avatar_url	TEXT	Yes	Profile Photo
+company_id	UUID	No	Business
+last_login	TIMESTAMP	Yes	Last Login
+created_at	TIMESTAMP	No	Created
+updated_at	TIMESTAMP	No	Updated
+
+Indexes
+
+email UNIQUE
+
+company_id
+12.7 companies
+
+Purpose
+
+Stores business information.
+
+Column	Type
+id	UUID
+name	TEXT
+email	TEXT
+phone	TEXT
+address	TEXT
+website	TEXT
+tax_number	TEXT
+logo_url	TEXT
+currency	TEXT
+timezone	TEXT
+created_at	TIMESTAMP
+updated_at	TIMESTAMP
+12.8 customers
+
+Purpose
+
+Stores customer information.
+
+Column	Type
+id	UUID
+company_id	UUID
+name	TEXT
+email	TEXT
+phone	TEXT
+address	TEXT
+notes	TEXT
+total_orders	INTEGER
+lifetime_value	DECIMAL
+created_at	TIMESTAMP
+updated_at	TIMESTAMP
+deleted_at	TIMESTAMP
+
+Indexes
+
+company_id
+
+email
+
+name
+12.9 products
+
+Purpose
+
+Product catalog.
+
+Column	Type
+id	UUID
+company_id	UUID
+sku	TEXT
+name	TEXT
+description	TEXT
+category	TEXT
+unit_price	DECIMAL
+cost_price	DECIMAL
+barcode	TEXT
+is_active	BOOLEAN
+created_at	TIMESTAMP
+updated_at	TIMESTAMP
+
+Indexes
+
+sku UNIQUE
+
+barcode
+
+name
+12.10 inventory
+
+Purpose
+
+Tracks stock levels.
+
+Column	Type
+id	UUID
+product_id	UUID
+quantity	INTEGER
+minimum_stock	INTEGER
+maximum_stock	INTEGER
+location	TEXT
+last_stock_update	TIMESTAMP
+created_at	TIMESTAMP
+updated_at	TIMESTAMP
+12.11 orders
+
+Purpose
+
+Customer orders.
+
+Column	Type
+id	UUID
+company_id	UUID
+customer_id	UUID
+invoice_number	TEXT
+status	TEXT
+subtotal	DECIMAL
+tax	DECIMAL
+discount	DECIMAL
+total	DECIMAL
+payment_status	TEXT
+payment_method	TEXT
+notes	TEXT
+created_at	TIMESTAMP
+updated_at	TIMESTAMP
+
+Indexes
+
+invoice_number UNIQUE
+
+customer_id
+
+status
+
+created_at
+12.12 order_items
+
+Purpose
+
+Stores purchased products.
+
+Column	Type
+id	UUID
+order_id	UUID
+product_id	UUID
+quantity	INTEGER
+unit_price	DECIMAL
+discount	DECIMAL
+tax	DECIMAL
+line_total	DECIMAL
+12.13 reports
+
+Purpose
+
+Generated reports.
+
+Column	Type
+id	UUID
+company_id	UUID
+report_type	TEXT
+start_date	DATE
+end_date	DATE
+generated_by	UUID
+pdf_url	TEXT
+created_at	TIMESTAMP
+12.14 forecasts
+
+Purpose
+
+AI generated forecasts.
+
+Column	Type
+id	UUID
+company_id	UUID
+forecast_type	TEXT
+prediction	JSON
+confidence	DECIMAL
+generated_at	TIMESTAMP
+created_by	UUID
+12.15 ai_history
+
+Purpose
+
+Conversation history.
+
+Column	Type
+id	UUID
+company_id	UUID
+user_id	UUID
+prompt	TEXT
+response	TEXT
+tokens_used	INTEGER
+model	TEXT
+latency_ms	INTEGER
+created_at	TIMESTAMP
+12.16 notifications
+
+Purpose
+
+System notifications.
+
+Column	Type
+id	UUID
+company_id	UUID
+title	TEXT
+message	TEXT
+type	TEXT
+is_read	BOOLEAN
+created_at	TIMESTAMP
+12.17 settings
+
+Purpose
+
+Application settings.
+
+Column	Type
+id	UUID
+company_id	UUID
+theme	TEXT
+language	TEXT
+currency	TEXT
+timezone	TEXT
+notifications_enabled	BOOLEAN
+auto_sync	BOOLEAN
+created_at	TIMESTAMP
+updated_at	TIMESTAMP
+12.18 licenses
+
+Purpose
+
+License management.
+
+Column	Type
+id	UUID
+company_id	UUID
+license_key	TEXT
+status	TEXT
+device_id	TEXT
+activated_at	TIMESTAMP
+expires_at	TIMESTAMP
+12.19 sync_queue
+
+Purpose
+
+Offline synchronization queue.
+
+Column	Type
+id	UUID
+table_name	TEXT
+record_id	UUID
+operation	TEXT
+payload	JSON
+status	TEXT
+retry_count	INTEGER
+created_at	TIMESTAMP
+12.20 sync_history
+
+Purpose
+
+Synchronization logs.
+
+Column	Type
+id	UUID
+started_at	TIMESTAMP
+completed_at	TIMESTAMP
+status	TEXT
+records_uploaded	INTEGER
+records_downloaded	INTEGER
+errors	INTEGER
+12.21 backups
+
+Purpose
+
+Local backup metadata.
+
+Column	Type
+id	UUID
+backup_name	TEXT
+file_path	TEXT
+checksum	TEXT
+created_at	TIMESTAMP
+version	TEXT
+12.22 audit_logs
+
+Purpose
+
+Tracks critical system actions.
+
+Column	Type
+id	UUID
+user_id	UUID
+action	TEXT
+entity	TEXT
+entity_id	UUID
+ip_address	TEXT
+device	TEXT
+created_at	TIMESTAMP
+12.23 Relationships
+Parent	Child	Relationship
+Company	Users	1:N
+Company	Customers	1:N
+Company	Products	1:N
+Company	Orders	1:N
+Company	Reports	1:N
+Company	Forecasts	1:N
+Customer	Orders	1:N
+Order	Order Items	1:N
+Product	Inventory	1:1
+Product	Order Items	1:N
+12.24 Database Views
+
+Version 1.0 includes several read-only views.
+
+sales_summary
+
+Aggregated sales by day, week, month, and year.
+
+inventory_status
+
+Current stock levels with low-stock indicators.
+
+customer_statistics
+
+Customer lifetime value, order count, and average order value.
+
+profit_loss_summary
+
+Revenue, costs, gross profit, expenses, and net profit.
+
+dashboard_metrics
+
+Optimized dataset for the dashboard widgets.
+
+Views reduce complex query logic in the application layer.
+
+12.25 Database Triggers
+
+Automatic triggers include:
+
+Orders
+Update inventory after order creation
+Recalculate customer lifetime value
+Add sync queue entry
+Inventory
+Generate low-stock notifications
+Add audit log entry
+Queue synchronization
+Customers
+Update updated_at
+Queue synchronization
+Products
+Update inventory timestamps
+Queue synchronization
+12.26 Constraints
+
+The database enforces:
+
+Primary Keys
+Foreign Keys
+Unique Constraints
+NOT NULL Constraints
+CHECK Constraints
+Default Values
+
+Examples:
+
+quantity >= 0
+total >= 0
+confidence BETWEEN 0 AND 1
+12.27 Indexing Strategy
+
+Indexes should exist on:
+
+Primary Keys
+Foreign Keys
+Invoice Number
+Customer Name
+Product Name
+SKU
+Barcode
+Email
+Created Date
+Sync Status
+
+Composite indexes may be added for frequently queried combinations, such as (company_id, created_at).
+
+12.28 Migration Strategy
+
+Database schema changes use versioned SQL migrations.
+
+Example:
+
+001_initial_schema.sql
+002_products.sql
+003_orders.sql
+004_reports.sql
+005_ai_history.sql
+006_notifications.sql
+
+Rules:
+
+Migrations are immutable.
+Applied in ascending order.
+Tracked in a migration history table.
+Backward-compatible whenever possible.
+12.29 Data Dictionary Standards
+
+Each table and column must include documentation describing:
+
+Business purpose
+Data type
+Allowed values
+Validation rules
+Relationships
+Default values
+
+This documentation should be maintained alongside the schema and updated with every migration.
+
+12.30 Acceptance Criteria
+
+The database schema is considered complete when:
+
+All business entities are represented.
+Relationships are enforced through foreign keys.
+Constraints maintain data integrity.
+Indexes support performance targets.
+Views simplify reporting.
+Triggers automate critical workflows.
+SQLite and PostgreSQL schemas remain synchronized.
+Migrations are version-controlled and reproducible.
+Chapter Summary
+
+This chapter defines the complete database schema and data dictionary for Finch. It establishes standardized table structures, relationships, constraints, views, triggers, and migration practices across both SQLite and Supabase PostgreSQL. The schema is optimized for an offline-first architecture while ensuring data integrity, synchronization reliability, and future scalability.

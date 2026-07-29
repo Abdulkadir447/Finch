@@ -1,0 +1,681 @@
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+
+Chapter 7 — Technical Architecture & System Design
+7.1 Purpose
+
+This chapter defines the technical architecture for Finch. It provides the engineering blueprint for building a scalable, secure, offline-first Windows desktop application that combines ERP functionality with AI-powered business intelligence.
+
+The architecture prioritizes:
+
+Offline reliability
+Fast performance
+Maintainability
+Security
+Scalability
+Modular development
+7.2 High-Level Architecture
+
+Finch follows a layered architecture.
+
+                    Finch Desktop Application
+
+                    Electron (Desktop Shell)
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+ React UI              AI Services         Local Services
+(TypeScript)             (GPT-5.5)            (SQLite)
+
+        │
+        ▼
+State Management (Zustand)
+
+        │
+        ▼
+Business Services Layer
+
+        │
+        ▼
+Synchronization Engine
+
+        │
+ ┌──────┴─────────────┐
+ ▼                    ▼
+SQLite          Supabase Cloud
+(Local)        (PostgreSQL + Auth)
+
+7.3 Technology Stack
+Layer	Technology
+Desktop Shell	Electron
+Frontend	React 18
+Language	TypeScript
+UI Library	Ant Design
+Charts	Recharts
+State Management	Zustand
+Routing	React Router
+Forms	React Hook Form
+Validation	Zod
+Local Database	SQLite
+Cloud Backend	Supabase
+Authentication	Supabase Auth
+AI	OpenAI GPT-5.5
+File Export	jsPDF / ExcelJS
+Packaging	Electron Builder
+Auto Updates	Electron Updater
+Testing	Vitest + Playwright
+7.4 Application Layers
+
+Finch is divided into six independent layers.
+
+Presentation Layer
+
+↓
+
+Application Layer
+
+↓
+
+Business Logic Layer
+
+↓
+
+Service Layer
+
+↓
+
+Data Layer
+
+↓
+
+Infrastructure Layer
+
+Each layer communicates only with the layer directly below it.
+
+7.5 Project Structure
+finch/
+
+├── apps/
+│   └── desktop/
+│
+├── packages/
+│   ├── ui/
+│   ├── database/
+│   ├── ai/
+│   ├── sync/
+│   ├── auth/
+│   ├── reports/
+│   ├── forecasting/
+│   ├── shared/
+│   └── utils/
+│
+├── docs/
+│
+├── scripts/
+│
+├── assets/
+│
+└── tests/
+7.6 Desktop Structure
+desktop/
+
+src/
+
+├── main/
+│
+├── preload/
+│
+├── renderer/
+│
+├── routes/
+│
+├── pages/
+│
+├── components/
+│
+├── hooks/
+│
+├── stores/
+│
+├── services/
+│
+├── database/
+│
+├── ai/
+│
+├── sync/
+│
+├── styles/
+│
+└── utils/
+7.7 Electron Process Architecture
+Main Process
+
+Responsible for:
+
+Window management
+Auto updates
+File system access
+Local backups
+Native dialogs
+Printing
+Licensing
+IPC communication
+Renderer Process
+
+Responsible for:
+
+UI
+Forms
+Charts
+Navigation
+Dashboard
+AI interface
+Preload Process
+
+Acts as the secure bridge between Electron and React.
+
+Exposes only approved APIs.
+
+Example:
+
+window.finch.backup.create()
+window.finch.export.pdf()
+window.finch.license.activate()
+
+Direct Node.js access from the renderer is prohibited.
+
+7.8 State Management
+
+Finch uses Zustand with domain-specific stores.
+
+Auth Store
+
+Dashboard Store
+
+Orders Store
+
+Inventory Store
+
+Customers Store
+
+AI Store
+
+Sync Store
+
+Theme Store
+
+Settings Store
+
+License Store
+
+Stores should remain focused and avoid cross-domain responsibilities.
+
+7.9 Data Architecture
+
+Finch follows an Offline-First model.
+
+User Action
+
+↓
+
+SQLite
+
+↓
+
+Sync Queue
+
+↓
+
+Internet Available?
+
+↓
+
+YES
+
+↓
+
+Supabase
+
+↓
+
+Other Devices (Future)
+
+
+Every user action is written locally first, ensuring uninterrupted operation even without connectivity.
+
+7.10 Synchronization Engine
+
+The synchronization engine is responsible for keeping local and cloud data consistent.
+
+Responsibilities
+Detect internet availability
+Queue offline operations
+Retry failed synchronizations
+Resolve conflicts
+Download remote updates
+Upload local changes
+Sync Flow
+Start
+
+↓
+
+Check Authentication
+
+↓
+
+Check Internet
+
+↓
+
+Read Local Queue
+
+↓
+
+Upload Changes
+
+↓
+
+Download Cloud Changes
+
+↓
+
+Resolve Conflicts
+
+↓
+
+Update SQLite
+
+↓
+
+Refresh UI
+
+↓
+
+Complete
+7.11 Conflict Resolution
+
+Possible conflicts include:
+
+Same order edited on multiple devices (future)
+Local data older than cloud
+Duplicate records
+
+Resolution strategy:
+
+Detect conflict.
+Preserve both versions.
+Prompt user to:
+Keep Local
+Keep Cloud
+Merge
+
+No data should be overwritten silently.
+
+7.12 Authentication
+
+Finch supports both local and cloud authentication.
+
+Local
+Cached session
+Offline login
+Encrypted credentials
+Cloud
+
+Supabase Auth provides:
+
+Email/password
+Password recovery
+Two-factor authentication
+Session management
+Authentication Flow
+Launch Finch
+
+↓
+
+Check Cached Session
+
+↓
+
+Session Valid?
+
+↓
+
+Yes → Open Dashboard
+
+↓
+
+No
+
+↓
+
+Login Screen
+
+↓
+
+Authenticate
+
+↓
+
+Cache Session
+
+↓
+
+Dashboard
+7.13 AI Integration
+
+All AI requests pass through a dedicated AI Service.
+
+User Prompt
+
+↓
+
+Context Builder
+
+↓
+
+Prompt Builder
+
+↓
+
+GPT-5.5 API
+
+↓
+
+Formatter
+
+↓
+
+Response
+
+Responsibilities:
+
+Token optimization
+Error handling
+Rate limiting
+Response validation
+Conversation history
+7.14 Database Architecture
+Local Database
+
+SQLite stores:
+
+Orders
+Inventory
+Customers
+Reports
+Settings
+AI history
+Sync queue
+Cloud Database
+
+Supabase stores:
+
+User accounts
+Cloud backups
+Orders
+Inventory
+Customers
+Reports
+Licensing
+AI history
+7.15 Service Layer
+
+Each domain exposes its own service.
+
+OrderService
+
+InventoryService
+
+CustomerService
+
+DashboardService
+
+AIService
+
+ReportService
+
+SyncService
+
+BackupService
+
+LicenseService
+
+SettingsService
+
+Services communicate through interfaces, not direct database calls.
+
+7.16 Security Architecture
+
+Security principles:
+
+Least privilege
+Secure defaults
+End-to-end encryption where applicable
+No secrets stored in source code
+Encryption
+
+Encrypt:
+
+Cached sessions
+Local credentials
+License tokens
+Sensitive settings
+API Keys
+
+Never embed API keys in the client application.
+
+All OpenAI requests should be proxied through a secure backend service to protect credentials and enable usage monitoring.
+
+7.17 Logging
+
+Levels:
+
+Info
+Warning
+Error
+Debug (development only)
+
+Logs should include:
+
+Timestamp
+Module
+Event
+User ID (if authenticated)
+Error details
+Stack trace (development)
+
+Sensitive data must never be written to logs.
+
+7.18 Backup System
+
+Manual backups only in v1.0.
+
+User flow:
+
+Settings
+
+↓
+
+Backup
+
+↓
+
+Choose Folder
+
+↓
+
+Create Backup
+
+↓
+
+Success
+
+Backups include:
+
+SQLite database
+Application settings
+User preferences
+
+AI API keys and authentication tokens should not be included in backup files.
+
+7.19 Licensing System
+
+License activation requires an internet connection.
+
+Flow:
+
+Enter License Key
+
+↓
+
+Validate with Server
+
+↓
+
+Receive Signed Token
+
+↓
+
+Store Encrypted License
+
+↓
+
+Activate Features
+
+If validation fails:
+
+Display a clear error message.
+Preserve trial functionality if applicable.
+7.20 Auto Updates
+
+Finch uses Electron Updater.
+
+Update flow:
+
+Launch
+
+↓
+
+Check Updates
+
+↓
+
+Download
+
+↓
+
+Notify User
+
+↓
+
+Restart
+
+↓
+
+Install
+
+Users may postpone updates unless a critical security patch is required.
+
+7.21 Error Handling
+
+Every service returns a standardized result.
+
+Example:
+
+{
+  success: true,
+  data: {},
+  error: null
+}
+
+or
+
+{
+  success: false,
+  data: null,
+  error: {
+    code: "SYNC_FAILED",
+    message: "Unable to synchronize changes."
+  }
+}
+7.22 Performance Targets
+Operation	Target
+Launch	< 3 seconds
+Dashboard Load	< 1 second
+Search	< 200 ms
+Save Order	< 500 ms
+AI Response Start	< 2 seconds
+Sync Check	< 1 second
+7.23 Dependency Management
+
+Use:
+
+npm workspaces
+Shared packages
+Semantic versioning
+Automated dependency checks
+
+Avoid duplicate libraries across packages.
+
+7.24 Build Pipeline
+Developer
+
+↓
+
+GitHub
+
+↓
+
+CI Pipeline
+
+↓
+
+Tests
+
+↓
+
+Build
+
+↓
+
+Electron Package
+
+↓
+
+Code Signing
+
+↓
+
+Release
+
+↓
+
+Auto Update Server
+7.25 Future Scalability
+
+The architecture should support future additions without major refactoring, including:
+
+macOS support
+Linux support
+Multi-user collaboration
+Mobile companion apps
+AI agents
+Voice AI
+Plugin marketplace
+Multiple warehouses
+Multi-company management
+7.26 Engineering Principles
+Feature modules should be loosely coupled.
+Business logic must not reside in UI components.
+Prefer composition over inheritance.
+All external services should be abstracted behind interfaces.
+Offline functionality takes precedence over cloud-only features.
+Every module should be independently testable.
+Chapter Summary
+
+This chapter establishes Finch's technical foundation. The architecture is built around an offline-first philosophy using Electron, React, SQLite, and Supabase, with GPT-5.5 integrated through a secure service layer. Emphasis is placed on modularity, security, synchronization, and long-term scalability, ensuring the platform can evolve into a full business operating system without major architectural changes.

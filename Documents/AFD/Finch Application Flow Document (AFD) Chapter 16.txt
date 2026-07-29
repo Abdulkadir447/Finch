@@ -1,0 +1,385 @@
+Finch Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 16 — Error Handling, Logging & Diagnostics Flow
+16.1 Purpose
+
+This chapter defines how Finch detects, handles, logs, reports, and recovers from errors throughout the application. The objective is to ensure that failures do not interrupt the user's workflow, business data remains protected, and developers have sufficient diagnostic information to identify and resolve issues.
+
+Errors should be handled gracefully, with clear messages for users and detailed logs for developers.
+
+16.2 Objectives
+
+The Error Handling & Diagnostics system must:
+
+Prevent application crashes whenever possible.
+Display user-friendly error messages.
+Log all significant events and errors.
+Automatically recover from recoverable failures.
+Preserve user data during unexpected events.
+Provide diagnostic information for troubleshooting.
+Support future crash reporting services.
+Monitor application health and performance.
+16.3 Error Handling Architecture
+                Application
+                     │
+                     ▼
+            Error Detection Layer
+                     │
+       ┌─────────────┼─────────────┐
+       ▼             ▼             ▼
+  User Interface   Logging     Diagnostics
+       │             │             │
+       └─────────────┼─────────────┘
+                     ▼
+             Recovery Manager
+                     │
+                     ▼
+              Continue Operation
+
+The architecture separates user-facing errors from internal diagnostic information.
+
+16.4 Error Categories
+Validation Errors
+
+Examples:
+
+Missing required fields
+Invalid email
+Invalid quantity
+Incorrect date
+Network Errors
+
+Examples:
+
+Internet unavailable
+API timeout
+DNS failure
+Server unavailable
+Database Errors
+
+Examples:
+
+SQLite locked
+Database corruption
+Migration failure
+Query failure
+Synchronization Errors
+
+Examples:
+
+Upload failed
+Download failed
+Conflict detected
+Authentication expired
+AI Errors
+
+Examples:
+
+API unavailable
+Timeout
+Invalid AI response
+Rate limit exceeded
+System Errors
+
+Examples:
+
+Disk full
+Permission denied
+Missing file
+Memory allocation failure
+Unexpected Errors
+
+Unhandled exceptions or unknown failures.
+
+16.5 Global Error Flow
+Application Error
+        │
+        ▼
+Detect Error
+        │
+        ▼
+Log Error
+        │
+        ▼
+Determine Severity
+        │
+ ┌──────┴─────────┐
+ │                │
+Recoverable   Critical
+ │                │
+ ▼                ▼
+Recover      Recovery Mode
+16.6 Error Severity Levels
+Level	Description
+Info	Informational events
+Warning	Minor issues that do not interrupt work
+Error	Operation failed but application continues
+Critical	Major failure requiring recovery
+Fatal	Application must shut down safely
+
+Each level determines how the application responds and what information is shown to the user.
+
+16.7 User-Friendly Error Messages
+
+Error messages should:
+
+Clearly explain what happened.
+Avoid technical jargon.
+Suggest possible solutions.
+Offer retry options when appropriate.
+
+Example:
+
+Instead of:
+
+SQLite Error Code 5
+
+Display:
+
+Unable to save your changes because the database is temporarily busy. Please try again in a few moments.
+
+16.8 Logging System
+
+Finch uses Pino as its logging framework.
+
+Logs include:
+
+Startup events
+Shutdown events
+User actions
+Database operations
+Synchronization events
+Authentication events
+AI requests
+Errors
+Performance metrics
+16.9 Log Levels
+Level	Purpose
+Trace	Detailed internal debugging
+Debug	Development information
+Info	Normal application events
+Warn	Recoverable issues
+Error	Failed operations
+Fatal	Critical application failures
+
+Production builds default to Info level, while Debug and Trace are available in Developer Mode.
+
+16.10 Logging Flow
+Application Event
+        │
+        ▼
+Determine Log Level
+        │
+        ▼
+Write to Log File
+        │
+        ▼
+Rotate Logs if Needed
+
+Logs are written asynchronously to avoid blocking the UI.
+
+16.11 Log Storage
+
+Log files are stored locally in an application-specific directory.
+
+Logs include:
+
+Timestamp
+Severity
+Module
+Event
+Error details
+Stack trace (development mode)
+Session ID
+
+Old logs are rotated automatically to prevent excessive disk usage.
+
+16.12 Crash Recovery
+
+If an unexpected crash occurs:
+
+Crash Detected
+      │
+      ▼
+Save Recovery Data
+      │
+      ▼
+Restart Application
+      │
+      ▼
+Restore Session
+      │
+      ▼
+Notify User
+
+Recovery data includes:
+
+Unsaved forms
+Open pages
+Session state
+Recent operations
+16.13 Diagnostic Mode
+
+Developer Mode enables additional tools.
+
+Available diagnostics:
+
+Application logs
+Database inspection
+Synchronization queue
+Performance metrics
+Memory usage
+Active services
+Environment information
+
+Diagnostic Mode is hidden from normal users.
+
+16.14 Health Monitoring
+
+The application continuously monitors:
+
+Database health
+Synchronization status
+Memory usage
+CPU usage
+AI service availability
+Network connectivity
+Disk space
+
+Problems generate warnings before they become critical.
+
+16.15 Performance Monitoring
+
+Key performance metrics include:
+
+Startup time
+Dashboard load time
+Database query duration
+Synchronization duration
+AI response time
+Memory consumption
+CPU utilization
+
+Performance data helps identify bottlenecks during development and support.
+
+16.16 Error Recovery Strategies
+Error Type	Recovery Strategy
+Network failure	Retry automatically
+Database lock	Retry after delay
+Sync conflict	Ask user to resolve
+AI timeout	Retry once, then notify
+File access denied	Prompt user to choose another location
+Configuration error	Restore default configuration
+
+Recovery should always prioritize preserving user data.
+
+16.17 Recovery Mode
+
+If the application cannot start normally:
+
+Startup Failure
+       │
+       ▼
+Recovery Mode
+       │
+       ▼
+Run Diagnostics
+       │
+       ▼
+Repair
+       │
+       ▼
+Restart
+
+Recovery Mode provides options to:
+
+Repair the database.
+Restore a backup.
+Reset application settings.
+Export logs for support.
+16.18 Error Notifications
+
+When appropriate, users receive notifications for:
+
+Failed synchronization
+Backup failure
+AI service unavailable
+Low disk space
+Database repair completed
+
+Notifications provide direct links to the relevant troubleshooting page.
+
+16.19 Privacy & Security
+
+Logs must never contain:
+
+User passwords
+Authentication tokens
+API keys
+Full payment information
+Sensitive personal information
+
+Sensitive values should be masked or omitted before logging.
+
+16.20 Error State Machine
+Normal
+   │
+   ▼
+Error Detected
+   │
+   ▼
+Log Error
+   │
+ ┌─┴─────────────┐
+ │               │
+Recoverable   Critical
+ │               │
+ ▼               ▼
+Recover      Recovery Mode
+ │               │
+ └──────┬────────┘
+        ▼
+      Normal
+16.21 Performance Targets
+Operation	Target
+Error Detection	<10 ms
+Error Logging	<20 ms
+User Notification	<300 ms
+Crash Recovery Startup	<5 seconds
+Log Rotation	Background only
+Health Check Cycle	Every 60 seconds
+16.22 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use Pino for structured JSON logging.
+Centralize error handling through a global Error Service.
+Implement React Error Boundaries to catch UI rendering errors.
+Catch and handle unhandled promise rejections and uncaught exceptions in the Electron main process.
+Rotate and compress old log files automatically.
+Include correlation IDs or request IDs where useful for tracing related events.
+Keep recovery logic isolated from business logic to simplify testing and maintenance.
+Ensure diagnostic features are accessible only in Developer Mode or with appropriate permissions.
+16.23 Acceptance Criteria
+
+The Error Handling, Logging & Diagnostics Flow is complete when:
+
+Errors are categorized and handled consistently.
+User-friendly error messages are displayed.
+Pino logs all significant events.
+Logs rotate automatically.
+Recoverable errors do not interrupt the user's workflow.
+Crash recovery restores sessions whenever possible.
+Diagnostic Mode provides detailed troubleshooting information.
+Health monitoring detects system issues proactively.
+Sensitive information is never written to logs.
+Performance targets are met.
+16.24 Chapter Summary
+
+The Error Handling, Logging & Diagnostics Flow provides Finch with a resilient operational foundation. Through structured logging, proactive health monitoring, intelligent recovery mechanisms, and user-friendly error handling, the application can remain stable and reliable even when unexpected failures occur. This architecture also equips developers and support teams with the tools needed to diagnose issues efficiently while protecting user privacy and business data.

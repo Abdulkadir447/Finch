@@ -1,0 +1,567 @@
+Finch Product Requirements Document (PRD)
+
+Version: 1.0
+Product: Finch
+Tagline: Your Business, Smarter.
+
+Chapter 3 — User Personas & User Journey Maps
+3.1 Purpose
+
+This chapter defines who Finch is built for, what they are trying to accomplish, and how the application should support them throughout their daily workflow.
+
+Every feature in Finch must solve a real business problem and reduce the amount of work required from the user.
+
+The primary design philosophy is:
+
+"The software should think before the user has to."
+
+3.2 Primary User
+Business Owner
+
+The first version of Finch is designed exclusively for a single business owner.
+
+Future versions will introduce additional roles such as managers and employees, but version 1.0 assumes one authenticated user per business.
+
+Persona Profile
+Attribute	Details
+Name	Sarah (Example Persona)
+Age	30–50
+Business Size	Small Business
+Employees	1–20
+Technical Skill	Beginner to Intermediate
+Daily Computer Usage	4–10 hours
+Uses Excel	Yes
+Current Software	Excel, QuickBooks, Paper Records
+Goals
+
+The business owner wants to:
+
+Know how the business is performing.
+Keep inventory accurate.
+Avoid running out of stock.
+Create invoices quickly.
+Understand customer behavior.
+Save time every day.
+Make smarter decisions using AI.
+Frustrations
+
+Current pain points include:
+
+Multiple spreadsheets.
+Forgotten customer information.
+Inventory mistakes.
+Manual invoice creation.
+Time-consuming report generation.
+No clear picture of business health.
+Success Definition
+
+The business owner considers Finch successful if:
+
+They understand the business in less than five minutes every morning.
+Inventory mistakes decrease.
+Reports generate instantly.
+AI answers questions accurately.
+Administrative work takes significantly less time.
+3.3 Jobs To Be Done (JTBD)
+
+Finch should help users accomplish the following jobs.
+
+Job 1
+
+"When I open Finch in the morning, I want to immediately know whether my business is healthy."
+
+Expected Outcome
+
+Dashboard immediately displays:
+
+Revenue
+Orders
+Inventory
+Customer activity
+AI summary
+Job 2
+
+"When I receive an order, I want to process it in less than one minute."
+
+Expected Outcome
+
+Order creation is fast.
+
+Inventory updates automatically.
+
+Invoice is generated automatically.
+
+Job 3
+
+"When inventory becomes low, I want Finch to tell me before it becomes a problem."
+
+Expected Outcome
+
+Automatic low-stock alerts.
+
+AI recommendations.
+
+Forecasted stock depletion.
+
+Job 4
+
+"When I ask a business question, I don't want to search through reports."
+
+Expected Outcome
+
+AI answers naturally.
+
+Charts are generated.
+
+Explanation is easy to understand.
+
+Job 5
+
+"When I finish work, I want a summary of today's business."
+
+Expected Outcome
+
+Daily AI summary including:
+
+Sales
+Customers
+Inventory
+Recommendations
+3.4 Daily User Journey
+Morning
+
+Business owner launches Finch.
+
+↓
+
+Application opens in under three seconds.
+
+↓
+
+Dashboard loads instantly.
+
+↓
+
+Business owner reviews:
+
+Today's revenue
+New orders
+Low stock
+Customer growth
+AI business summary
+
+↓
+
+Business owner knows exactly where attention is needed.
+
+During Business Hours
+
+Customer places an order.
+
+↓
+
+Business owner creates order.
+
+↓
+
+Inventory updates automatically.
+
+↓
+
+Invoice generated.
+
+↓
+
+Customer information updated.
+
+↓
+
+Dashboard refreshes.
+
+Afternoon
+
+Business owner checks inventory.
+
+↓
+
+Receives low-stock warning.
+
+↓
+
+AI recommends reorder quantity.
+
+↓
+
+Business owner plans purchases.
+
+Evening
+
+Business owner opens AI Assistant.
+
+↓
+
+Asks:
+
+"How did the business perform today?"
+
+↓
+
+AI generates:
+
+Summary
+Charts
+Revenue analysis
+Customer insights
+Recommendations
+
+↓
+
+Business owner exports report as PDF.
+
+3.5 User Journey Map
+Stage	User Goal	Finch Experience	Emotion
+Launch	Open application	Fast startup	😊
+Dashboard	Understand business	KPIs + AI Summary	😊
+Orders	Process sales	Simple workflow	😀
+Inventory	Check stock	Smart alerts	😀
+Customers	View history	Organized profiles	😊
+Reports	Generate insights	AI-powered reports	😄
+Exit	Finish work	Daily summary	😄
+3.6 Information Architecture
+
+Finch uses a hierarchical navigation model.
+
+Finch
+
+├── Dashboard
+│
+├── Orders
+│   ├── All Orders
+│   ├── Create Order
+│   ├── Order Details
+│   └── Invoices
+│
+├── Inventory
+│   ├── Products
+│   ├── Categories
+│   ├── Stock History
+│   └── Low Stock
+│
+├── Customers
+│   ├── Customer List
+│   ├── Customer Profile
+│   └── Purchase History
+│
+├── AI Assistant
+│   ├── Chat
+│   ├── Reports
+│   ├── Forecasts
+│   ├── Insights
+│   └── History
+│
+└── Settings
+    ├── Profile
+    ├── Backup
+    ├── Theme
+    ├── License
+    └── Security
+3.7 Navigation Philosophy
+
+Navigation should require minimal thinking.
+
+Every important feature should be accessible within two clicks.
+
+Primary navigation remains visible at all times.
+
+The application should never require deep menu hierarchies.
+
+3.8 Primary User Flows
+Dashboard Flow
+Open Finch
+
+↓
+
+Dashboard
+
+↓
+
+View KPIs
+
+↓
+
+Open Module
+
+↓
+
+Complete Task
+
+↓
+
+Return Dashboard
+Order Creation Flow
+Orders
+
+↓
+
+New Order
+
+↓
+
+Select Customer
+
+↓
+
+Add Products
+
+↓
+
+Review
+
+↓
+
+Create Invoice
+
+↓
+
+Complete
+Inventory Flow
+Inventory
+
+↓
+
+Products
+
+↓
+
+Choose Product
+
+↓
+
+Adjust Stock
+
+↓
+
+Save
+
+↓
+
+Dashboard Updates
+Customer Flow
+Customers
+
+↓
+
+Search
+
+↓
+
+Open Profile
+
+↓
+
+View History
+
+↓
+
+Create New Order
+AI Flow
+Open AI
+
+↓
+
+Ask Question
+
+↓
+
+AI Processes Context
+
+↓
+
+Generates Answer
+
+↓
+
+Optional Chart
+
+↓
+
+Export
+3.9 User Stories
+Dashboard
+
+As a business owner,
+
+I want to immediately understand today's business performance,
+
+so I can prioritize my work.
+
+Orders
+
+As a business owner,
+
+I want to create an order quickly,
+
+so customers are served faster.
+
+Inventory
+
+As a business owner,
+
+I want inventory updated automatically,
+
+so I never sell unavailable products.
+
+Customers
+
+As a business owner,
+
+I want customer purchase history,
+
+so I can provide better service.
+
+Reports
+
+As a business owner,
+
+I want reports generated instantly,
+
+so I don't waste time creating spreadsheets.
+
+AI
+
+As a business owner,
+
+I want to ask questions in plain English,
+
+so I don't need to learn reporting tools.
+
+Forecasting
+
+As a business owner,
+
+I want AI to predict future sales,
+
+so I can prepare inventory before demand increases.
+
+3.10 Accessibility
+
+Finch should be usable by everyone.
+
+Requirements:
+
+Full keyboard navigation
+High contrast support
+Screen reader compatibility
+Adjustable font scaling
+Large clickable targets
+Clear typography
+Consistent spacing
+3.11 Onboarding Experience
+
+The onboarding process should take less than five minutes.
+
+Step 1
+
+Welcome screen.
+
+Introduce Finch.
+
+Step 2
+
+Create account or sign in.
+
+Step 3
+
+Enter company information.
+
+Business name
+Logo
+Currency
+Tax information
+Step 4
+
+Import existing data.
+
+Options:
+
+CSV
+Excel
+
+Or skip.
+
+Step 5
+
+Interactive product tour.
+
+Highlights:
+
+Dashboard
+Orders
+Inventory
+Customers
+AI Assistant
+Step 6
+
+Dashboard ready.
+
+AI greets the user with a personalized welcome and prompts them to ask their first business question.
+
+3.12 UX Principles
+
+Every feature should follow these principles.
+
+Simple
+
+No unnecessary complexity.
+
+Fast
+
+Every interaction should feel immediate.
+
+Predictable
+
+Users should always know what happens next.
+
+Helpful
+
+The AI should proactively provide useful suggestions without becoming intrusive.
+
+Beautiful
+
+The interface should feel premium, trustworthy, and enjoyable to use.
+
+3.13 Empty States
+
+When no data exists, Finch should guide users rather than show empty tables.
+
+Examples:
+
+Orders: "No orders yet. Create your first order to get started."
+Inventory: "Add your first product to begin tracking stock."
+Customers: "Your customer list is empty. Add a customer or create an order."
+Reports: "Generate your first report using AI."
+AI Assistant: Suggested prompts such as:
+"How can I set up my inventory?"
+"What reports can you generate?"
+"How do I create an invoice?"
+3.14 Error Handling
+
+Errors should be clear, actionable, and non-technical.
+
+Instead of:
+
+"Database Error 500"
+
+Use:
+
+"We couldn't save your order right now. Your data is safe locally and will be synchronized when the connection is restored."
+
+Every error should include:
+
+What happened
+Why (if known)
+How to fix it
+Whether any data was lost (preferably never)
+Chapter Summary
+
+This chapter defines who Finch is built for and how users interact with the product. By focusing on a single business owner in v1.0, Finch can deliver a streamlined, intuitive experience centered around quick access to business insights, efficient workflows, and AI-assisted decision-making.

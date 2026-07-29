@@ -1,0 +1,93 @@
+{
+  "mcpServers": {
+    "ruflo": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "ruflo@latest",
+        "mcp",
+        "start"
+      ],
+      "env": {
+        "npm_config_update_notifier": "false",
+        "CLAUDE_FLOW_MODE": "v3",
+        "CLAUDE_FLOW_HOOKS_ENABLED": "true",
+        "CLAUDE_FLOW_TOPOLOGY": "hierarchical-mesh",
+        "CLAUDE_FLOW_MAX_AGENTS": "15",
+        "CLAUDE_FLOW_MEMORY_BACKEND": "hybrid"
+      },
+      "autoStart": true
+    },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
+    },
+    "githubcopilot": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@github/copilot-mcp-server"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "YOUR_ACTUAL_GITHUB_PAT_HERE"
+      }
+    },
+    "designcomputer_mysql": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "uvx",
+        "mcp-server-mysql"
+      ],
+      "env": {
+        "MYSQL_URL": "mysql://user:password@localhost:3306/dbname"
+      }
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-playwright"
+      ]
+    },
+    "linear_server": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    },
+    "sequential_thinking": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "chrome_devtools": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-chrome-devtools"
+      ]
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?features=storage%2Cbranching%2Cfunctions%2Cdevelopment%2Cdebugging%2Cdatabase%2Cdocs%2Caccount"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
+    }
+  }
+}

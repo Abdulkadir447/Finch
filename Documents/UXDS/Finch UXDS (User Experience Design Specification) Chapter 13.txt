@@ -1,0 +1,578 @@
+Finch UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 13 — Reports & Analytics Screen Specification
+13.1 Purpose
+
+The Reports & Analytics module is Finch's Business Intelligence (BI) center. It transforms raw business data into actionable insights through interactive dashboards, AI-generated summaries, forecasting, and exportable reports.
+
+Rather than simply displaying charts, the module should answer important business questions such as:
+
+How is my business performing?
+What products generate the most profit?
+Which customers contribute the most revenue?
+Where am I losing money?
+What should I expect next month?
+
+The Reports module follows four guiding principles:
+
+Clarity — Complex data should be easy to understand.
+Insight — AI should explain the numbers, not just display them.
+Interactivity — Reports should encourage exploration.
+Decision Support — Every report should help users make better business decisions.
+13.2 Objectives
+
+The Reports module enables users to:
+
+View business reports
+Analyze sales performance
+Review Profit & Loss
+Monitor inventory performance
+Track customer growth
+Generate AI summaries
+Create forecasts
+Export reports
+Compare different time periods
+Work offline using cached report data
+13.3 Screen Layout
+
+The Reports page follows a dashboard-first design.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Reports Header                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Report Selector │ Date Range │ Filters │ Export │ AI Summary               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ KPI Cards                                                                  │
+├──────────────────────────────┬──────────────────────────────────────────────┤
+│ Main Chart                   │ Secondary Chart                             │
+├──────────────────────────────┼──────────────────────────────────────────────┤
+│ AI Report Summary            │ Forecast                                    │
+├──────────────────────────────┼──────────────────────────────────────────────┤
+│ Detailed Data Table          │ Insights Panel                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Status Bar                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+The layout minimizes scrolling while maximizing data visibility.
+
+13.4 Reports Header
+
+The page header includes:
+
+Left
+
+Reports title
+Last generated time
+
+Center
+
+Report selector
+Date range picker
+
+Right
+
+Export
+Refresh
+AI Assistant
+
+Example:
+
+Reports
+
+Last Updated: 10:45 AM
+
+[Sales Report]
+
+[This Month]
+
+Export
+
+Refresh
+
+🤖
+13.5 Report Categories
+
+Version 1.0 includes six report categories.
+
+Sales Report
+
+Shows:
+
+Revenue
+Orders
+Sales trends
+Top-selling products
+Profit & Loss Report
+
+Shows:
+
+Revenue
+Expenses
+Gross Profit
+Net Profit
+Profit Margin
+Inventory Report
+
+Displays:
+
+Inventory value
+Stock movement
+Low-stock products
+Fast-moving products
+Slow-moving products
+Customer Report
+
+Displays:
+
+Customer growth
+Returning customers
+Lifetime value
+Customer segmentation
+Forecast Report
+
+Generated using the hybrid forecasting model.
+
+Includes:
+
+Revenue prediction
+Sales prediction
+Inventory demand
+Growth prediction
+AI Summary Report
+
+Natural language explanation of the selected report.
+
+13.6 KPI Cards
+
+Every report displays KPI cards.
+
+Example (Sales Report):
+
+Revenue
+
+₦8,450,000
+
+▲12%
+
+────────────
+
+Orders
+
+325
+
+▲8%
+
+────────────
+
+Customers
+
+145
+
+▲6%
+
+────────────
+
+Average Order
+
+₦26,000
+
+▲4%
+
+Cards animate when data changes.
+
+13.7 Main Chart
+
+The largest chart visualizes the selected report.
+
+Supported chart types:
+
+Line
+Area
+Bar
+Stacked Bar
+
+Users can switch chart types instantly.
+
+Features:
+
+Hover tooltips
+Zoom
+Pan
+Export Image
+Compare periods
+13.8 Secondary Chart
+
+Displays supporting metrics.
+
+Examples:
+
+Sales Report
+
+Orders over time
+
+Inventory Report
+
+Inventory value by category
+
+Customer Report
+
+Customer acquisition trend
+
+Forecast Report
+
+Predicted vs Actual
+13.9 AI Report Summary
+
+One of Finch's flagship features.
+
+Example:
+
+Monthly Business Summary
+
+Revenue increased by 14% compared to last month.
+
+Profit margins remained stable despite increased operating costs.
+
+Customer growth continues to improve.
+
+Inventory turnover increased significantly.
+
+Overall business health is excellent.
+
+The summary should use concise business language.
+
+13.10 Forecast Panel
+
+Uses OpenAI GPT-5.5 combined with statistical forecasting.
+
+Displays:
+
+Revenue Forecast
+Sales Forecast
+Inventory Demand
+Growth Prediction
+
+Each prediction includes:
+
+Confidence Score
+Trend Indicator
+Expected Range
+
+Example:
+
+Revenue Forecast
+
+₦9.2M
+
+Confidence
+
+93%
+
+Expected Growth
+
+11%
+13.11 Detailed Data Table
+
+The lower section contains the complete report dataset.
+
+Features:
+
+Sorting
+Filtering
+Pagination
+Export
+Copy
+Search
+
+Users may click rows to reveal more details.
+
+13.12 Insights Panel
+
+Displays contextual insights.
+
+Examples:
+
+Highest-performing product
+Most profitable customer
+Lowest sales day
+Largest order
+Best-performing category
+
+The panel updates automatically when filters change.
+
+13.13 Date Range Selector
+
+Supported ranges:
+
+Today
+Yesterday
+Last 7 Days
+Last 30 Days
+This Month
+Last Month
+This Quarter
+This Year
+Custom
+
+Changing the range refreshes every chart simultaneously.
+
+13.14 Report Filters
+
+Available filters depend on report type.
+
+Examples:
+
+Sales
+
+Product
+Category
+Customer
+Payment Status
+
+Inventory
+
+Category
+Stock Status
+
+Customers
+
+Registration Date
+Lifetime Value
+
+Multiple filters may be combined.
+
+13.15 Compare Mode
+
+Users can compare:
+
+Current vs Previous Month
+Current vs Previous Year
+Custom vs Custom
+
+Charts display both datasets simultaneously.
+
+Example:
+
+Blue Line
+
+Current Month
+
+Gray Line
+
+Previous Month
+13.16 Export Options
+
+Supported formats:
+
+PDF
+Excel
+CSV
+
+Export includes:
+
+Charts
+Tables
+AI Summary
+Company Logo
+Generation Timestamp
+
+Users can export either the full report or selected sections.
+
+13.17 Print Preview
+
+Reports include a print-friendly view.
+
+The preview removes unnecessary interface elements while preserving branding, charts, and report formatting.
+
+Users can print directly or save as PDF.
+
+13.18 AI Chat Integration
+
+Users can ask questions about the current report.
+
+Examples:
+
+Why did revenue decrease?
+Which products should I restock?
+Explain this chart.
+Summarize this report.
+Predict next month's revenue.
+
+The AI references the currently displayed report to provide contextual answers.
+
+13.19 Interactive Charts
+
+Charts support:
+
+Hover tooltips
+Click to drill down
+Zoom
+Pan
+Legend toggle
+Full-screen mode
+
+Interactions should feel smooth and responsive.
+
+13.20 Empty State
+
+If no report data exists:
+
+Display:
+
+Illustration
+Message
+
+Example:
+
+No report data available yet.
+
+Start creating orders and managing inventory to generate meaningful reports.
+
+AI may suggest importing historical data.
+
+13.21 Loading State
+
+Loading order:
+
+KPI Cards
+Charts
+AI Summary
+Forecast
+Data Table
+
+Skeleton placeholders preserve layout.
+
+13.22 Error State
+
+Example:
+
+Unable to generate report.
+
+[Retry]
+
+Continue Offline
+
+Previously generated reports remain available locally.
+
+13.23 Offline Behavior
+
+Available offline:
+
+View cached reports
+Filter cached data
+Export cached reports
+Print reports
+
+Unavailable:
+
+AI-generated summaries
+Live forecasting
+Gmail sharing
+Cloud synchronization
+
+A banner indicates that displayed data may not reflect recent cloud changes.
+
+13.24 Notifications
+
+Users receive notifications when:
+
+Report generation completes
+Export completes
+Forecast is ready
+AI summary finishes
+Synchronization updates report data
+
+Notifications link directly to the relevant report.
+
+13.25 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + R	Refresh Report
+Ctrl + E	Export
+Ctrl + P	Print
+Ctrl + F	Search Table
+Ctrl + Shift + A	Ask AI
+F11	Full-Screen Chart
+Esc	Exit Full Screen
+13.26 Animations
+
+Animations include:
+
+KPI card updates
+Chart rendering
+AI summary reveal
+Forecast card fade-in
+Table loading
+Toast notifications
+
+Duration:
+
+180–220 milliseconds
+
+Animations should support comprehension without delaying interaction.
+
+13.27 Accessibility
+
+The Reports module supports:
+
+Screen readers
+Keyboard-only navigation
+High-contrast mode
+Zoom up to 200%
+Accessible chart descriptions
+Semantic table headers
+Visible focus indicators
+
+Every chart should include a textual summary for users relying on assistive technologies.
+
+13.28 Performance Targets
+Metric	Target
+Reports Page Load	<2 seconds
+Chart Render	<1 second
+Report Refresh	<500 ms
+Export Generation	<3 seconds
+AI Summary	<2 seconds
+Forecast Generation	<2 seconds
+13.29 Developer Component Structure
+ReportsPage
+├── ReportsHeader
+├── ReportSelector
+├── DateRangePicker
+├── KPIGrid
+├── MainChart
+├── SecondaryChart
+├── AIReportSummaryCard
+├── ForecastCard
+├── DataTable
+├── InsightsPanel
+├── ExportDialog
+├── PrintPreview
+└── FloatingAI
+
+Each component should:
+
+Be independently testable.
+Support loading, empty, and error states.
+Use Finch design tokens.
+Respect Light and Dark themes.
+Integrate with Recharts, SQLite, Supabase, and the OpenAI Responses API.
+13.30 Acceptance Criteria
+
+The Reports & Analytics module is complete when:
+
+All six report categories are available.
+KPI cards, charts, and tables update correctly based on filters and date ranges.
+AI generates accurate summaries and contextual insights.
+Forecasts display confidence scores and actionable predictions.
+Reports can be exported to PDF, Excel, and CSV.
+Cached reports remain accessible offline.
+Accessibility and performance targets are achieved.
+The module integrates seamlessly with Dashboard, Orders, Inventory, Customers, and the AI Assistant.
+Chapter Summary
+
+The Reports & Analytics module is Finch's business intelligence hub, transforming operational data into actionable insights. Through interactive dashboards, AI-generated summaries, forecasting, detailed analytics, and flexible exports, business owners can understand current performance, identify trends, and make informed decisions with confidence. Its responsive design, offline capabilities, and deep integration with the rest of the application make it a central tool for strategic business management.

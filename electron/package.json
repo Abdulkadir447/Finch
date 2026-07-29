@@ -1,0 +1,16 @@
+{
+  "name": "finch-electron",
+  "version": "0.1.0",
+  "description": "Electron wrapper for Finch frontend",
+  "main": "main.js",
+  "scripts": {
+    "start": "npm run electron",
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}

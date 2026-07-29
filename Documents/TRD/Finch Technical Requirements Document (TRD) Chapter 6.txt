@@ -1,0 +1,547 @@
+Finch Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Finch
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 6 — Backend Architecture & Supabase Services
+6.1 Purpose
+
+This chapter defines the backend architecture for Finch, detailing the use of Supabase as the cloud platform, the database structure, authentication, storage, serverless functions, AI integration, synchronization services, and backend security.
+
+The backend is designed to complement Finch's offline-first desktop architecture by providing secure cloud services for synchronization, authentication, AI, backups, and reporting.
+
+6.2 Backend Design Goals
+
+The backend architecture must achieve the following goals:
+
+Secure cloud synchronization
+Offline-first compatibility
+High availability
+Horizontal scalability
+Strong security
+Low latency
+Minimal maintenance
+Future multi-tenant support
+6.3 Backend Technology Stack
+Layer	Technology
+Backend Platform	Supabase
+Database	PostgreSQL
+Authentication	Supabase Auth
+Object Storage	Supabase Storage
+Serverless	Supabase Edge Functions
+Database Security	Row Level Security (RLS)
+AI Gateway	OpenAI Responses API
+Logging	Pino
+Communication	HTTPS + REST
+Realtime	Supabase Realtime
+6.4 Backend Overview
+                    Electron Desktop
+
+                           │
+                    HTTPS Requests
+                           │
+                ┌─────────────────────┐
+                │     Supabase        │
+                ├─────────────────────┤
+                │ Authentication      │
+                │ PostgreSQL          │
+                │ Storage             │
+                │ Edge Functions      │
+                │ Realtime            │
+                └──────────┬──────────┘
+                           │
+                           ▼
+                OpenAI Responses API
+
+The backend acts as a secure intermediary between the desktop application and external cloud services.
+
+6.5 Supabase Project Structure
+supabase/
+
+├── functions/
+│   ├── ai-chat/
+│   ├── generate-report/
+│   ├── forecast/
+│   ├── activate-license/
+│   ├── sync/
+│   └── webhook/
+│
+├── migrations/
+│
+├── seed/
+│
+├── storage/
+│
+└── config.toml
+
+Each Edge Function is isolated and independently deployable.
+
+6.6 Backend Services
+
+The backend provides the following services:
+
+Authentication
+Login
+Signup
+Session management
+Password recovery
+Two-factor authentication
+Cloud Database
+
+Stores:
+
+Orders
+Customers
+Inventory
+Reports
+AI history
+User profile
+Settings
+License status
+Cloud Storage
+
+Stores:
+
+Company logos
+Exported reports
+Invoice PDFs
+Backup files
+Attachments
+AI Services
+
+Provides:
+
+Business analysis
+Forecast generation
+Chart explanations
+Report summaries
+Invoice assistance
+Synchronization
+
+Responsible for:
+
+Uploading local changes
+Downloading remote changes
+Conflict resolution
+Sync history
+6.7 PostgreSQL Database Design
+
+The cloud database follows a normalized relational design.
+
+Primary tables include:
+
+users
+
+companies
+
+customers
+
+orders
+
+order_items
+
+inventory
+
+products
+
+reports
+
+forecasts
+
+ai_conversations
+
+settings
+
+notifications
+
+licenses
+
+sync_log
+
+Each table includes:
+
+Primary Key (UUID)
+Created At
+Updated At
+Deleted At (soft delete where appropriate)
+6.8 Database Relationships
+Company
+
+├── Customers
+
+├── Products
+
+├── Orders
+
+│      └── Order Items
+
+├── Inventory
+
+├── Reports
+
+├── Forecasts
+
+└── AI Conversations
+
+Relationships use foreign keys with cascading rules where appropriate.
+
+6.9 Authentication Architecture
+
+Supabase Auth manages user authentication.
+
+Supported methods:
+
+Email & Password
+Password Recovery
+Two-Factor Authentication (TOTP)
+
+Future support:
+
+Google Sign-In
+Microsoft Sign-In
+GitHub Sign-In
+6.10 Session Management
+
+Upon login:
+
+Login
+
+↓
+
+Supabase Auth
+
+↓
+
+Access Token
+
+↓
+
+Refresh Token
+
+↓
+
+Encrypted Local Storage
+
+↓
+
+Authenticated Session
+
+Tokens must refresh automatically before expiration.
+
+6.11 Authorization
+
+Version 1.0 supports a single business owner.
+
+Future versions will introduce:
+
+Admin
+Manager
+Employee
+Accountant
+
+Authorization is enforced through Row Level Security policies.
+
+6.12 Row Level Security (RLS)
+
+RLS is mandatory for all user data.
+
+Rules:
+
+Users can only access their own records.
+Cross-company access is prohibited.
+Every query is filtered by ownership.
+
+Example policy:
+
+user_id = auth.uid()
+
+No table should be publicly accessible unless explicitly intended.
+
+6.13 Supabase Storage
+
+Storage buckets include:
+
+company-logos
+
+invoice-pdfs
+
+reports
+
+backups
+
+attachments
+
+Access rules:
+
+Private by default
+Signed URLs for downloads
+Expiring links
+Authenticated uploads only
+6.14 Edge Functions
+
+Edge Functions encapsulate sensitive operations.
+
+Functions include:
+
+ai-chat
+
+generate-report
+
+forecast
+
+activate-license
+
+sync
+
+backup
+
+send-email
+
+Each function has a single responsibility.
+
+6.15 AI Gateway
+
+The desktop application never communicates directly with OpenAI.
+
+Flow:
+
+Desktop
+
+↓
+
+Supabase Edge Function
+
+↓
+
+OpenAI Responses API
+
+↓
+
+Edge Function
+
+↓
+
+Desktop
+
+Benefits:
+
+API key protection
+Centralized prompt management
+Usage logging
+Rate limiting
+Easier provider changes
+6.16 AI Request Lifecycle
+User Prompt
+
+↓
+
+Context Builder
+
+↓
+
+Edge Function
+
+↓
+
+GPT-5.5
+
+↓
+
+Structured JSON Response
+
+↓
+
+Validation
+
+↓
+
+Desktop UI
+
+Responses should be validated before being displayed or persisted.
+
+6.17 Synchronization Service
+
+Synchronization follows a bidirectional model.
+
+SQLite
+
+↓
+
+Dirty Records
+
+↓
+
+Sync Queue
+
+↓
+
+Supabase
+
+↓
+
+Confirmation
+
+↓
+
+SQLite Updated
+
+The service should resume automatically when connectivity returns.
+
+6.18 Conflict Resolution
+
+Conflicts occur when both local and cloud versions have changed.
+
+Resolution strategy:
+
+Compare timestamps
+Detect conflicting fields
+Apply merge rules where possible
+Prompt the user only when automatic resolution is unsafe
+
+A conflict log must be maintained for auditing.
+
+6.19 Realtime Features
+
+Supabase Realtime may be used for:
+
+Sync status updates
+Notification delivery
+License changes
+
+Core business functionality must not depend on realtime connectivity.
+
+6.20 Backup Metadata
+
+Cloud metadata includes:
+
+Backup ID
+User ID
+Company ID
+Timestamp
+Version
+Checksum
+
+Actual backup files remain stored locally unless future cloud backup features are introduced.
+
+6.21 API Design Principles
+
+Backend APIs should be:
+
+Stateless
+Versioned
+Idempotent where applicable
+Fully authenticated
+Strongly validated
+
+Responses use a consistent structure.
+
+Example:
+
+{
+  "success": true,
+  "data": {},
+  "error": null
+}
+6.22 Error Handling
+
+Every backend operation should return structured errors.
+
+Example:
+
+{
+  "success": false,
+  "error": {
+    "code": "AUTH_FAILED",
+    "message": "Invalid email or password."
+  }
+}
+
+Internal details should never be exposed to clients.
+
+6.23 Logging
+
+Backend logs include:
+
+Authentication
+AI requests
+Synchronization
+Storage operations
+Errors
+License activation
+Edge Function execution
+
+Sensitive values (passwords, tokens, API keys) must never appear in logs.
+
+6.24 Security
+
+Backend security measures include:
+
+HTTPS only
+JWT validation
+Row Level Security
+Rate limiting
+Input validation
+SQL injection prevention
+Secure secret management
+Signed storage URLs
+Encrypted communication
+
+Security is mandatory for every endpoint and function.
+
+6.25 Performance Targets
+Operation	Target
+Authentication	< 1 second
+Database Query	< 200 ms
+Edge Function	< 2 seconds
+AI Response Start	< 2 seconds
+File Upload	< 5 seconds
+Sync Cycle	< 10 seconds
+6.26 Scalability
+
+The backend must support future expansion without architectural redesign.
+
+Future enhancements include:
+
+Multi-company support
+Multiple user roles
+Multiple warehouses
+Cloud backups
+Public APIs
+Plugin ecosystem
+AI agents
+Mobile applications
+
+These features should integrate by extending existing services rather than replacing them.
+
+6.27 Monitoring
+
+Operational metrics include:
+
+Active users
+Sync success rate
+AI request latency
+Storage usage
+Authentication failures
+Edge Function execution time
+Database performance
+
+Metrics should be reviewed regularly to maintain service quality.
+
+6.28 Acceptance Criteria
+
+The backend implementation is considered complete when:
+
+Authentication functions correctly.
+Cloud synchronization is reliable.
+Row Level Security protects all user data.
+AI requests are securely routed through Edge Functions.
+Storage buckets enforce proper permissions.
+Edge Functions perform within target latency.
+Errors are standardized and logged.
+All services operate securely over HTTPS.
+Chapter Summary
+
+This chapter defines Finch's backend architecture using Supabase as the cloud platform. By combining PostgreSQL, Supabase Auth, Storage, Realtime, and Edge Functions with the OpenAI Responses API, the backend provides secure authentication, cloud synchronization, AI capabilities, and scalable infrastructure while preserving Finch's offline-first desktop experience.

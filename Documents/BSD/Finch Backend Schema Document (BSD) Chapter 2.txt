@@ -1,0 +1,580 @@
+Finch Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 2 — Database Design Principles & Naming Standards
+2.1 Purpose
+
+This chapter defines the database standards, conventions, and architectural principles that every table, view, function, trigger, and API within Finch must follow.
+
+These standards ensure that the database remains:
+
+Consistent
+Scalable
+Easy to maintain
+Secure
+Performant
+Future-proof
+
+Every developer working on Finch must follow these guidelines.
+
+2.2 Database Philosophy
+
+Finch follows five fundamental database principles:
+
+1. Offline First
+
+Every write operation begins in the local SQLite database before synchronizing to Supabase PostgreSQL.
+
+2. Business Isolation
+
+Every piece of business data belongs to exactly one registered business.
+
+No business should ever access another business's data unless explicitly authorized in future enterprise editions.
+
+3. Security by Default
+
+Every table containing business data is protected using:
+
+Row Level Security (RLS)
+Authentication
+Authorization
+Secure API access
+4. Modular Design
+
+Each business module owns its own tables.
+
+Example:
+
+Orders
+Inventory
+Customers
+Reports
+AI
+Notifications
+
+Modules should remain loosely coupled while sharing common identifiers.
+
+5. Scalability
+
+The database should support:
+
+One business
+Thousands of businesses
+Millions of records
+Future enterprise deployments
+
+without requiring redesign.
+
+2.3 Database Architecture
+Electron App
+      │
+      ▼
+SQLite Database
+      │
+Sync Queue
+      │
+      ▼
+Supabase PostgreSQL
+      │
+      ▼
+Storage
+Functions
+Views
+Triggers
+
+SQLite is the operational database.
+
+Supabase PostgreSQL is the cloud database.
+
+2.4 Schema Organization
+
+The backend is organized into logical domains.
+
+Authentication
+
+Business
+
+Users
+
+Orders
+
+Inventory
+
+Customers
+
+Reports
+
+AI
+
+Storage
+
+Notifications
+
+Audit
+
+Synchronization
+
+Settings
+
+Analytics
+
+Each domain contains:
+
+Tables
+Views
+Indexes
+Triggers
+Functions
+Policies
+2.5 Primary Key Strategy
+
+Every major table uses UUIDs.
+
+Example
+
+id UUID PRIMARY KEY
+
+Reasons:
+
+Better synchronization
+Safer offline creation
+Globally unique identifiers
+Easier merging
+Better future scalability
+
+Auto-incrementing IDs should not be used for primary keys.
+
+2.6 Foreign Key Strategy
+
+Relationships use UUID foreign keys.
+
+Example
+
+order_id
+
+customer_id
+
+business_id
+
+supplier_id
+
+user_id
+
+Foreign keys enforce referential integrity while maintaining flexibility.
+
+2.7 Universal Table Structure
+
+Most tables follow this standard structure.
+
+id
+
+business_id
+
+created_by
+
+updated_by
+
+created_at
+
+updated_at
+
+deleted_at
+
+version
+
+This provides:
+
+Ownership
+Auditability
+Synchronization support
+Soft deletion
+Conflict resolution
+2.8 Timestamp Standards
+
+Every timestamp uses UTC.
+
+Required fields:
+
+created_at
+
+updated_at
+
+deleted_at
+
+Benefits:
+
+Consistent synchronization
+Time zone independence
+Accurate auditing
+
+Applications convert UTC to the user's local time when displaying data.
+
+2.9 Version Control
+
+Every synchronized table contains:
+
+version INTEGER
+
+Version numbers increment after each update.
+
+Example
+
+Order
+
+Version 1
+
+↓
+
+Version 2
+
+↓
+
+Version 3
+
+This supports optimistic concurrency and conflict detection.
+
+2.10 Naming Conventions
+Tables
+
+Plural, lowercase, snake_case.
+
+Examples:
+
+users
+
+businesses
+
+orders
+
+customers
+
+inventory_items
+
+suppliers
+Columns
+
+Lowercase snake_case.
+
+Examples:
+
+business_name
+
+phone_number
+
+created_at
+
+serial_number
+Foreign Keys
+
+Always end with "_id".
+
+Examples:
+
+customer_id
+
+order_id
+
+supplier_id
+
+business_id
+Junction Tables
+
+Use the names of the related tables.
+
+Examples:
+
+order_products
+
+user_roles
+
+product_categories
+2.11 Reserved Columns
+
+The following column names have predefined meanings across the entire database.
+
+Column	Purpose
+id	Primary Key
+business_id	Business ownership
+created_at	Creation time
+updated_at	Last update
+deleted_at	Soft delete timestamp
+created_by	User who created the record
+updated_by	User who last modified the record
+version	Record version
+is_active	Active/inactive state
+
+Developers should not repurpose these names.
+
+2.12 Soft Delete Strategy
+
+Records are never immediately deleted.
+
+Instead:
+
+deleted_at
+
+deleted_by
+
+Workflow:
+
+Delete
+
+↓
+
+Soft Delete
+
+↓
+
+Retention Period
+
+↓
+
+Permanent Deletion
+
+Benefits:
+
+Recovery
+Audit history
+Synchronization safety
+2.13 Permanent Deletion
+
+Expired soft-deleted records are removed by a scheduled background job.
+
+Deleted
+
+↓
+
+Retention Check
+
+↓
+
+Expired?
+
+↓
+
+Delete Permanently
+
+Retention duration is configurable in application settings.
+
+2.14 Business Isolation
+
+Every business-owned table contains:
+
+business_id
+
+Example:
+
+Businesses
+
+↓
+
+Orders
+
+↓
+
+Customers
+
+↓
+
+Inventory
+
+↓
+
+Reports
+
+↓
+
+Settings
+
+This ensures complete separation of business data.
+
+2.15 Indexing Strategy
+
+Indexes are created on:
+
+Primary keys
+Foreign keys
+Frequently searched fields
+Frequently sorted fields
+Synchronization fields
+
+Common indexes:
+
+business_id
+
+created_at
+
+updated_at
+
+customer_id
+
+order_number
+
+email
+
+sku
+
+serial_number
+
+Proper indexing improves query performance as datasets grow.
+
+2.16 Constraints
+
+The database uses constraints to maintain data integrity.
+
+Examples:
+
+NOT NULL
+UNIQUE
+CHECK
+FOREIGN KEY
+DEFAULT
+
+Example:
+
+quantity >= 0
+
+Constraints prevent invalid data from entering the system.
+
+2.17 Relationship Standards
+
+Relationship types:
+
+One-to-One
+Business
+
+↓
+
+Business Settings
+One-to-Many
+Customer
+
+↓
+
+Orders
+Many-to-Many
+Products
+
+↓
+
+Order Products
+
+↓
+
+Orders
+
+Junction tables handle many-to-many relationships.
+
+2.18 Data Types
+
+Preferred PostgreSQL types:
+
+Purpose	Type
+Primary Keys	UUID
+Text	TEXT
+Short Text	VARCHAR
+Integer	INTEGER
+Decimal	NUMERIC
+Boolean	BOOLEAN
+Date	DATE
+Timestamp	TIMESTAMPTZ
+JSON	JSONB
+Binary Files	Storage Bucket Reference
+
+These types balance performance, flexibility, and precision.
+
+2.19 JSON Usage
+
+JSONB is reserved for flexible or semi-structured data.
+
+Examples:
+
+Dashboard layouts
+User preferences
+AI metadata
+Notification payloads
+Import settings
+
+Core business entities should use normalized relational tables instead of JSON.
+
+2.20 Database Migrations
+
+All schema changes are version-controlled through migrations.
+
+Migration rules:
+
+Never modify production tables manually.
+Every schema change requires a migration script.
+Migrations must be reversible where practical.
+Database version must align with the application version.
+2.21 Schema Versioning
+
+Each release updates the schema version.
+
+Database v1
+
+↓
+
+Migration
+
+↓
+
+Database v2
+
+↓
+
+Migration
+
+↓
+
+Database v3
+
+This ensures consistent upgrades across all installations.
+
+2.22 Documentation Standards
+
+Every database object should include documentation.
+
+Document:
+
+Purpose
+Relationships
+Constraints
+Indexes
+Owner module
+Migration history
+
+This simplifies long-term maintenance.
+
+2.23 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all primary keys and foreign key references.
+Apply consistent snake_case naming across all database objects.
+Enforce business isolation using business_id and RLS.
+Include standard audit fields (created_at, updated_at, deleted_at, etc.) in all business tables.
+Create indexes only where they provide measurable performance benefits.
+Keep schemas normalized while using JSONB only for flexible metadata.
+Review migrations in code review to maintain consistency and prevent breaking changes.
+2.24 Acceptance Criteria
+
+The database design standards are complete when:
+
+All tables follow the naming conventions.
+UUIDs are used consistently.
+Standard audit fields exist across business tables.
+Soft delete is implemented uniformly.
+Business isolation is enforced.
+Appropriate indexes and constraints are defined.
+Migrations are version-controlled.
+Documentation exists for all major database objects.
+The schema supports offline synchronization and future scalability.
+2.25 Chapter Summary
+
+This chapter establishes the standards that govern Finch's database design. By enforcing consistent naming conventions, UUID-based identifiers, standardized audit fields, business isolation, soft deletion, indexing strategies, and migration practices, the database becomes easier to maintain, more secure, and capable of supporting long-term growth. These principles form the foundation for every schema defined in the chapters that follow.

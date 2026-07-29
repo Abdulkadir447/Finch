@@ -1,0 +1,457 @@
+Finch Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 10 — AI Assistant Flow
+10.1 Purpose
+
+The AI Assistant is the intelligence layer of Finch. Unlike traditional chatbots, the AI Assistant understands the user's current context within the application and assists with business operations rather than simply answering questions.
+
+The assistant is available throughout the application as a floating panel similar to Microsoft Copilot. It can analyze business data, generate reports, explain charts, draft invoices, answer operational questions, and recommend actions—all while ensuring that potentially destructive actions require explicit user confirmation.
+
+The AI Assistant is designed to be a trusted business advisor that enhances productivity without taking control away from the user.
+
+10.2 Objectives
+
+The AI Assistant must:
+
+Understand application context.
+Respond naturally to user questions.
+Generate business reports.
+Summarize business performance.
+Explain charts and analytics.
+Generate invoices.
+Recommend business improvements.
+Never perform irreversible actions without permission.
+Maintain conversation history.
+Integrate with every major Finch module.
+10.3 AI Architecture
+                  User
+                    │
+                    ▼
+         Floating AI Assistant
+                    │
+                    ▼
+        Context Collection Engine
+                    │
+        ┌───────────┼────────────┐
+        ▼           ▼            ▼
+    SQLite     Supabase      Current Page
+                    │
+                    ▼
+          OpenAI GPT-5.5 API
+                    │
+                    ▼
+            AI Response Engine
+                    │
+                    ▼
+              User Interface
+
+The AI Assistant uses GPT-5.5 via the OpenAI Responses API and only sends the information required to answer the user's request.
+
+10.4 Assistant Availability
+
+The assistant is accessible from every major module.
+
+Supported modules:
+
+Dashboard
+Orders
+Inventory
+Customers
+Reports
+Settings
+
+The floating assistant remains available without interrupting the user's workflow.
+
+10.5 Opening the Assistant
+
+The AI Assistant can be opened by:
+
+Clicking the floating AI button.
+Using the keyboard shortcut Ctrl + Space.
+Clicking an AI suggestion card.
+Clicking "Explain with AI" on supported pages.
+
+Flow:
+
+User
+ │
+ ▼
+Open AI
+ │
+ ▼
+Load Previous Conversation
+ │
+ ▼
+Collect Current Context
+ │
+ ▼
+Ready
+10.6 Conversation Lifecycle
+Open Assistant
+      │
+      ▼
+Start Conversation
+      │
+      ▼
+User Prompt
+      │
+      ▼
+Collect Context
+      │
+      ▼
+Send Request
+      │
+      ▼
+Receive Response
+      │
+      ▼
+Display Result
+      │
+      ▼
+Continue Conversation
+
+Each conversation retains context until the user starts a new chat.
+
+10.7 Context Awareness
+
+The AI automatically understands where the user is working.
+
+Examples:
+
+Dashboard
+
+Context includes:
+
+Revenue
+Profit
+Orders
+Inventory
+Forecast
+Orders
+
+Context includes:
+
+Customer
+Products
+Totals
+Discounts
+Taxes
+Inventory
+
+Context includes:
+
+Product
+Quantity
+Stock History
+Inventory Value
+Customers
+
+Context includes:
+
+Customer Profile
+Purchase History
+Notes
+Spending Trends
+Reports
+
+Context includes:
+
+Selected Report
+Charts
+Date Range
+KPIs
+
+The user does not need to manually provide this information.
+
+10.8 AI Request Flow
+User Prompt
+      │
+      ▼
+Determine Context
+      │
+      ▼
+Collect Required Data
+      │
+      ▼
+Generate Prompt
+      │
+      ▼
+Send to GPT-5.5
+      │
+      ▼
+Receive Response
+      │
+      ▼
+Display Answer
+
+Responses should generally appear in under 2 seconds, depending on network conditions.
+
+10.9 Supported AI Actions
+
+The AI Assistant can:
+
+Business Analysis
+Summarize performance
+Explain revenue changes
+Identify trends
+Recommend improvements
+Reports
+Generate reports
+Summarize reports
+Explain reports
+Inventory
+Recommend restocking
+Identify slow-moving products
+Suggest inventory improvements
+Orders
+Explain invoices
+Review pricing
+Suggest discounts
+Customers
+Summarize customer activity
+Identify valuable customers
+Suggest follow-up actions
+Forecasting
+Predict demand
+Explain forecasts
+Highlight business risks
+10.10 AI Action Confirmation
+
+The AI never performs important actions automatically.
+
+Whenever an action affects user data:
+
+AI Suggestion
+      │
+      ▼
+Ask Permission
+      │
+ ┌────┴─────┐
+ │          │
+Approve   Cancel
+ │
+ ▼
+Execute Action
+
+Examples requiring confirmation:
+
+Save report
+Save invoice
+Email report
+Email invoice
+Import data
+Modify records
+
+This behavior follows the product requirements established earlier.
+
+10.11 Report Generation Flow
+Generate Report
+       │
+       ▼
+AI Creates Report
+       │
+       ▼
+Display Preview
+       │
+       ▼
+Save?
+       │
+ ┌────┴─────┐
+ │          │
+Yes        No
+
+If saved:
+
+The AI asks:
+
+"Would you also like me to email this report?"
+
+10.12 Invoice Generation Flow
+Generate Invoice
+       │
+       ▼
+AI Builds Invoice
+       │
+       ▼
+Preview
+       │
+       ▼
+Save?
+       │
+       ▼
+Email?
+
+Invoices always require user approval before being stored or sent.
+
+10.13 Chart Explanation Flow
+Click Explain
+       │
+       ▼
+Capture Chart Data
+       │
+       ▼
+GPT Analysis
+       │
+       ▼
+Simple Explanation
+
+Example:
+
+"Revenue increased because completed orders rose by 12% compared to the previous month."
+
+The AI explains data but never alters it.
+
+10.14 AI History
+
+Every conversation is stored locally.
+
+History contains:
+
+Timestamp
+User prompt
+AI response
+Related module
+
+When online, history synchronizes with Supabase.
+
+Users can:
+
+Search history
+Rename conversations
+Delete conversations
+Start a new conversation
+
+Deleting a conversation always requires confirmation.
+
+10.15 Offline Behavior
+
+If the application is offline:
+
+Open AI
+    │
+    ▼
+Internet?
+    │
+ ┌──┴─────┐
+ │        │
+Yes      No
+ │        │
+ ▼        ▼
+GPT      Offline Message
+
+Available offline:
+
+View previous AI conversations.
+Search AI history.
+
+Unavailable:
+
+New AI requests
+Report summaries
+Forecast generation
+Chart explanations
+
+The assistant should clearly communicate when online connectivity is required.
+
+10.16 Error Handling
+
+Possible AI errors:
+
+Error	Recovery
+Network unavailable	Inform the user and offer offline history
+AI timeout	Retry request
+API error	Display friendly message and allow retry
+Invalid response	Retry automatically once, then notify user
+Context unavailable	Ask the user for additional information
+
+Errors should never cause the application to freeze or crash.
+
+10.17 AI Notifications
+
+The assistant may proactively notify the user when:
+
+Sales decline significantly.
+Inventory reaches low-stock thresholds.
+Forecast predicts increased demand.
+A report is ready.
+Synchronization has completed.
+
+Notifications should be informative rather than intrusive.
+
+10.18 Privacy & Security
+
+The AI Assistant follows strict privacy principles.
+
+Only required data is sent to the AI service.
+Sensitive business information is minimized where possible.
+Authentication tokens are never shared with the AI.
+AI responses are not treated as authoritative business records until the user confirms any resulting action.
+Conversation history is encrypted when stored locally.
+10.19 AI State Machine
+Closed
+   │
+   ▼
+Opening
+   │
+   ▼
+Ready
+   │
+   ▼
+Thinking
+   │
+   ▼
+Responding
+   │
+   ▼
+Waiting
+
+If an error occurs:
+
+Thinking
+    │
+    ▼
+Error
+    │
+    ▼
+Retry
+10.20 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use the OpenAI Responses API with GPT-5.5.
+Collect contextual information only from the currently relevant modules.
+Stream responses where supported to improve perceived performance.
+Cache recent AI responses locally for quick access.
+Queue failed requests for manual retry rather than automatic replay.
+Keep AI interactions separate from business logic so that modules remain functional if AI services are unavailable.
+Design the assistant architecture to support future features such as Voice AI, autonomous AI agents, and custom business workflows.
+10.21 Performance Targets
+Operation	Target
+Open Assistant	<300 ms
+Load Conversation	<500 ms
+AI Response (Typical)	<2 seconds
+Load History	<500 ms
+Search History	<100 ms
+Context Collection	<200 ms
+10.22 Acceptance Criteria
+
+The AI Assistant Flow is complete when:
+
+The assistant is available from every major module.
+Conversations maintain relevant application context.
+Business reports, summaries, invoices, and chart explanations can be generated.
+Users are prompted before any save, email, or data-modifying action.
+Conversation history is searchable and synchronized.
+Offline mode allows viewing previous conversations.
+AI failures are handled gracefully without affecting the rest of the application.
+Privacy rules are enforced.
+Performance targets are met.
+10.23 Chapter Summary
+
+The AI Assistant is the intelligent core of Finch, providing contextual business assistance across every major module. By combining GPT-5.5 with application-aware context, offline-first design, and user-controlled confirmations, the assistant helps business owners make better decisions while preserving trust, privacy, and control. Its modular architecture also positions Finch for future capabilities such as Voice AI, autonomous agents, and advanced workflow automation.

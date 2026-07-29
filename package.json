@@ -1,0 +1,33 @@
+{
+  "name": "finch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Finch - AI-powered Business Management Platform",
+  "scripts": {
+    "prepare": "husky install",
+    "pre-commit": "pre-commit run --all-files",
+    "commitlint": "commitlint --edit $1",
+    "lint": "pnpm --filter ./frontend lint && pnpm --filter ./backend lint",
+    "format": "pnpm --filter ./frontend format && pnpm --filter ./backend format",
+    "typecheck": "pnpm --filter ./frontend typecheck && pnpm --filter ./backend typecheck",
+    "test": "pnpm --filter ./frontend test && pnpm --filter ./backend test",
+    "build": "pnpm --filter ./frontend build && pnpm --filter ./backend build",
+    "dev": "pnpm --filter ./frontend dev & pnpm --filter ./backend dev"
+  },
+  "dependencies": {
+    "ecc-universal": "^2.0.0",
+    "electron": "^42.5.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "husky": "^9.0.0",
+    "pre-commit": "^3.1.0",
+    "shadcn": "^4.14.1"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

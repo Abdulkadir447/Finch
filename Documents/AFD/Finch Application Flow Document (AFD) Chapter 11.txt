@@ -1,0 +1,434 @@
+Finch Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Finch – Your Business, Smarter
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 11 — Notifications & Communication Flow
+11.1 Purpose
+
+The Notifications & Communication module keeps users informed about important business events without disrupting their workflow. It delivers timely alerts, reminders, AI-generated insights, synchronization updates, and communication-related actions across Finch.
+
+Notifications are actionable, meaning users can click a notification to immediately navigate to the relevant page or perform the next logical action.
+
+The system supports both in-app notifications and native Windows desktop notifications, with behavior customized through user preferences.
+
+11.2 Objectives
+
+The Notifications module must:
+
+Deliver real-time business alerts.
+Support both in-app and desktop notifications.
+Keep users informed without overwhelming them.
+Allow notifications to open related pages.
+Work while offline.
+Synchronize notification states across devices.
+Support future notification channels.
+Allow complete notification customization.
+11.3 Notification Architecture
+                 Business Event
+                       │
+                       ▼
+          Notification Event Manager
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+   In-App Feed    Desktop Toast   AI Notifications
+        │              │              │
+        └──────────────┼──────────────┘
+                       ▼
+               User Interaction
+                       │
+                       ▼
+              Open Related Module
+
+The Notification Event Manager acts as a centralized service that receives events from all Finch modules.
+
+11.4 Notification Sources
+
+Notifications can originate from:
+
+Orders
+Order completed
+Order cancelled
+Invoice generated
+Invoice emailed
+Inventory
+Low stock
+Out of stock
+Stock adjustment
+Product imported
+Customers
+New customer
+Customer milestone (future)
+Customer import completed
+Reports
+Report generated
+Export completed
+Email sent
+AI Assistant
+Business insight
+Revenue alert
+Forecast warning
+Inventory recommendation
+System
+Backup completed
+Cloud sync completed
+Cloud sync failed
+Software update available
+License status
+Database recovery completed
+11.5 Notification Lifecycle
+
+Every notification follows a consistent lifecycle.
+
+Business Event
+      │
+      ▼
+Generate Notification
+      │
+      ▼
+Deliver
+      │
+      ▼
+Unread
+      │
+      ▼
+Read
+      │
+      ▼
+Archived
+
+Notifications are never deleted immediately. Archived notifications remain searchable for audit purposes.
+
+11.6 Notification Types
+Information
+
+Blue
+
+Examples:
+
+Report generated
+Customer added
+Import completed
+Success
+
+Green
+
+Examples:
+
+Invoice sent
+Backup completed
+Sync successful
+Warning
+
+Yellow
+
+Examples:
+
+Low inventory
+Pending sync
+License expiring
+Error
+
+Red
+
+Examples:
+
+Email failed
+Backup failed
+AI unavailable
+Sync failure
+11.7 Notification Delivery Flow
+Business Event
+      │
+      ▼
+Determine Priority
+      │
+      ▼
+Check User Preferences
+      │
+      ▼
+Display Notification
+      │
+      ▼
+Store SQLite
+      │
+      ▼
+Queue Cloud Sync
+
+Notifications should appear within 500 milliseconds of the triggering event.
+
+11.8 In-App Notification Flow
+
+The notification bell is located in the custom title bar.
+
+Flow:
+
+Notification Arrives
+        │
+        ▼
+Notification Bell Badge
+        │
+        ▼
+User Opens Panel
+        │
+        ▼
+Notification Feed
+        │
+        ▼
+Select Notification
+        │
+        ▼
+Open Related Page
+
+Unread notifications display a badge count.
+
+11.9 Desktop Notification Flow
+
+If desktop notifications are enabled:
+
+Business Event
+      │
+      ▼
+Windows Toast
+      │
+      ▼
+User Clicks
+      │
+      ▼
+Open Finch
+      │
+      ▼
+Navigate to Related Page
+
+Desktop notifications respect Windows Focus Assist settings.
+
+11.10 Notification Actions
+
+Every notification may contain one or more actions.
+
+Examples:
+
+Notification	Action
+Low Stock	Open Inventory
+Report Ready	Open Report
+Invoice Sent	View Invoice
+Sync Failed	Retry Sync
+Backup Complete	Open Backup Folder
+AI Insight	Open AI Assistant
+
+Actions should require no more than one click.
+
+11.11 AI Notifications
+
+The AI Assistant proactively monitors business performance.
+
+Examples:
+
+"Revenue has increased by 12% this week."
+
+"Inventory for Product A may run out within 5 days."
+
+"Customer retention has improved compared to last month."
+
+AI notifications are advisory only and never perform actions automatically.
+
+11.12 Notification Center
+
+The Notification Center provides:
+
+Search
+Filters
+Mark as Read
+Mark All as Read
+Archive
+Delete (future)
+
+Available filters:
+
+All
+Orders
+Inventory
+Customers
+Reports
+AI
+System
+
+Sorting:
+
+Newest First
+Oldest First
+Priority
+11.13 Read & Unread Flow
+Unread
+   │
+   ▼
+User Opens
+   │
+   ▼
+Mark Read
+   │
+   ▼
+Sync Status
+
+Users can also manually mark notifications as unread.
+
+11.14 Offline Notification Flow
+
+When offline:
+
+Available:
+
+Generate notifications
+Read notifications
+Archive notifications
+
+Unavailable:
+
+Desktop notifications requiring cloud events
+AI-generated alerts
+Cloud synchronization
+
+Offline notifications are stored locally and synchronized later.
+
+11.15 Communication Flow
+
+Finch communicates with users through:
+
+In-app notifications
+Windows desktop notifications
+Email (reports and invoices)
+AI Assistant messages
+
+Future versions may include:
+
+SMS
+WhatsApp
+Microsoft Teams
+Slack
+Push notifications
+11.16 Daily Business Summary
+
+At a user-selected time, Finch may generate a daily summary.
+
+Example:
+
+Today's Summary
+
+Revenue: ₦120,000
+
+Orders: 48
+
+New Customers: 12
+
+Low Stock: 3
+
+Forecast:
+
+Sales expected to increase tomorrow.
+
+The summary appears as an in-app notification and can optionally be emailed.
+
+11.17 Notification Synchronization
+Notification Created
+        │
+        ▼
+Save SQLite
+        │
+        ▼
+Queue Sync
+        │
+        ▼
+Internet?
+        │
+ ┌──────┴──────┐
+ │             │
+Yes           No
+ │             │
+ ▼             ▼
+Upload      Wait
+
+Read/unread status synchronizes across all user devices.
+
+11.18 Notification Preferences
+
+Users can configure:
+
+Enable/Disable Desktop Notifications
+Enable/Disable In-App Notifications
+AI Notification Frequency
+Sound (future)
+Daily Summary Time
+Notification Categories
+Quiet Hours (future)
+
+Changes take effect immediately.
+
+11.19 Error Handling
+
+Possible notification errors:
+
+Error	Recovery
+Notification failed to display	Retry automatically
+Desktop notification unavailable	Display in-app notification
+Cloud sync failed	Queue notification for later
+Email failed	Notify user and allow retry
+Invalid notification action	Open Notification Center instead
+
+The notification system should fail gracefully without affecting core business operations.
+
+11.20 Notification State Machine
+Created
+    │
+    ▼
+Delivered
+    │
+ ┌──┴────────────┐
+ │               │
+Read         Unread
+ │               │
+ └──────┬────────┘
+        ▼
+    Archived
+
+The state machine ensures consistent behavior across all notification types.
+
+11.21 Performance Targets
+Operation	Target
+Notification Generation	<100 ms
+In-App Display	<300 ms
+Desktop Notification	<500 ms
+Open Related Page	<300 ms
+Notification Search	<100 ms
+Notification Sync	<2 seconds
+11.22 Developer Implementation Notes
+
+Implementation guidelines:
+
+Implement a centralized Notification Service using an event-driven architecture.
+Store notifications in SQLite before synchronizing with Supabase.
+Use Electron's native notification API for Windows desktop notifications.
+Keep notification actions modular so new modules can register actions without modifying existing code.
+Prevent duplicate notifications for the same event.
+Synchronize notification state changes (read, unread, archived) across devices.
+Design the service to support future communication channels such as mobile push notifications, Slack, Microsoft Teams, SMS, and WhatsApp.
+11.23 Acceptance Criteria
+
+The Notifications & Communication Flow is complete when:
+
+Notifications are generated from all supported modules.
+Both in-app and desktop notifications function correctly.
+Notifications navigate to the appropriate pages.
+Read, unread, and archived states work consistently.
+AI-generated notifications provide useful business insights.
+Daily summaries can be generated.
+Notification preferences are configurable.
+Offline notifications are stored and synchronized later.
+Performance targets are met.
+The system is extensible for future communication channels.
+11.24 Chapter Summary
+
+The Notifications & Communication Flow ensures users stay informed about every important business event without interrupting their work. Through real-time alerts, AI-driven recommendations, native desktop notifications, and configurable preferences, Finch provides a responsive and intelligent communication system that scales from individual users to future enterprise deployments.

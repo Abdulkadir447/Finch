@@ -6,8 +6,18 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  base: './', // This tells Vite to use relative paths
   build: {
-    outDir: '../frontend/dist', // output to folder that Electron will load
+    outDir: 'dist',
     emptyOutDir: true,
+    assetsDir: 'assets', // Keeps assets in a subfolder
+    rollupOptions: {
+      output: {
+        // This ensures consistent asset naming
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
+    },
   },
 });
