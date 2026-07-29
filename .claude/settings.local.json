@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(mkdir *)",
+      "Bash(cmd *)",
+      "Bash(printf %s\\\\n *)",
+      "Bash(docker compose up *)",
+      "Bash(git init *)",
+      "Bash(python *)",
+      "Bash(git add *)"
+    ]
+  }
+}
