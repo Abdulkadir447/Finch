@@ -100,5 +100,17 @@
     "additionalDirectories": [
       "c:\\Users\\abdul\\OneDrive\\Documents\\Projects\\Finch\\.claude\\agents"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "ruflo",
+    "figma",
+    "githubcopilot",
+    "designcomputer_mysql",
+    "playwright",
+    "linear_server",
+    "sequential_thinking",
+    "chrome_devtools",
+    "supabase",
+    "shadcn"
+  ]
 }
