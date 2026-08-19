@@ -1,5 +1,5 @@
 import React from 'react';
-import { SignIn } from '@clerk/clerk-react';
+import { SignIn } from '@clerk/react';
 
 export const SignInPage: React.FC = () => {
   return (

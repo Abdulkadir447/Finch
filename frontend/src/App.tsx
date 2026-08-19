@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigProvider, Layout, Avatar, Space, Switch, Typography, Spin } from 'antd';
-import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined, Menu } from '@ant-design/icons';
+import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
+import { Menu } from 'antd';
 import { theme as finchTheme, brand, neutral } from './theme';
 import 'antd/dist/reset.css';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
@@ -45,10 +46,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // ---------------------------------------------------------------------------
 // Sign In Page using Clerk
 // ---------------------------------------------------------------------------
-const SignInPage: React.FC = () => {
+const SignInPage = () => {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <SignIn afterSignInUrl="/" afterSignUpUrl="/" fallbackRedirectUrl="/" />
+      <SignIn />
     </div>
   );
 };
@@ -59,7 +60,7 @@ const SignInPage: React.FC = () => {
 const SignUpPage: React.FC = () => {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <SignUp afterSignInUrl="/" afterSignUpUrl="/" fallbackRedirectUrl="/" />
+      <SignUp afterSignOutUrl="/" afterSignUpUrl="/" fallbackRedirectUrl="/" />
     </div>
   );
 };
