@@ -1,8 +1,9 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Build stage — Node 22 matches the repo engines (>=22) and Vite 8's
+# requirement (^20.19 || >=22.12) (Task 12 polish).
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --silent
+RUN npm ci --silent
 COPY . .
 RUN npm run build
 

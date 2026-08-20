@@ -2,7 +2,10 @@
  * New Order modal (Task 7 create-order flow, Phase-1 spec): customer select,
  * dynamic product lines with quantity + snapshot unit price (pre-filled from
  * the product catalog, editable per policy), live line/grand totals.
- * The server re-validates stock, duplicates and totals on submit.
+ *
+ * Catalogs are remote and searchable (Task 12 / M1) so tenants with more than
+ * 100 products/customers are never silently limited. The server re-validates
+ * stock, duplicates and totals on submit.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -17,23 +20,14 @@ import {
   theme as antdTheme,
 } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { ApiError, useApiClient } from '../../services/api/client';
 import { formatCurrency } from '../Dashboard/kpiConfig';
+import {
+  useCatalogError,
+  useCustomerCatalog,
+  useProductCatalog,
+  withSelected,
+} from './useCatalog';
 import type { OrderCreateInput } from './useOrders';
-
-interface CatalogProduct {
-  id: number;
-  sku: string;
-  name: string;
-  unit_price: number;
-  current_stock: number;
-}
-
-interface CatalogCustomer {
-  id: number;
-  full_name: string;
-  email: string;
-}
 
 interface LineDraft {
   key: number;
@@ -58,41 +52,22 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
   onSubmit,
 }) => {
   const { token } = antdTheme.useToken();
-  const api = useApiClient();
 
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [customers, setCustomers] = useState<CatalogCustomer[]>([]);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const products = useProductCatalog();
+  const customers = useCustomerCatalog();
+  const catalogError = useCatalogError(products, customers);
 
   const [customerId, setCustomerId] = useState<number | undefined>();
   const [lines, setLines] = useState<LineDraft[]>([{ key: lineKeySeq++, quantity: 1 }]);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Load the catalogs when the modal opens.
+  // Refresh the catalog when the modal (re)opens so stock levels are current.
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    setLoadingCatalog(true);
-    setCatalogError(null);
-    Promise.all([
-      api.get('/products', { params: { limit: 100 } }),
-      api.get('/customers', { params: { limit: 100 } }),
-    ])
-      .then(([p, cu]) => {
-        if (cancelled) return;
-        setProducts(p.data.items);
-        setCustomers(cu.data.items);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setCatalogError(e instanceof ApiError ? e.message : 'Unable to load catalog data.');
-      })
-      .finally(() => !cancelled && setLoadingCatalog(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [open, api]);
+    products.reload();
+    customers.reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Reset the form each time the modal opens.
   useEffect(() => {
@@ -102,14 +77,21 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
     setFormError(null);
   }, [open]);
 
-  const productById = useMemo(
-    () => new Map(products.map((p) => [p.id, p])),
-    [products],
+  const selectedIds = useMemo(
+    () => new Set(lines.map((l) => l.product_id).filter((x): x is number => x != null)),
+    [lines],
   );
 
-  const selectedIds = useMemo(
-    () => new Set(lines.map((l) => l.product_id).filter(Boolean)),
-    [lines],
+  // Selected records stay visible in the dropdown even when they fall outside
+  // the current search results.
+  const productOptions = useMemo(
+    () => withSelected(products.results, products.known, selectedIds),
+    [products.results, products.known, selectedIds],
+  );
+
+  const customerOptions = useMemo(
+    () => withSelected(customers.results, customers.known, customerId != null ? [customerId] : []),
+    [customers.results, customers.known, customerId],
   );
 
   const grandTotal = useMemo(
@@ -125,7 +107,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   const chooseProduct = (key: number, productId: number) => {
-    const product = productById.get(productId);
+    const product = products.known.get(productId);
     patchLine(key, {
       product_id: productId,
       unit_price: product?.unit_price, // snapshot pre-fill (Task 7 policy)
@@ -144,7 +126,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
       if (l.product_id == null) return 'Every line needs a product.';
       if (!l.quantity || l.quantity < 1) return 'Every line needs a quantity of at least 1.';
       if (l.unit_price == null || l.unit_price <= 0) return 'Every line needs a unit price above 0.';
-      const product = productById.get(l.product_id);
+      const product = products.known.get(l.product_id);
       if (product && l.quantity > product.current_stock) {
         return `Only ${product.current_stock} in stock for "${product.name}".`;
       }
@@ -178,7 +160,7 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
       okText={submitting ? 'Creating…' : `Create order${grandTotal > 0 ? ` — ${formatCurrency(grandTotal)}` : ''}`}
       cancelText="Discard"
       confirmLoading={submitting}
-      okButtonProps={{ disabled: loadingCatalog || Boolean(catalogError) }}
+      okButtonProps={{ disabled: products.loading || customers.loading || Boolean(catalogError) }}
       destroyOnClose
       width={720}
     >
@@ -193,14 +175,20 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
           <Select
             showSearch
             allowClear
-            placeholder="Select customer"
-            loading={loadingCatalog}
+            filterOption={false}
+            onSearch={customers.setSearch}
+            placeholder="Search customers by name or email"
+            loading={customers.loading}
             value={customerId}
             onChange={(v) => setCustomerId(v)}
-            optionFilterProp="label"
             style={{ width: '100%' }}
-            options={customers.map((c) => ({ value: c.id, label: `${c.full_name} (${c.email})` }))}
-            notFoundContent={loadingCatalog ? 'Loading…' : 'No customers yet — add one in the Customers module.'}
+            options={customerOptions.map((c) => ({
+              value: c.id,
+              label: `${c.full_name} (${c.email})`,
+            }))}
+            notFoundContent={
+              customers.loading ? 'Loading…' : 'No customers match — add one in the Customers module.'
+            }
           />
         </div>
 
@@ -213,25 +201,28 @@ const OrderFormModal: React.FC<OrderFormModalProps> = ({
           </Typography.Text>
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             {lines.map((line) => {
-              const product = line.product_id != null ? productById.get(line.product_id) : undefined;
+              const product = line.product_id != null ? products.known.get(line.product_id) : undefined;
               const lineTotal =
                 line.unit_price != null ? Math.round(line.unit_price * line.quantity * 100) / 100 : null;
               return (
                 <Space key={line.key} align="start" wrap style={{ width: '100%' }}>
                   <Select
                     showSearch
-                    placeholder="Select product"
-                    loading={loadingCatalog}
+                    filterOption={false}
+                    onSearch={products.setSearch}
+                    placeholder="Search products by name or SKU"
+                    loading={products.loading}
                     value={line.product_id}
                     onChange={(v) => chooseProduct(line.key, v)}
-                    optionFilterProp="label"
                     style={{ width: 260 }}
-                    options={products.map((p) => ({
+                    options={productOptions.map((p) => ({
                       value: p.id,
                       label: `${p.name} (${p.current_stock} in stock)`,
                       disabled: p.current_stock === 0 || (selectedIds.has(p.id) && p.id !== line.product_id),
                     }))}
-                    notFoundContent={loadingCatalog ? 'Loading…' : 'No products yet — add one in the Products module.'}
+                    notFoundContent={
+                      products.loading ? 'Loading…' : 'No products match — add one in the Products module.'
+                    }
                   />
                   <InputNumber
                     min={1}

@@ -85,8 +85,11 @@ const ProductsPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editing) {
-        // SKU is immutable on update — never sent.
-        const { sku: _sku, ...rest } = values;
+        // SKU and stock are immutable on update (Task 12 / M6). current_stock
+        // is deliberately excluded so an edit can never zero or change stock —
+        // stock moves only via Inventory -> Adjust Stock. The backend ignores
+        // both fields too, but not sending them keeps the contract explicit.
+        const { sku: _sku, current_stock: _stock, ...rest } = values;
         await updateProduct(editing.id, rest);
         messageApi.success('Product updated');
       } else {
@@ -104,11 +107,13 @@ const ProductsPage: React.FC = () => {
 
   // Delete confirmation — adaptation of the "Default delete confirmation
   // modal" template (centered, warning icon, Yes I'm sure / No cancel).
+  // Deletion is PERMANENT from the user's perspective (Task 12 / M11): there
+  // is no trash/restore UI. The backend soft-deletes for ledger integrity.
   const confirmDelete = (product: Product) => {
     Modal.confirm({
       title: 'Delete product',
       icon: <ExclamationCircleFilled />,
-      content: `Are you sure you want to delete "${product.name}" (${product.sku})? This cannot be undone.`,
+      content: `Are you sure you want to delete "${product.name}" (${product.sku})? This is permanent and cannot be undone.`,
       centered: true,
       okText: "Yes, I'm sure",
       okButtonProps: { danger: true },

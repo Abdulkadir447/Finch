@@ -19,6 +19,7 @@ export interface DashboardSummary {
   products_count: number;
   inventory_value: number;
   low_stock_count: number;
+  out_of_stock_count: number;
   customers_total: number;
   customers_new_month: number;
 }

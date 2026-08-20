@@ -88,3 +88,14 @@ def test_adjust_stock_contract_is_post():
     assert adjust_calls, "Frontend no longer calls the adjust-stock endpoint"
     for method, path in adjust_calls:
         assert method == "POST", f"Adjust stock must be POST, found {method} {path}"
+
+
+def test_order_transitions_single_source_of_truth():
+    """Regression guard for M4: the frontend must not keep its own copy of the
+    allowed order transitions — they come from the backend (OrderOut.allowed_transitions)."""
+    src = pathlib.Path("frontend/src/pages/Orders/useOrders.ts")
+    text = src.read_text()
+    assert "ALLOWED_TRANSITIONS" not in text, (
+        "The frontend must not maintain its own transition map; the backend "
+        "publishes `allowed_transitions` on each order."
+    )

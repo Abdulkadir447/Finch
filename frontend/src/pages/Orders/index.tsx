@@ -33,7 +33,6 @@ import dayjs from 'dayjs';
 import { formatCurrency } from '../Dashboard/kpiConfig';
 import OrderFormModal from './OrderFormModal';
 import {
-  ALLOWED_TRANSITIONS,
   Order,
   OrderCreateInput,
   OrderStatus,
@@ -94,14 +93,15 @@ const OrdersPage: React.FC = () => {
   };
 
   // Delete confirmation — shared pattern (centered Modal.confirm, danger
-  // "Yes, I'm sure" / "No, cancel").
+  // "Yes, I'm sure" / "No, cancel"). Deletion is PERMANENT from the user's
+  // perspective (Task 12 / M11).
   const confirmDelete = (order: Order) => {
     Modal.confirm({
       title: 'Delete order',
       icon: <ExclamationCircleFilled />,
-      content: `Are you sure you want to delete ${orderNumber(order.id)}?${
+      content: `Are you sure you want to delete ${orderNumber(order.id)}? This is permanent and cannot be undone.${
         order.status !== 'cancelled' ? ' Its stock will be restored.' : ''
-      } This cannot be undone.`,
+      }`,
       centered: true,
       okText: "Yes, I'm sure",
       okButtonProps: { danger: true },
@@ -183,7 +183,7 @@ const OrdersPage: React.FC = () => {
       width: 220,
       align: 'right',
       render: (_: unknown, o) => {
-        const nexts = ALLOWED_TRANSITIONS[o.status];
+        const nexts = o.allowed_transitions ?? [];
         return (
           <Space size={4}>
             <Select

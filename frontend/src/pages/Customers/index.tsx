@@ -83,13 +83,14 @@ const CustomersPage: React.FC = () => {
   };
 
   // Delete confirmation — same pattern as Products (centered Modal.confirm,
-  // danger "Yes, I'm sure" / "No, cancel"). Order history is preserved:
-  // customers are soft-deleted and orders keep their reference.
+  // danger "Yes, I'm sure" / "No, cancel"). Deletion is PERMANENT from the
+  // user's perspective (Task 12 / M11); their order history is kept for
+  // reporting (customers are soft-deleted and orders keep their reference).
   const confirmDelete = (customer: Customer) => {
     Modal.confirm({
       title: 'Delete customer',
       icon: <ExclamationCircleFilled />,
-      content: `Are you sure you want to delete "${customer.full_name}" (${customer.email})? Their order history is preserved.`,
+      content: `Are you sure you want to delete "${customer.full_name}" (${customer.email})? This is permanent and cannot be undone. Their order history is kept for reporting.`,
       centered: true,
       okText: "Yes, I'm sure",
       okButtonProps: { danger: true },

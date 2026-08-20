@@ -68,13 +68,9 @@ function createWindow () {
     }
   });
   
-  // Use absolute path to be safe
+  // Use an absolute path relative to this script (frontend/dist/index.html).
   const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
-  console.log('Loading:', indexPath);
   win.loadFile(indexPath);
-  
-  // Open DevTools to debug
-  win.webContents.openDevTools();
 }
 
 app.whenReady().then(() => {

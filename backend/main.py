@@ -11,19 +11,21 @@ Authentication model (this phase):
     to that tenant via ``business_id`` (BSD Ch1.8 multi-tenant isolation).
 """
 
+import os
+from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, or_, select, text
 from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
-from .database import get_db, init_db
+from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
 from .schemas import (
     ALLOWED_CURRENCIES,
@@ -60,13 +62,37 @@ from .schemas import (
 # FastAPI Application
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Finch", openapi_url="/docs/openapi.json", docs_url="/docs")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Fail fast in production when Clerk is not configured (Task 11 / audit
+    # H5): get_frontend_api raises unless CLERK_FRONTEND_API is set there.
+    get_frontend_api()
+    # Additive dev bootstrap: CREATE TABLE IF NOT EXISTS via the ORM. Alembic
+    # migrations (backend/alembic) are the real migration path; this never
+    # alters existing tables.
+    await init_db()
+    yield
+    await dispose_db()
 
-# CORS: Bearer-token auth (no cookies), so '*' without credentials is the
-# correct dev posture; tighten to known origins for production deployments.
+
+app = FastAPI(
+    title="Finch",
+    openapi_url="/docs/openapi.json",
+    docs_url="/docs",
+    lifespan=lifespan,
+)
+
+# CORS: Bearer-token auth (no cookies), so '*' without credentials is a safe
+# dev default. Set CORS_ORIGINS to a comma-separated allow-list to tighten it
+# (e.g. https://app.finch.example) (Task 12 polish).
+_cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "*").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,6 +100,26 @@ app.add_middleware(
 
 # Order statuses that count toward revenue/profit (not pending/cancelled).
 _ACTIVE_STATUSES = ["shipped", "delivered"]
+
+
+# ---------------------------------------------------------------------------
+# Shared "low stock" definition (Task 12 / M9).
+#
+# ONE definition used by every dashboard/inventory surface, mutually exclusive
+# with out-of-stock so a product is never double-counted:
+#   low = in stock (current_stock > 0) but at/below the reorder level
+#   out = current_stock == 0
+# ---------------------------------------------------------------------------
+def _strictly_low_stock_case():
+    return case(
+        (Product.current_stock == 0, 0),
+        (Product.current_stock <= Product.reorder_level, 1),
+        else_=0,
+    )
+
+
+def _out_of_stock_case():
+    return case((Product.current_stock == 0, 1), else_=0)
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +160,16 @@ def _scoped(model):
 # ---------------------------------------------------------------------------
 
 @app.get("/healthcheck", tags=["Health"])
-async def healthcheck() -> dict:
-    return {"status": "healthy"}
+async def healthcheck(db: AsyncSession = Depends(get_db)) -> dict:
+    """Liveness + database readiness (Task 12 polish).
+
+    Returns 200 when the API and its database are reachable, 503 otherwise.
+    """
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="database unavailable")
+    return {"status": "healthy", "database": "up"}
 
 
 @app.get("/", tags=["Root"])
@@ -309,7 +363,7 @@ async def create_product(
 @app.get("/products", response_model=ProductListResponse, tags=["Products"])
 async def list_products(
     search: Optional[str] = Query(None, min_length=1),
-    low_stock: bool = Query(False, description="Only products at/below their reorder level"),
+    low_stock: bool = Query(False, description="Only products in stock but at/below their reorder level"),
     stock: Optional[str] = Query(
         None, description="Stock status filter: in | low | out (Task 8)"
     ),
@@ -321,7 +375,8 @@ async def list_products(
     """Paginated, searchable product listing (Task 5 envelope)."""
     base = select(Product).where(Product.business_id == business.id, Product.deleted_at.is_(None))
     if low_stock:
-        base = base.where(Product.current_stock <= Product.reorder_level)
+        # Shared definition: strictly low (in stock but at/below reorder).
+        base = base.where(Product.current_stock > 0, Product.current_stock <= Product.reorder_level)
     if stock is not None:
         if stock not in {"in", "low", "out"}:
             raise HTTPException(status_code=422, detail="stock must be one of: in, low, out")
@@ -444,10 +499,8 @@ async def inventory_summary(
         select(
             func.count(Product.id),
             func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
-            # Low = strictly low but still in stock (0 < stock <= reorder),
-            # so Low and Out cards never double-count a product.
-            func.coalesce(func.sum(case((Product.current_stock == 0, 0), (Product.current_stock <= Product.reorder_level, 1), else_=0)), 0),
-            func.coalesce(func.sum(case((Product.current_stock == 0, 1), else_=0)), 0),
+            func.coalesce(func.sum(_strictly_low_stock_case()), 0),
+            func.coalesce(func.sum(_out_of_stock_case()), 0),
         ).where(*scope)
     )).one()
     categories = (await db.execute(
@@ -608,13 +661,20 @@ async def _load_order(id: int, business: Business, db: AsyncSession) -> Order:
 
 
 def _serialize_order(order: Order) -> OrderOut:
-    from .schemas import OrderItemOut  # local import: avoids cycle at module load
+    from .schemas import OrderItemOut, OrderStatus as SchemaOrderStatus  # local import: avoids cycle at module load
+
+    current = order.status.value if hasattr(order.status, "value") else str(order.status)
+    allowed = [
+        SchemaOrderStatus(s)
+        for s in sorted(ALLOWED_ORDER_TRANSITIONS.get(current, set()))
+    ]
 
     return OrderOut(
         id=order.id,
         customer_id=order.customer_id,
         customer=order.customer,
         status=order.status,
+        allowed_transitions=allowed,
         total_amount=order.total_amount,
         order_date=order.order_date,
         created_at=order.created_at,
@@ -717,6 +777,25 @@ async def create_order(
     return _serialize_order(await _load_order(new_order.id, business, db))
 
 
+def _parse_order_id(term: str) -> Optional[int]:
+    """Parse an order id out of a search term (Task 12 / M7).
+
+    Accepts the forms the UI shows and users type: ``12``, ``0012``,
+    ``#ORD-0012`` and ``ORD-0012`` all resolve to order id 12. Returns None
+    when the term does not look like an order reference (so it can still match
+    a customer name via ILIKE).
+    """
+    t = term.strip().upper()
+    if t.startswith("#"):
+        t = t[1:]
+    if t.startswith("ORD-"):
+        t = t[len("ORD-"):]
+    t = t.lstrip("0") or "0"
+    if t.isdigit():
+        return int(t)
+    return None
+
+
 @app.get("/orders", response_model=OrderListResponse, tags=["Orders"])
 async def list_orders(
     status_filter: Optional[str] = Query(None, alias="status"),
@@ -738,8 +817,9 @@ async def list_orders(
     if search:
         like = f"%{search.strip().lower()}%"
         conditions = [Customer.full_name.ilike(like)]
-        if search.strip().isdigit():
-            conditions.append(Order.id == int(search.strip()))
+        order_id = _parse_order_id(search)
+        if order_id is not None:
+            conditions.append(Order.id == order_id)
         base = base.join(Customer, Order.customer_id == Customer.id).where(or_(*conditions))
     if start_date:
         base = base.where(Order.created_at >= start_date)
@@ -876,12 +956,13 @@ async def dashboard_summary(
                Order.order_date < datetime.combine(first_next, time.min))
     )).scalar() or 0.0
 
-    # Inventory metrics.
+    # Inventory metrics (low/out use the shared mutually-exclusive definition).
     inv_row = (await db.execute(
         select(
             func.count(Product.id),
             func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
-            func.coalesce(func.sum(case((Product.current_stock <= Product.reorder_level, 1), else_=0)), 0),
+            func.coalesce(func.sum(_strictly_low_stock_case()), 0),
+            func.coalesce(func.sum(_out_of_stock_case()), 0),
         ).where(Product.business_id == bid, Product.deleted_at.is_(None))
     )).one()
 
@@ -905,6 +986,7 @@ async def dashboard_summary(
         products_count=inv_row[0],
         inventory_value=inv_row[1],
         low_stock_count=inv_row[2],
+        out_of_stock_count=inv_row[3],
         customers_total=cust_total,
         customers_new_month=cust_new,
     )
@@ -1012,8 +1094,11 @@ async def low_stock_items(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> int:
+    # Same definition as dashboard/inventory summaries (strictly low: in stock
+    # but at/below the reorder level, excluding out-of-stock products).
     stmt = select(func.count(Product.id)).where(
         Product.business_id == business.id, Product.deleted_at.is_(None),
+        Product.current_stock > 0,
         Product.current_stock <= Product.reorder_level,
     )
     return (await db.execute(stmt)).scalar() or 0
@@ -1046,21 +1131,3 @@ async def top_products(
     ]
 
 
-# ---------------------------------------------------------------------------
-# Startup / Shutdown hooks
-# ---------------------------------------------------------------------------
-
-@app.on_event("startup")
-async def startup_event():
-    # Fail fast in production when Clerk is not configured (Task 11 / audit
-    # H5): get_frontend_api raises unless CLERK_FRONTEND_API is set there.
-    get_frontend_api()
-    # Phase 1 schema bootstrap: CREATE TABLE IF NOT EXISTS via the ORM.
-    # Alembic migrations (backend/alembic) are the real migration path; this
-    # stays as an additive dev convenience and never alters existing tables.
-    await init_db()
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    pass

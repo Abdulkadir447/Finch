@@ -13,6 +13,7 @@ import InventoryPage from './pages/Inventory';
 import CustomersPage from './pages/Customers';
 import OrdersPage from './pages/Orders';
 import SettingsPage from './pages/Settings';
+import NotFoundPage from './pages/NotFound';
 import { setCurrency } from './services/currency';
 import { useApiClient } from './services/api/client';
 
@@ -207,8 +208,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-// Placeholder Pages
-
 // Main App Component
 const App: React.FC = () => {
   const [booting, setBooting] = useState(true);
@@ -238,6 +237,7 @@ const App: React.FC = () => {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

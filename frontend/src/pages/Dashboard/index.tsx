@@ -82,7 +82,7 @@ const DashboardPage: React.FC = () => {
       orders: { value: String(summary.orders_month), caption: `${summary.orders_today} today` },
       inventory: {
         value: formatCurrency(summary.inventory_value),
-        caption: `${summary.low_stock_count} low stock · ${summary.products_count} products`,
+        caption: `${summary.low_stock_count} low · ${summary.out_of_stock_count} out · ${summary.products_count} products`,
       },
       'customer-growth': {
         value: String(summary.customers_total),

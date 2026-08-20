@@ -14,8 +14,10 @@ import { getCurrency } from '../../services/currency';
  * KPI definitions for the Dashboard first row (UXDS 9.7):
  * Profit • Revenue • Orders • Inventory • Customer Growth • Forecast.
  *
- * The backend is not wired yet, so every card ships in its empty state
- * (value '—', no trend, no sparkline points — UXDS 9.22 / task spec item 3).
+ * These are static card definitions (title, icon, accent, route). Live values
+ * are injected from /dashboard/summary at render time; the `value`/`sparkData`
+ * fields below are the honest empty-state defaults shown while data loads or
+ * when a backend value does not exist yet (UXDS 9.22).
  */
 export interface KpiDefinition {
   key: string;
@@ -24,7 +26,7 @@ export interface KpiDefinition {
   accent: string;
   /** UXDS 9.9 — KPI click navigates to the associated module (when it exists). */
   route?: string;
-  /** Placeholder until backend data arrives. */
+  /** Empty-state default; replaced by live data when available. */
   value: string;
   trend: null;
   sparkData: number[];

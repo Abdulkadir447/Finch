@@ -235,6 +235,10 @@ class OrderOut(BaseModel):
     customer_id: int
     customer: Optional[CustomerBrief] = None
     status: OrderStatus
+    # Legal next statuses, computed from the backend's single transition map
+    # (Task 12 / M4). The frontend renders the status control from this instead
+    # of maintaining its own copy of the rules.
+    allowed_transitions: List[OrderStatus] = []
     total_amount: float
     order_date: datetime
     created_at: datetime
@@ -284,6 +288,7 @@ class DashboardSummary(BaseModel):
     products_count: int
     inventory_value: float
     low_stock_count: int
+    out_of_stock_count: int
     customers_total: int
     customers_new_month: int
 
