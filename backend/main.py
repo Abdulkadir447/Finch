@@ -17,13 +17,15 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import case, func, or_, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .clerk_auth import ClerkUser, verify_clerk_token
 from .database import get_db, init_db
-from .models import Business, Customer, Order, OrderItem, Product
+from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
 from .schemas import (
+    AdjustStockRequest,
     AuthMeResponse,
     CategoryValue,
     CustomerCreate,
@@ -32,6 +34,8 @@ from .schemas import (
     CustomerUpdate,
     DashboardSummary,
     GrowthResponse,
+    InventorySummary,
+    MovementListResponse,
     OrderCreate,
     OrderListResponse,
     OrderOut,
@@ -42,6 +46,7 @@ from .schemas import (
     ProductUpdate,
     RevenueMonthResponse,
     RevenueTodayResponse,
+    StockMovementOut,
     TimeseriesPoint,
     TopProductItem,
 )
@@ -132,6 +137,30 @@ async def auth_me(business: Business = Depends(get_current_business)) -> AuthMeR
 # Products CRUD (tenant-scoped)
 # ---------------------------------------------------------------------------
 
+def _log_movement(
+    db: AsyncSession,
+    business_id: int,
+    product_id: int,
+    change: int,
+    reason: StockMovementReason,
+    actor: Optional[str],
+    note: Optional[str] = None,
+    order_id: Optional[int] = None,
+) -> None:
+    """Append one immutable row to the stock ledger (Task 8)."""
+    db.add(
+        StockMovement(
+            business_id=business_id,
+            product_id=product_id,
+            change=change,
+            reason=reason,
+            note=note,
+            order_id=order_id,
+            actor=actor,
+        )
+    )
+
+
 @app.post("/products", response_model=ProductOut, status_code=status.HTTP_201_CREATED, tags=["Products"])
 async def create_product(
     product: ProductCreate,
@@ -145,6 +174,12 @@ async def create_product(
     new_product = Product(**product.model_dump(), business_id=business.id, created_by=business.owner_id)
     db.add(new_product)
     await db.flush()
+    # Initial stock (if any) is the first ledger entry (UXDS 11.9).
+    if new_product.current_stock:
+        _log_movement(
+            db, business.id, new_product.id, new_product.current_stock,
+            StockMovementReason.initial, business.owner_id,
+        )
     await db.refresh(new_product)
     return new_product
 
@@ -153,6 +188,9 @@ async def create_product(
 async def list_products(
     search: Optional[str] = Query(None, min_length=1),
     low_stock: bool = Query(False, description="Only products at/below their reorder level"),
+    stock: Optional[str] = Query(
+        None, description="Stock status filter: in | low | out (Task 8)"
+    ),
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     business: Business = Depends(get_current_business),
@@ -162,6 +200,15 @@ async def list_products(
     base = select(Product).where(Product.business_id == business.id, Product.deleted_at.is_(None))
     if low_stock:
         base = base.where(Product.current_stock <= Product.reorder_level)
+    if stock is not None:
+        if stock not in {"in", "low", "out"}:
+            raise HTTPException(status_code=422, detail="stock must be one of: in, low, out")
+        if stock == "out":
+            base = base.where(Product.current_stock == 0)
+        elif stock == "low":
+            base = base.where(Product.current_stock > 0, Product.current_stock <= Product.reorder_level)
+        else:  # "in"
+            base = base.where(Product.current_stock > Product.reorder_level)
     if search:
         like = f"%{search.lower()}%"
         base = base.where(
@@ -216,6 +263,100 @@ async def delete_product(
     product.deleted_at = datetime.utcnow()
     product.deleted_by = business.owner_id
     await db.flush()
+
+
+# ---------------------------------------------------------------------------
+# Inventory (tenant-scoped) — Task 8: stock adjustments, movement ledger,
+# module summary. After creation, stock changes ONLY through /adjust here.
+# ---------------------------------------------------------------------------
+
+@app.post("/products/{id}/adjust", response_model=ProductOut, tags=["Inventory"])
+async def adjust_stock(
+    id: int,
+    req: AdjustStockRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> ProductOut:
+    """Apply a signed stock adjustment and log it to the ledger (UXDS 11.11)."""
+    if req.change == 0:
+        raise HTTPException(status_code=422, detail="Adjustment change must be non-zero")
+
+    product = await get_product(id, business, db)
+    current = product.current_stock or 0
+    new_level = current + req.change
+    if new_level < 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Insufficient stock to remove: {current} available, {-req.change} requested",
+        )
+
+    # Optimistic-concurrency guard (BSD Ch2.9): apply only if the version we
+    # read is still current; bump it atomically. A concurrent writer wins ->
+    # 0 rows matched -> 409 so the caller retries with fresh data.
+    result = await db.execute(
+        sa_update(Product)
+        .where(Product.id == id, Product.version == product.version)
+        .values(current_stock=new_level, version=product.version + 1, updated_by=business.owner_id)
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=409, detail="Stock changed concurrently — please retry")
+
+    _log_movement(
+        db, business.id, id, req.change,
+        StockMovementReason(req.reason.value), business.owner_id, note=req.note,
+    )
+    await db.flush()
+    await db.refresh(product)
+    return product
+
+
+@app.get("/products/{id}/movements", response_model=MovementListResponse, tags=["Inventory"])
+async def list_movements(
+    id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> MovementListResponse:
+    """Immutable stock-movement ledger for one product, newest first (UXDS 11.12)."""
+    await get_product(id, business, db)  # 404 for unknown/cross-tenant products
+    base = select(StockMovement).where(
+        StockMovement.business_id == business.id, StockMovement.product_id == id
+    )
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    rows = (await db.execute(
+        base.order_by(StockMovement.id.desc()).offset((page - 1) * limit).limit(limit)
+    )).scalars().all()
+    return MovementListResponse(items=rows, total=total, page=page, limit=limit)
+
+
+@app.get("/inventory/summary", response_model=InventorySummary, tags=["Inventory"])
+async def inventory_summary(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> InventorySummary:
+    """Inventory KPI row (UXDS 11.5): products, value, low, out, categories."""
+    scope = [Product.business_id == business.id, Product.deleted_at.is_(None)]
+    row = (await db.execute(
+        select(
+            func.count(Product.id),
+            func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
+            # Low = strictly low but still in stock (0 < stock <= reorder),
+            # so Low and Out cards never double-count a product.
+            func.coalesce(func.sum(case((Product.current_stock == 0, 0), (Product.current_stock <= Product.reorder_level, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Product.current_stock == 0, 1), else_=0)), 0),
+        ).where(*scope)
+    )).one()
+    categories = (await db.execute(
+        select(func.count(func.distinct(Product.category))).where(*scope, Product.category.is_not(None))
+    )).scalar() or 0
+    return InventorySummary(
+        products_count=row[0],
+        inventory_value=row[1],
+        low_stock_count=row[2],
+        out_of_stock_count=row[3],
+        categories_count=categories,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -381,12 +522,18 @@ def _serialize_order(order: Order) -> OrderOut:
     )
 
 
-def _restore_stock(order: Order, actor: Optional[str]) -> None:
-    """Return each line's quantity to its product's stock."""
+def _restore_stock(
+    db: AsyncSession, order: Order, actor: Optional[str], reason: StockMovementReason
+) -> None:
+    """Return each line's quantity to its product's stock and log it."""
     for item in order.items:
         if item.product is not None:
             item.product.current_stock = (item.product.current_stock or 0) + item.quantity
             item.product.updated_by = actor
+            _log_movement(
+                db, order.business_id, item.product_id, item.quantity,
+                reason, actor, order_id=order.id,
+            )
 
 
 @app.post("/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED, tags=["Orders"])
@@ -447,6 +594,12 @@ async def create_order(
     )
     db.add(new_order)
     await db.flush()
+    # One ledger row per deducted line, referencing the new order (Task 8).
+    for product, item in lines:
+        _log_movement(
+            db, business.id, product.id, -item.quantity,
+            StockMovementReason.order, business.owner_id, order_id=new_order.id,
+        )
     return _serialize_order(await _load_order(new_order.id, business, db))
 
 
@@ -518,9 +671,9 @@ async def update_order_status(
             detail=f"Cannot transition order from '{current}' to '{requested}'",
         )
 
-    # Cancellation restores stock exactly once (Task 7 policy).
+    # Cancellation restores stock exactly once (Task 7 policy) and logs it.
     if requested == "cancelled":
-        _restore_stock(order, business.owner_id)
+        _restore_stock(db, order, business.owner_id, StockMovementReason.order_cancelled)
 
     order.status = updates.status
     order.updated_by = business.owner_id
@@ -540,7 +693,7 @@ async def delete_order(
     # Restore stock unless already cancelled (which already restored once).
     current = order.status.value if hasattr(order.status, "value") else str(order.status)
     if current != "cancelled":
-        _restore_stock(order, business.owner_id)
+        _restore_stock(db, order, business.owner_id, StockMovementReason.order_deleted)
     order.deleted_at = datetime.utcnow()
     order.deleted_by = business.owner_id
     await db.flush()

@@ -204,6 +204,41 @@ class OrderItem(Base):
 
 
 # ---------------------------------------------------------------------------
+# Stock movements — append-only inventory ledger (BSD Ch9 ``stock_movements``,
+# UXDS 11.12). Every change to ``products.current_stock`` writes exactly one
+# row here. Movements are immutable: no update/delete columns by design.
+# ---------------------------------------------------------------------------
+class StockMovementReason(str, Enum):
+    initial = "initial"                      # initial stock at product creation
+    purchase = "purchase"                    # manual adjustment reasons (UXDS 11.11)
+    sale = "sale"
+    damaged = "damaged"
+    returned = "returned"
+    correction = "correction"
+    order = "order"                          # automatic: order created
+    order_cancelled = "order_cancelled"      # automatic: order cancelled
+    order_deleted = "order_deleted"          # automatic: order deleted
+
+
+class StockMovement(Base):
+    """One immutable row per stock change (audit trail, Task 8)."""
+
+    __tablename__ = "stock_movements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)   # tenant isolation
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    change = Column(Integer, nullable=False)                    # signed quantity delta
+    reason = Column(SAEnum(StockMovementReason), nullable=False)
+    note = Column(String(500))
+    order_id = Column(Integer, nullable=True)                   # set for order-driven moves
+    actor = Column(String(255))                                 # Clerk user id
+    created_at = Column(DateTime, server_default=func.now())
+
+    product = relationship("Product")
+
+
+# ---------------------------------------------------------------------------
 # Profile — local user profile, keyed to the Clerk identity (BSD Ch3.11).
 # Supabase is the storage layer for Finch; identity comes from Clerk, so the
 # profile is keyed by the Clerk user id and lives in Supabase Postgres.

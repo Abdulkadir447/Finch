@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigProvider, Layout, Avatar, Space, Switch, Typography, Spin } from 'antd';
-import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
+import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, InboxOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
 import { Menu } from 'antd';
 import { theme as finchTheme, brand, neutral } from './theme';
 import 'antd/dist/reset.css';
@@ -9,6 +9,7 @@ import { useAuth, useUser, useClerk, SignIn, SignUp } from '@clerk/react';
 import { message } from 'antd';
 import DashboardPage from './pages/Dashboard';
 import ProductsPage from './pages/Products';
+import InventoryPage from './pages/Inventory';
 import CustomersPage from './pages/Customers';
 import OrdersPage from './pages/Orders';
 
@@ -20,6 +21,7 @@ const { Title } = Typography;
 const NAV_ITEMS = [
   { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/' },
   { key: 'products', icon: <ShoppingCartOutlined />, label: 'Products', path: '/products' },
+  { key: 'inventory', icon: <InboxOutlined />, label: 'Inventory', path: '/inventory' },
   { key: 'customers', icon: <UserOutlined />, label: 'Customers', path: '/customers' },
   { key: 'orders', icon: <TeamOutlined />, label: 'Orders', path: '/orders' },
   { key: 'settings', icon: <SettingOutlined />, label: 'Settings', path: '/settings' },
@@ -166,6 +168,7 @@ const App: React.FC = () => {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/products" element={<ProductsPage />} />
+                <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/settings" element={<Settings />} />

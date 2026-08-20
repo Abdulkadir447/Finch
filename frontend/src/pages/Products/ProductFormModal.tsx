@@ -41,8 +41,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         category: product.category ?? undefined,
         unit_price: product.unit_price,
         cost_price: product.cost_price ?? undefined,
-        current_stock: product.current_stock,
         reorder_level: product.reorder_level,
+        // NOTE: current_stock is intentionally NOT editable after creation.
+        // Stock changes only via Inventory -> Adjust Stock (audit trail).
       });
     } else {
       form.resetFields();
@@ -136,11 +137,18 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="Optional" />
             </Form.Item>
           </Col>
-          <Col xs={12} sm={6}>
-            <Form.Item label="Current Stock" name="current_stock" rules={[{ required: true }]}>
-              <InputNumber min={0} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
+          {!editing && (
+            <Col xs={12} sm={6}>
+              <Form.Item
+                label="Initial Stock"
+                name="current_stock"
+                rules={[{ required: true }]}
+                extra="After creation, adjust stock via Inventory."
+              >
+                <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          )}
           <Col xs={12} sm={6}>
             <Form.Item label="Reorder Level" name="reorder_level" rules={[{ required: true }]}>
               <InputNumber min={0} precision={0} style={{ width: '100%' }} />

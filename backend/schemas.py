@@ -42,14 +42,17 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = Field(None, max_length=100)
     unit_price: Optional[float] = Field(None, gt=0)
     cost_price: Optional[float] = Field(None, ge=0)
-    current_stock: Optional[int] = Field(None, ge=0)
     reorder_level: Optional[int] = Field(None, ge=0)
+    # NOTE (Task 8): `current_stock` is deliberately NOT editable here.
+    # After creation, stock changes only via POST /products/{id}/adjust,
+    # which writes the audit ledger. Initial stock is set at create time.
 
 
 class ProductOut(ProductBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+    version: int = 1  # optimistic-lock counter (bumped on stock adjustments)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -61,6 +64,64 @@ class ProductListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# ---------------------------------------------------------------------------
+# Inventory schemas (Task 8)
+# ---------------------------------------------------------------------------
+
+class AdjustReason(str, Enum):
+    """Manual adjustment reasons (UXDS 11.11)."""
+
+    purchase = "purchase"
+    sale = "sale"
+    damaged = "damaged"
+    returned = "returned"
+    correction = "correction"
+
+
+class AdjustStockRequest(BaseModel):
+    """POST /products/{id}/adjust body.
+
+    `change` is a signed quantity: positive adds stock, negative removes it.
+    Zero is rejected. The resulting level may not go below zero (409).
+    """
+
+    change: int = Field(..., description="Signed stock delta; must be non-zero")
+    reason: AdjustReason
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class StockMovementOut(BaseModel):
+    id: int
+    product_id: int
+    change: int
+    reason: str
+    note: Optional[str] = None
+    order_id: Optional[int] = None
+    actor: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MovementListResponse(BaseModel):
+    """Paginated stock-movement ledger envelope (newest first)."""
+
+    items: List[StockMovementOut]
+    total: int
+    page: int
+    limit: int
+
+
+class InventorySummary(BaseModel):
+    """Inventory module KPI row (UXDS 11.5): products, value, low, out, categories."""
+
+    products_count: int
+    inventory_value: float
+    low_stock_count: int
+    out_of_stock_count: int
+    categories_count: int
 
 
 # ---------------------------------------------------------------------------

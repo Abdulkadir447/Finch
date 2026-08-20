@@ -141,6 +141,19 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 -- ---------------------------------------------------------------------------
 -- Order items
 -- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS stock_movements (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id   INTEGER NOT NULL,
+    product_id    INTEGER NOT NULL,
+    change        INTEGER NOT NULL,
+    reason        TEXT NOT NULL,
+    note          TEXT,
+    order_id      INTEGER,
+    actor         TEXT,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products (id)
+);
+
 CREATE TABLE IF NOT EXISTS order_items (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     business_id   INTEGER,
