@@ -35,6 +35,7 @@ from .schemas import (
     OrderOut,
     OrderUpdate,
     ProductCreate,
+    ProductListResponse,
     ProductOut,
     ProductUpdate,
     RevenueMonthResponse,
@@ -146,22 +147,31 @@ async def create_product(
     return new_product
 
 
-@app.get("/products", response_model=List[ProductOut], tags=["Products"])
+@app.get("/products", response_model=ProductListResponse, tags=["Products"])
 async def list_products(
     search: Optional[str] = Query(None, min_length=1),
+    low_stock: bool = Query(False, description="Only products at/below their reorder level"),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=100),
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
-) -> List[ProductOut]:
-    query = select(Product).where(Product.business_id == business.id, Product.deleted_at.is_(None))
+) -> ProductListResponse:
+    """Paginated, searchable product listing (Task 5 envelope)."""
+    base = select(Product).where(Product.business_id == business.id, Product.deleted_at.is_(None))
+    if low_stock:
+        base = base.where(Product.current_stock <= Product.reorder_level)
     if search:
         like = f"%{search.lower()}%"
-        query = query.where(
+        base = base.where(
             or_(Product.name.ilike(like), Product.sku.ilike(like), Product.category.ilike(like))
         )
-    query = query.order_by(Product.id.desc()).offset((page - 1) * limit).limit(limit)
-    return (await db.execute(query)).scalars().all()
+
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    rows = (await db.execute(
+        base.order_by(Product.id.desc()).offset((page - 1) * limit).limit(limit)
+    )).scalars().all()
+
+    return ProductListResponse(items=rows, total=total, page=page, limit=limit)
 
 
 @app.get("/products/{id}", response_model=ProductOut, tags=["Products"])

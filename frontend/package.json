@@ -17,6 +17,7 @@
     "apexcharts": "^6.10.0",
     "axios": "^1.18.1",
     "dayjs": "^1.11.21",
+    "flowbite": "^4.0.2",
     "react": "^18.3.0",
     "react-apexcharts": "^2.1.1",
     "react-dom": "^18.3.0",

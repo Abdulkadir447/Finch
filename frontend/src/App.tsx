@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { useAuth, useUser, useClerk, SignIn, SignUp } from '@clerk/react';
 import { message } from 'antd';
 import DashboardPage from './pages/Dashboard';
+import ProductsPage from './pages/Products';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -133,13 +134,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // Placeholder Pages
-const Products: React.FC = () => (
-  <div>
-    <h2>Products</h2>
-    <p>Product management will be displayed here.</p>
-  </div>
-);
-
 const Customers: React.FC = () => (
   <div>
     <h2>Customers</h2>
@@ -183,7 +177,7 @@ const App: React.FC = () => {
             <AppLayout>
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
-                <Route path="/products" element={<Products />} />
+                <Route path="/products" element={<ProductsPage />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/orders" element={<Orders />} />
                 <Route path="/settings" element={<Settings />} />

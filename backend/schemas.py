@@ -22,8 +22,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class ProductBase(BaseModel):
     sku: str = Field(..., min_length=3, max_length=50, description="Unique product identifier")
     name: str = Field(..., min_length=1, max_length=255, description="Product name")
-    description: Optional[str] = None
-    category: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=1000)
+    category: Optional[str] = Field(None, max_length=100)
     unit_price: float = Field(..., gt=0, description="Price must be greater than 0")
     cost_price: Optional[float] = Field(None, ge=0, description="Cost price, if applicable")
     current_stock: int = Field(default=0, ge=0, description="Current inventory level")
@@ -38,8 +38,8 @@ class ProductCreate(ProductBase):
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    category: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=1000)
+    category: Optional[str] = Field(None, max_length=100)
     unit_price: Optional[float] = Field(None, gt=0)
     cost_price: Optional[float] = Field(None, ge=0)
     current_stock: Optional[int] = Field(None, ge=0)
@@ -52,6 +52,15 @@ class ProductOut(ProductBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductListResponse(BaseModel):
+    """Paginated product listing envelope (Task 5)."""
+
+    items: List[ProductOut]
+    total: int
+    page: int
+    limit: int
 
 
 # ---------------------------------------------------------------------------
