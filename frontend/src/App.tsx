@@ -5,8 +5,9 @@ import { Menu } from 'antd';
 import { theme as finchTheme, brand, neutral } from './theme';
 import 'antd/dist/reset.css';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, useUser, SignIn, SignUp } from '@clerk/react';
+import { useAuth, useUser, useClerk, SignIn, SignUp } from '@clerk/react';
 import { message } from 'antd';
+import DashboardPage from './pages/Dashboard';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -60,7 +61,7 @@ const SignInPage = () => {
 const SignUpPage: React.FC = () => {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <SignUp afterSignOutUrl="/" afterSignUpUrl="/" fallbackRedirectUrl="/" />
+      <SignUp afterSignOutUrl="/" fallbackRedirectUrl="/" />
     </div>
   );
 };
@@ -72,11 +73,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
+  const { signOut } = useClerk();
 
   const toggleTheme = (checked: boolean) => setDarkMode(checked);
 
   const handleLogout = async () => {
-    await useAuth().signOut();
+    await signOut();
     message.info('Logged out successfully');
   };
 
@@ -131,13 +133,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // Placeholder Pages
-const Dashboard: React.FC = () => (
-  <div>
-    <h2>Dashboard</h2>
-    <p>Dashboard analytics will be displayed here.</p>
-  </div>
-);
-
 const Products: React.FC = () => (
   <div>
     <h2>Products</h2>
@@ -187,7 +182,7 @@ const App: React.FC = () => {
           <ProtectedRoute>
             <AppLayout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<DashboardPage />} />
                 <Route path="/products" element={<Products />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/orders" element={<Orders />} />

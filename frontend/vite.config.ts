@@ -5,6 +5,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    host: '0.0.0.0',
+    allowedHosts: true, // allow preview/tunnel hosts in development
+  },
+  // ApexCharts v6 tree-shaking entries used by the Dashboard must be listed
+  // here so Vite's dependency optimizer does not bundle the library twice
+  // (ApexCharts tree-shaking reference, "Vite Configuration").
+  optimizeDeps: {
+    include: [
+      'react-apexcharts/core',
+      'apexcharts/area',
+      'apexcharts/pie',
+      'apexcharts/features/legend',
+      'apexcharts/features/keyboard',
+    ],
   },
   base: './', // This tells Vite to use relative paths
   build: {

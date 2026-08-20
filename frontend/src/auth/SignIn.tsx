@@ -9,11 +9,7 @@ export const SignInPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Finch</h1>
           <p className="mt-2 text-sm text-gray-600">Your Business, Smarter.</p>
         </div>
-        <SignIn
-          afterSignInUrl="/"
-          afterSignUpUrl="/"
-          fallbackRedirectUrl="/"
-        />
+        <SignIn fallbackRedirectUrl="/" />
       </div>
     </div>
   );
