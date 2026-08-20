@@ -7,6 +7,16 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     allowedHosts: true, // allow preview/tunnel hosts in development
+    // Backend proxy: the browser calls same-origin /api/*, Vite forwards to
+    // the FastAPI backend. Keeps embedded previews working (the user's
+    // browser cannot reach the sandbox's localhost directly).
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api/, ''),
+      },
+    },
   },
   // ApexCharts v6 tree-shaking entries used by the Dashboard must be listed
   // here so Vite's dependency optimizer does not bundle the library twice

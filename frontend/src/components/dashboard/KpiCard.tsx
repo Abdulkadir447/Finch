@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Space, Typography, theme as antdTheme } from 'antd';
+import { Card, Skeleton, Space, Typography, theme as antdTheme } from 'antd';
 import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons';
 import Sparkline from './Sparkline';
 
@@ -23,6 +23,10 @@ export interface KpiCardProps {
   sparkData?: number[];
   /** True when backend data does not exist yet. */
   isEmpty?: boolean;
+  /** True while backend data is being fetched. */
+  loading?: boolean;
+  /** Bottom caption when no trend comparison label applies. */
+  caption?: string;
   /** UXDS 9.9 — clicking a KPI card navigates to its module. */
   onClick?: () => void;
 }
@@ -44,6 +48,8 @@ const KpiCard: React.FC<KpiCardProps> = ({
   trend,
   sparkData = [],
   isEmpty = false,
+  loading = false,
+  caption,
   onClick,
 }) => {
   const { token } = antdTheme.useToken();
@@ -117,18 +123,22 @@ const KpiCard: React.FC<KpiCardProps> = ({
 
         {/* Value + trend row — the value is the dominant element (UXDS 9.8) */}
         <Space align="baseline" size={8} wrap>
-          <Typography.Text
-            style={{
-              fontSize: token.fontSizeHeading2,
-              fontWeight: 600,
-              color: token.colorText,
-              lineHeight: 1.2,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {value}
-          </Typography.Text>
-          {!isEmpty && trend && (
+          {loading ? (
+            <Skeleton.Input active size="small" style={{ width: 90, height: 28 }} />
+          ) : (
+            <Typography.Text
+              style={{
+                fontSize: token.fontSizeHeading2,
+                fontWeight: 600,
+                color: token.colorText,
+                lineHeight: 1.2,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {value}
+            </Typography.Text>
+          )}
+          {!isEmpty && !loading && trend && (
             <Space size={4} style={{ color: trendColor, fontSize: token.fontSizeSM }}>
               {trendUp ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
               {Math.abs(trend.percent).toFixed(1)}%
@@ -141,7 +151,7 @@ const KpiCard: React.FC<KpiCardProps> = ({
 
         {/* Single comparison / empty caption (UXDS 9.8) */}
         <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          {isEmpty ? 'No data yet' : trend?.comparisonLabel}
+          {isEmpty ? 'No data yet' : trend?.comparisonLabel ?? caption}
         </Typography.Text>
       </Space>
     </Card>

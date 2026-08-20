@@ -50,6 +50,7 @@ class Business(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
+    owner_id = Column(String(255), index=True)        # Clerk user id of the owner
     owner_email = Column(String(255), index=True)
     industry = Column(String(100))
     currency = Column(String(8), default="USD")
@@ -197,22 +198,24 @@ class OrderItem(Base):
 
 
 # ---------------------------------------------------------------------------
-# Profile — local user profile, keyed to Supabase Auth (BSD Ch3.11)
+# Profile — local user profile, keyed to the Clerk identity (BSD Ch3.11).
+# Supabase is the storage layer for Finch; identity comes from Clerk, so the
+# profile is keyed by the Clerk user id and lives in Supabase Postgres.
 # ---------------------------------------------------------------------------
 class Profile(Base):
-    """Local user profile, linked to the Supabase Auth identity.
+    """Local user profile, linked to the Clerk identity.
 
-    ``supabase_user_id`` stores the external auth user id; the local
-    integer ``id`` keeps the ORM/SQLite layer backward-compatible
-    with the rest of the schema (UUID primary keys are deferred per
-    BSD Ch2.5). Authentication *tokens* are intentionally NOT
-    stored here — they live in Supabase per BSD Ch3.17.
+    ``clerk_user_id`` stores the external auth user id (Clerk ``sub`` claim);
+    the local integer ``id`` keeps the ORM layer backward-compatible with the
+    rest of the schema (UUID primary keys are deferred per BSD Ch2.5).
+    Authentication *tokens* are intentionally NOT stored here (BSD Ch3.17) —
+    Clerk session tokens are verified per-request against Clerk's public JWKS.
     """
 
     __tablename__ = "profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    supabase_user_id = Column(String(255), unique=True, nullable=False, index=True)
+    clerk_user_id = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(255))
     email = Column(String(255), unique=True, index=True)
     avatar_url = Column(String(1024))

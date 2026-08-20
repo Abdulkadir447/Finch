@@ -1,6 +1,9 @@
 """Pydantic schemas for request and response validation.
-These mirror the ORM models defined in `backend/models.py` and are used by FastAPI
-to validate incoming JSON payloads and to control the shape of responses.
+
+These mirror the ORM models defined in `backend/models.py` and are used by
+FastAPI to validate incoming JSON payloads and to control the shape of
+responses. Pydantic v2 style (`model_config = ConfigDict(from_attributes=True)`
+replaces the removed v1 `orm_mode`).
 """
 
 from __future__ import annotations
@@ -9,7 +12,8 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, EmailStr, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 
 # ---------------------------------------------------------------------------
 # Product schemas
@@ -25,11 +29,12 @@ class ProductBase(BaseModel):
     current_stock: int = Field(default=0, ge=0, description="Current inventory level")
     reorder_level: int = Field(default=5, ge=0, description="Stock level that triggers reorder")
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ProductCreate(ProductBase):
     pass
+
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -40,16 +45,14 @@ class ProductUpdate(BaseModel):
     current_stock: Optional[int] = Field(None, ge=0)
     reorder_level: Optional[int] = Field(None, ge=0)
 
-    class Config:
-        orm_mode = True
 
 class ProductOut(ProductBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 # ---------------------------------------------------------------------------
 # Customer schemas
@@ -62,11 +65,12 @@ class CustomerBase(BaseModel):
     address: Optional[str] = None
     company: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class CustomerCreate(CustomerBase):
     pass
+
 
 class CustomerUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -75,15 +79,21 @@ class CustomerUpdate(BaseModel):
     address: Optional[str] = None
     company: Optional[str] = None
 
-    class Config:
-        orm_mode = True
 
 class CustomerOut(CustomerBase):
     id: int
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerBrief(BaseModel):
+    """Lightweight nested customer used inside order listings."""
+
+    full_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 # ---------------------------------------------------------------------------
 # Order schemas
@@ -96,52 +106,51 @@ class OrderStatus(str, Enum):
     delivered = "delivered"
     cancelled = "cancelled"
 
+
 class OrderItemBase(BaseModel):
     product_id: int
     quantity: int = Field(..., gt=0)
     unit_price: float = Field(..., gt=0)
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class OrderItemCreate(OrderItemBase):
     pass
+
 
 class OrderItemOut(OrderItemBase):
     id: int
     total_price: float
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
 
 class OrderBase(BaseModel):
     customer_id: int
     status: Optional[OrderStatus] = OrderStatus.pending
 
-    class Config:
-        orm_mode = True
 
 class OrderCreate(OrderBase):
     items: List[OrderItemCreate]
 
+
 class OrderUpdate(BaseModel):
     status: Optional[OrderStatus] = None
-    # Updating items is out of scope for Phase 1 – they are immutable after creation.
+    # Updating items is out of scope for Phase 1 – they are immutable after creation.
 
-    class Config:
-        orm_mode = True
 
 class OrderOut(BaseModel):
     id: int
     customer_id: int
+    customer: Optional[CustomerBrief] = None
     status: OrderStatus
     total_amount: float
+    order_date: datetime
     created_at: datetime
-    updated_at: datetime
     items: List[OrderItemOut]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +179,44 @@ class TopProductItem(BaseModel):
     total_quantity: int
     total_revenue: float
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
+class DashboardSummary(BaseModel):
+    """Aggregated KPI payload for the Dashboard (one round-trip)."""
+
+    revenue_today: float
+    orders_today: int
+    revenue_month: float
+    orders_month: int
+    revenue_growth_percent: Optional[float] = None
+    profit_month: float
+    products_count: int
+    inventory_value: float
+    low_stock_count: int
+    customers_total: int
+    customers_new_month: int
+
+
+class TimeseriesPoint(BaseModel):
+    """One day of revenue/orders for the Revenue chart."""
+
+    date: str
+    revenue: float
+    orders: int
+
+
+class CategoryValue(BaseModel):
+    """Inventory value grouped by product category (donut chart)."""
+
+    category: str
+    value: float
+
+
+class AuthMeResponse(BaseModel):
+    """Identity + tenant info for the signed-in Finch user."""
+
+    user_id: str
+    business_id: int
+    business_name: str
+    currency: str
