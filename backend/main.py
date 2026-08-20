@@ -33,6 +33,7 @@ from .schemas import (
     DashboardSummary,
     GrowthResponse,
     OrderCreate,
+    OrderListResponse,
     OrderOut,
     OrderUpdate,
     ProductCreate,
@@ -316,8 +317,77 @@ async def delete_customer(
 
 
 # ---------------------------------------------------------------------------
-# Orders CRUD (tenant-scoped)
+# Orders (tenant-scoped) — Task 7: transactional stock handling,
+# guarded status transitions, pagination envelope.
+#
+# Inventory policy:
+#   * Stock is deducted exactly once, at order creation, after ALL items
+#     validate. Any failure raises before the order is added, and get_db's
+#     request-scoped rollback guarantees inventory is left unchanged.
+#   * Stock is restored exactly once — on cancellation, or on deletion of an
+#     order that was not already cancelled.
+#   * Prices are snapshots: the submitted unit_price is stored as-is.
 # ---------------------------------------------------------------------------
+
+# Legal status transitions (MVP): shipped cannot be cancelled; delivered and
+# cancelled are terminal.
+ALLOWED_ORDER_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"confirmed", "cancelled"},
+    "confirmed": {"shipped", "cancelled"},
+    "shipped": {"delivered"},
+    "delivered": set(),
+    "cancelled": set(),
+}
+
+
+async def _load_order(id: int, business: Business, db: AsyncSession) -> Order:
+    """Tenant-scoped ORM fetch with relationships; 404 when absent."""
+    stmt = (
+        select(Order)
+        .options(
+            selectinload(Order.customer),
+            selectinload(Order.items).selectinload(OrderItem.product),
+        )
+        .where(Order.id == id, Order.business_id == business.id, Order.deleted_at.is_(None))
+    )
+    order = (await db.execute(stmt)).scalars().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+
+
+def _serialize_order(order: Order) -> OrderOut:
+    from .schemas import OrderItemOut  # local import: avoids cycle at module load
+
+    return OrderOut(
+        id=order.id,
+        customer_id=order.customer_id,
+        customer=order.customer,
+        status=order.status,
+        total_amount=order.total_amount,
+        order_date=order.order_date,
+        created_at=order.created_at,
+        items=[
+            OrderItemOut(
+                id=item.id,
+                product_id=item.product_id,
+                product_name=item.product.name if item.product is not None else None,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                total_price=item.total_price,
+            )
+            for item in order.items
+        ],
+    )
+
+
+def _restore_stock(order: Order, actor: Optional[str]) -> None:
+    """Return each line's quantity to its product's stock."""
+    for item in order.items:
+        if item.product is not None:
+            item.product.current_stock = (item.product.current_stock or 0) + item.quantity
+            item.product.updated_by = actor
+
 
 @app.post("/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED, tags=["Orders"])
 async def create_order(
@@ -327,10 +397,33 @@ async def create_order(
 ) -> OrderOut:
     customer = await get_customer(order.customer_id, business, db)
 
+    # ---- Validation phase (SELECTs only; nothing written yet) -------------
+    seen_product_ids: set[int] = set()
+    lines: list[tuple[Product, type(order.items[0])]] = []
+    for item in order.items:
+        if item.product_id in seen_product_ids:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Duplicate order line for product id {item.product_id}",
+            )
+        seen_product_ids.add(item.product_id)
+        product = await get_product(item.product_id, business, db)  # 404 cross-tenant
+        if (product.current_stock or 0) < item.quantity:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Insufficient stock for '{product.name}': "
+                    f"{product.current_stock or 0} available, {item.quantity} requested"
+                ),
+            )
+        lines.append((product, item))
+
+    # ---- Application phase (single request transaction; rollback-safe) ----
     total = 0.0
     item_models: List[OrderItem] = []
-    for item in order.items:
-        product = await get_product(item.product_id, business, db)
+    for product, item in lines:
+        product.current_stock = (product.current_stock or 0) - item.quantity
+        product.updated_by = business.owner_id
         line_total = round(item.unit_price * item.quantity, 2)
         total += line_total
         item_models.append(
@@ -338,7 +431,7 @@ async def create_order(
                 business_id=business.id,
                 product_id=product.id,
                 quantity=item.quantity,
-                unit_price=item.unit_price,
+                unit_price=item.unit_price,  # snapshot price (Task 7 policy)
                 total_price=line_total,
                 created_by=business.owner_id,
             )
@@ -354,33 +447,46 @@ async def create_order(
     )
     db.add(new_order)
     await db.flush()
-    # Re-fetch with relationships for the response shape.
-    return await get_order(new_order.id, business, db)
+    return _serialize_order(await _load_order(new_order.id, business, db))
 
 
-@app.get("/orders", response_model=List[OrderOut], tags=["Orders"])
+@app.get("/orders", response_model=OrderListResponse, tags=["Orders"])
 async def list_orders(
     status_filter: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = Query(None, min_length=1),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=100),
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
-) -> List[OrderOut]:
-    query = (
+) -> OrderListResponse:
+    base = (
         select(Order)
-        .options(selectinload(Order.customer), selectinload(Order.items))
+        .options(selectinload(Order.customer), selectinload(Order.items).selectinload(OrderItem.product))
         .where(Order.business_id == business.id, Order.deleted_at.is_(None))
     )
     if status_filter:
-        query = query.where(Order.status == status_filter)
+        base = base.where(Order.status == status_filter)
+    if search:
+        like = f"%{search.strip().lower()}%"
+        conditions = [Customer.full_name.ilike(like)]
+        if search.strip().isdigit():
+            conditions.append(Order.id == int(search.strip()))
+        base = base.join(Customer, Order.customer_id == Customer.id).where(or_(*conditions))
     if start_date:
-        query = query.where(Order.created_at >= start_date)
+        base = base.where(Order.created_at >= start_date)
     if end_date:
-        query = query.where(Order.created_at <= end_date)
-    query = query.order_by(Order.id.desc()).offset((page - 1) * limit).limit(limit)
-    return (await db.execute(query)).scalars().all()
+        base = base.where(Order.created_at <= end_date)
+
+    total = (await db.execute(select(func.count()).select_from(base.order_by(None).subquery()))).scalar() or 0
+    rows = (await db.execute(
+        base.order_by(Order.id.desc()).offset((page - 1) * limit).limit(limit)
+    )).scalars().all()
+
+    return OrderListResponse(
+        items=[_serialize_order(o) for o in rows], total=total, page=page, limit=limit
+    )
 
 
 @app.get("/orders/{id}", response_model=OrderOut, tags=["Orders"])
@@ -389,15 +495,7 @@ async def get_order(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> OrderOut:
-    stmt = (
-        select(Order)
-        .options(selectinload(Order.customer), selectinload(Order.items))
-        .where(Order.id == id, Order.business_id == business.id, Order.deleted_at.is_(None))
-    )
-    order = (await db.execute(stmt)).scalars().first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    return order
+    return _serialize_order(await _load_order(id, business, db))
 
 
 @app.put("/orders/{id}/status", response_model=OrderOut, tags=["Orders"])
@@ -407,13 +505,29 @@ async def update_order_status(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> OrderOut:
-    order = await get_order(id, business, db)
-    if updates.status is not None:
-        order.status = updates.status
-        order.updated_by = business.owner_id
+    order = await _load_order(id, business, db)
+    if updates.status is None:
+        return _serialize_order(order)
+
+    current = order.status.value if hasattr(order.status, "value") else str(order.status)
+    requested = updates.status.value if hasattr(updates.status, "value") else str(updates.status)
+
+    if requested not in ALLOWED_ORDER_TRANSITIONS.get(current, set()):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot transition order from '{current}' to '{requested}'",
+        )
+
+    # Cancellation restores stock exactly once (Task 7 policy).
+    if requested == "cancelled":
+        _restore_stock(order, business.owner_id)
+
+    order.status = updates.status
+    order.updated_by = business.owner_id
     await db.flush()
     await db.refresh(order)
-    return order
+    # Re-load relationships refreshed by the stock restore.
+    return _serialize_order(await _load_order(id, business, db))
 
 
 @app.delete("/orders/{id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Orders"])
@@ -422,7 +536,11 @@ async def delete_order(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    order = await get_order(id, business, db)
+    order = await _load_order(id, business, db)
+    # Restore stock unless already cancelled (which already restored once).
+    current = order.status.value if hasattr(order.status, "value") else str(order.status)
+    if current != "cancelled":
+        _restore_stock(order, business.owner_id)
     order.deleted_at = datetime.utcnow()
     order.deleted_by = business.owner_id
     await db.flush()

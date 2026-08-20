@@ -141,6 +141,7 @@ class OrderItemCreate(OrderItemBase):
 class OrderItemOut(OrderItemBase):
     id: int
     total_price: float
+    product_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -151,12 +152,21 @@ class OrderBase(BaseModel):
 
 
 class OrderCreate(OrderBase):
-    items: List[OrderItemCreate]
+    items: List[OrderItemCreate] = Field(..., min_length=1)
 
 
 class OrderUpdate(BaseModel):
     status: Optional[OrderStatus] = None
     # Updating items is out of scope for Phase 1 – they are immutable after creation.
+
+
+class OrderListResponse(BaseModel):
+    """Paginated order listing envelope (Task 7, parity with Products/Customers)."""
+
+    items: List["OrderOut"]
+    total: int
+    page: int
+    limit: int
 
 
 class OrderOut(BaseModel):

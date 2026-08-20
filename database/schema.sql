@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_id   INTEGER NOT NULL,
     status        TEXT DEFAULT 'pending',
     total_amount  REAL NOT NULL,
+    order_date    DATETIME DEFAULT CURRENT_TIMESTAMP,
     created_by    TEXT,
     updated_by    TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,

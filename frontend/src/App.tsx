@@ -10,6 +10,7 @@ import { message } from 'antd';
 import DashboardPage from './pages/Dashboard';
 import ProductsPage from './pages/Products';
 import CustomersPage from './pages/Customers';
+import OrdersPage from './pages/Orders';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -135,13 +136,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // Placeholder Pages
-const Orders: React.FC = () => (
-  <div>
-    <h2>Orders</h2>
-    <p>Order management will be displayed here.</p>
-  </div>
-);
-
 const Settings: React.FC = () => (
   <div>
     <h2>Settings</h2>
@@ -173,7 +167,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
-                <Route path="/orders" element={<Orders />} />
+                <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </AppLayout>
