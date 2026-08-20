@@ -90,11 +90,14 @@ CREATE TABLE IF NOT EXISTS customers (
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted_at    DATETIME,
     deleted_by    TEXT,
-    version       INTEGER NOT NULL DEFAULT 1,
-    UNIQUE (business_id, email)
+    version       INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_customers_business ON customers(business_id);
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+-- Email is unique per business among LIVE rows only (Task 11 / audit H2):
+-- a soft-deleted customer's email becomes reusable.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_business_email
+    ON customers(business_id, email) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Orders

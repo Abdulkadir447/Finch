@@ -51,6 +51,12 @@ export function createApiClient(
     (error: AxiosError<{ detail?: string }>) => {
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
+      // A 401 means the Clerk session token was rejected (expired / revoked).
+      // Notify the session guard so it can sign the user out and route them
+      // to /sign-in. The guard de-duplicates, so repeated 401s are harmless.
+      if (status === 401 && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('finch:unauthorized'));
+      }
       const message =
         detail ||
         (status === 401

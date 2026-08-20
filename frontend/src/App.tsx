@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ConfigProvider, Layout, Avatar, Space, Switch, Typography, Spin } from 'antd';
 import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, InboxOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
 import { Menu } from 'antd';
@@ -91,6 +91,34 @@ const SignUpPage: React.FC = () => {
       <SignUp afterSignOutUrl="/" fallbackRedirectUrl="/" />
     </div>
   );
+};
+
+/**
+ * Session-expiry guard (Task 11 / audit H6).
+ *
+ * The API client dispatches a `finch:unauthorized` event whenever the backend
+ * rejects a request with 401 (session expired/revoked — a case Clerk's normal
+ * token refresh does not cover). This component signs the user out exactly
+ * once in response, after which Clerk's state flips to signed-out and the
+ * ProtectedRoute deterministically navigates to /sign-in. The `handled` ref is
+ * the loop guard: repeated 401s cannot trigger repeated sign-outs or a
+ * sign-in <-> redirect bounce.
+ */
+const SessionExpiryGuard: React.FC = () => {
+  const { signOut } = useClerk();
+  const handled = useRef(false);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      if (handled.current) return;
+      handled.current = true;
+      signOut().catch(() => undefined);
+    };
+    window.addEventListener('finch:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('finch:unauthorized', onUnauthorized);
+  }, [signOut]);
+
+  return null;
 };
 
 /**
@@ -195,6 +223,7 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <SessionExpiryGuard />
       <Routes>
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />

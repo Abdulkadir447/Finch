@@ -12,8 +12,6 @@
   },
   "database": {
     "driver": "sqlite+aiosqlite",
-    "host": "localhost",
-    "port": 0,
     "name": "finch_test.db"
   },
   "sync": {

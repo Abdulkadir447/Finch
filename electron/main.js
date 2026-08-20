@@ -27,11 +27,17 @@ const path = require('path');
 // bursting-swan-43.clerk.accounts.dev host with the production Frontend API
 // hostname (e.g. https://clerk.finch.example).
 // ---------------------------------------------------------------------------
+// The Clerk Frontend API host is parameterised (Task 11 / audit H5): production
+// builds set CLERK_FRONTEND_API in the environment; otherwise the development
+// instance is used. Keeping it a single variable keeps the CSP self-consistent.
 const CLERK_FAPI_DEV = 'https://bursting-swan-43.clerk.accounts.dev';
+const CLERK_FAPI = process.env.CLERK_FRONTEND_API
+  ? `https://${process.env.CLERK_FRONTEND_API}`
+  : CLERK_FAPI_DEV;
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${CLERK_FAPI_DEV} https://challenges.cloudflare.com https://*.protect.clerk.com`,
-  `connect-src 'self' ${CLERK_FAPI_DEV} https://*.accounts.dev https://*.protect.clerk.com`,
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${CLERK_FAPI} https://challenges.cloudflare.com https://*.protect.clerk.com`,
+  `connect-src 'self' ${CLERK_FAPI} https://*.accounts.dev https://*.protect.clerk.com`,
   "img-src 'self' data: https://img.clerk.com",
   "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",

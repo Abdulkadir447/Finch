@@ -22,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .clerk_auth import ClerkUser, verify_clerk_token
+from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
 from .schemas import (
@@ -215,6 +215,62 @@ def _log_movement(
     )
 
 
+async def _change_stock(
+    db: AsyncSession,
+    business_id: int,
+    product: Product,
+    delta: int,
+    reason: StockMovementReason,
+    actor: Optional[str],
+    note: Optional[str] = None,
+    order_id: Optional[int] = None,
+) -> None:
+    """Apply a signed stock change under the optimistic-lock guard.
+
+    This is the SINGLE choke point for every stock mutation (Task 11 / audit
+    H1): manual adjustments, order creation (deduct), cancellation and
+    deletion (restore). The version-guarded UPDATE means a caller holding a
+    stale ``product.version`` (a concurrent writer already changed the row)
+    matches 0 rows and aborts with 409, so no write is ever lost and stock can
+    never be double-deducted or double-restored.
+    """
+    if delta == 0:
+        raise HTTPException(status_code=422, detail="Stock change must be non-zero")
+
+    current = product.current_stock or 0
+    new_level = current + delta
+    if new_level < 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Insufficient stock: {current} available, {-delta} requested",
+        )
+
+    result = await db.execute(
+        sa_update(Product)
+        .where(Product.id == product.id, Product.version == product.version)
+        .values(
+            current_stock=new_level,
+            version=product.version + 1,
+            updated_by=actor,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount == 0:
+        raise HTTPException(
+            status_code=409, detail="Stock changed concurrently — please retry"
+        )
+
+    # Keep the in-session object consistent with the row we just wrote.
+    product.current_stock = new_level
+    product.version = product.version + 1
+    product.updated_by = actor
+
+    _log_movement(
+        db, business_id, product.id, delta, reason, actor,
+        note=note, order_id=order_id,
+    )
+
+
 @app.post("/products", response_model=ProductOut, status_code=status.HTTP_201_CREATED, tags=["Products"])
 async def create_product(
     product: ProductCreate,
@@ -348,27 +404,8 @@ async def adjust_stock(
         raise HTTPException(status_code=422, detail="Adjustment change must be non-zero")
 
     product = await get_product(id, business, db)
-    current = product.current_stock or 0
-    new_level = current + req.change
-    if new_level < 0:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Insufficient stock to remove: {current} available, {-req.change} requested",
-        )
-
-    # Optimistic-concurrency guard (BSD Ch2.9): apply only if the version we
-    # read is still current; bump it atomically. A concurrent writer wins ->
-    # 0 rows matched -> 409 so the caller retries with fresh data.
-    result = await db.execute(
-        sa_update(Product)
-        .where(Product.id == id, Product.version == product.version)
-        .values(current_stock=new_level, version=product.version + 1, updated_by=business.owner_id)
-    )
-    if result.rowcount == 0:
-        raise HTTPException(status_code=409, detail="Stock changed concurrently — please retry")
-
-    _log_movement(
-        db, business.id, id, req.change,
+    await _change_stock(
+        db, business.id, product, req.change,
         StockMovementReason(req.reason.value), business.owner_id, note=req.note,
     )
     await db.flush()
@@ -435,7 +472,14 @@ async def create_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> CustomerOut:
-    stmt = select(Customer).where(Customer.email == customer.email, Customer.business_id == business.id)
+    # Duplicate guard covers LIVE rows only (Task 11 / audit H2): a
+    # soft-deleted customer's email is reusable, matching the partial unique
+    # index on (business_id, email) WHERE deleted_at IS NULL.
+    stmt = select(Customer).where(
+        Customer.email == customer.email,
+        Customer.business_id == business.id,
+        Customer.deleted_at.is_(None),
+    )
     if (await db.execute(stmt)).scalars().first():
         raise HTTPException(status_code=409, detail="Email already exists")
 
@@ -588,16 +632,18 @@ def _serialize_order(order: Order) -> OrderOut:
     )
 
 
-def _restore_stock(
+async def _restore_stock(
     db: AsyncSession, order: Order, actor: Optional[str], reason: StockMovementReason
 ) -> None:
-    """Return each line's quantity to its product's stock and log it."""
+    """Return each line's quantity to its product's stock and log it.
+
+    Goes through ``_change_stock`` so restoration is subject to the same
+    optimistic-lock guard as deduction — no lost or duplicated restores.
+    """
     for item in order.items:
         if item.product is not None:
-            item.product.current_stock = (item.product.current_stock or 0) + item.quantity
-            item.product.updated_by = actor
-            _log_movement(
-                db, order.business_id, item.product_id, item.quantity,
+            await _change_stock(
+                db, order.business_id, item.product, item.quantity,
                 reason, actor, order_id=order.id,
             )
 
@@ -635,8 +681,6 @@ async def create_order(
     total = 0.0
     item_models: List[OrderItem] = []
     for product, item in lines:
-        product.current_stock = (product.current_stock or 0) - item.quantity
-        product.updated_by = business.owner_id
         line_total = round(item.unit_price * item.quantity, 2)
         total += line_total
         item_models.append(
@@ -659,11 +703,15 @@ async def create_order(
         items=item_models,
     )
     db.add(new_order)
+    # Flush assigns new_order.id, needed as the ledger reference below.
     await db.flush()
-    # One ledger row per deducted line, referencing the new order (Task 8).
+
+    # Deduct one line at a time under the optimistic lock (Task 11 / audit H1).
+    # A stale version on ANY line aborts the whole request; get_db rolls back,
+    # leaving both the order and all stock untouched.
     for product, item in lines:
-        _log_movement(
-            db, business.id, product.id, -item.quantity,
+        await _change_stock(
+            db, business.id, product, -item.quantity,
             StockMovementReason.order, business.owner_id, order_id=new_order.id,
         )
     return _serialize_order(await _load_order(new_order.id, business, db))
@@ -739,7 +787,7 @@ async def update_order_status(
 
     # Cancellation restores stock exactly once (Task 7 policy) and logs it.
     if requested == "cancelled":
-        _restore_stock(db, order, business.owner_id, StockMovementReason.order_cancelled)
+        await _restore_stock(db, order, business.owner_id, StockMovementReason.order_cancelled)
 
     order.status = updates.status
     order.updated_by = business.owner_id
@@ -759,7 +807,7 @@ async def delete_order(
     # Restore stock unless already cancelled (which already restored once).
     current = order.status.value if hasattr(order.status, "value") else str(order.status)
     if current != "cancelled":
-        _restore_stock(db, order, business.owner_id, StockMovementReason.order_deleted)
+        await _restore_stock(db, order, business.owner_id, StockMovementReason.order_deleted)
     order.deleted_at = datetime.utcnow()
     order.deleted_by = business.owner_id
     await db.flush()
@@ -1004,8 +1052,12 @@ async def top_products(
 
 @app.on_event("startup")
 async def startup_event():
+    # Fail fast in production when Clerk is not configured (Task 11 / audit
+    # H5): get_frontend_api raises unless CLERK_FRONTEND_API is set there.
+    get_frontend_api()
     # Phase 1 schema bootstrap: CREATE TABLE IF NOT EXISTS via the ORM.
-    # Alembic migrations replace this once the schema stabilises.
+    # Alembic migrations (backend/alembic) are the real migration path; this
+    # stays as an additive dev convenience and never alters existing tables.
     await init_db()
 
 

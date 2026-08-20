@@ -160,7 +160,7 @@ export function useInventory() {
   }, [search, stockFilter, load]);
 
   const adjustStock = (productId: number, input: AdjustInput) =>
-    api.put<InventoryProduct>(`/products/${productId}/adjust`, input);
+    api.post<InventoryProduct>(`/products/${productId}/adjust`, input);
 
   const fetchMovements = (productId: number, limit = 20) =>
     api.get<MovementListResponse>(`/products/${productId}/movements`, {
