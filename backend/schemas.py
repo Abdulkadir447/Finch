@@ -71,8 +71,8 @@ class CustomerBase(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr = Field(..., max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
-    address: Optional[str] = None
-    company: Optional[str] = None
+    address: Optional[str] = Field(None, max_length=500)
+    company: Optional[str] = Field(None, max_length=255)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -82,18 +82,28 @@ class CustomerCreate(CustomerBase):
 
 
 class CustomerUpdate(BaseModel):
-    full_name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    company: Optional[str] = None
+    full_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    email: Optional[EmailStr] = Field(None, max_length=255)
+    phone: Optional[str] = Field(None, max_length=20)
+    address: Optional[str] = Field(None, max_length=500)
+    company: Optional[str] = Field(None, max_length=255)
 
 
 class CustomerOut(CustomerBase):
     id: int
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerListResponse(BaseModel):
+    """Paginated customer listing envelope (Task 6, parity with Products)."""
+
+    items: List[CustomerOut]
+    total: int
+    page: int
+    limit: int
 
 
 class CustomerBrief(BaseModel):

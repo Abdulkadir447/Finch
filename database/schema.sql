@@ -99,8 +99,8 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS customers (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     business_id   INTEGER,
-    name          TEXT NOT NULL,
-    email         TEXT UNIQUE,
+    full_name     TEXT NOT NULL,
+    email         TEXT NOT NULL,
     phone         TEXT,
     address       TEXT,
     company       TEXT,
@@ -110,7 +110,8 @@ CREATE TABLE IF NOT EXISTS customers (
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted_at    DATETIME,
     deleted_by    TEXT,
-    version       INTEGER NOT NULL DEFAULT 1
+    version       INTEGER NOT NULL DEFAULT 1,
+    UNIQUE (business_id, email)
 );
 CREATE INDEX IF NOT EXISTS idx_customers_business ON customers(business_id);
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);

@@ -27,6 +27,7 @@ from .schemas import (
     AuthMeResponse,
     CategoryValue,
     CustomerCreate,
+    CustomerListResponse,
     CustomerOut,
     CustomerUpdate,
     DashboardSummary,
@@ -237,22 +238,28 @@ async def create_customer(
     return new_customer
 
 
-@app.get("/customers", response_model=List[CustomerOut], tags=["Customers"])
+@app.get("/customers", response_model=CustomerListResponse, tags=["Customers"])
 async def list_customers(
     search: Optional[str] = Query(None, min_length=1),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=100),
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
-) -> List[CustomerOut]:
-    query = select(Customer).where(Customer.business_id == business.id, Customer.deleted_at.is_(None))
+) -> CustomerListResponse:
+    """Paginated, searchable customer listing (Task 6 envelope)."""
+    base = select(Customer).where(Customer.business_id == business.id, Customer.deleted_at.is_(None))
     if search:
         like = f"%{search.lower()}%"
-        query = query.where(
+        base = base.where(
             or_(Customer.full_name.ilike(like), Customer.email.ilike(like), Customer.company.ilike(like))
         )
-    query = query.order_by(Customer.id.desc()).offset((page - 1) * limit).limit(limit)
-    return (await db.execute(query)).scalars().all()
+
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+    rows = (await db.execute(
+        base.order_by(Customer.id.desc()).offset((page - 1) * limit).limit(limit)
+    )).scalars().all()
+
+    return CustomerListResponse(items=rows, total=total, page=page, limit=limit)
 
 
 @app.get("/customers/{id}", response_model=CustomerOut, tags=["Customers"])
@@ -276,6 +283,18 @@ async def update_customer(
     db: AsyncSession = Depends(get_db),
 ) -> CustomerOut:
     customer = await get_customer(id, business, db)
+
+    # Per-tenant email duplicate guard (excluding the record being updated).
+    if updates.email is not None and updates.email != customer.email:
+        stmt = select(Customer).where(
+            Customer.business_id == business.id,
+            Customer.email == updates.email,
+            Customer.id != id,
+            Customer.deleted_at.is_(None),
+        )
+        if (await db.execute(stmt)).scalars().first():
+            raise HTTPException(status_code=409, detail="Email already exists")
+
     for field, value in updates.model_dump(exclude_unset=True).items():
         setattr(customer, field, value)
     customer.updated_by = business.owner_id

@@ -29,6 +29,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -100,11 +101,16 @@ class Customer(Base):
     """Customer entity (``customers`` table)."""
 
     __tablename__ = "customers"
+    # Email is unique PER BUSINESS (multi-tenant): two different businesses
+    # may both have the same customer email (Task 6 fix).
+    __table_args__ = (
+        UniqueConstraint("business_id", "email", name="uq_customers_business_email"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True)            # tenant isolation
     full_name = Column(String(255), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
     phone = Column(String(20))
     address = Column(String(500))
     company = Column(String(255))
