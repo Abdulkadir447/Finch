@@ -45,10 +45,24 @@ const SplashScreen: React.FC = () => (
 );
 
 // ---------------------------------------------------------------------------
+// Full-screen loader shown while Clerk resolves the session. Auth state must
+// NEVER be evaluated before `isLoaded` — redirecting on unresolved state is
+// what caused the / <-> /sign-in redirect loop.
+// ---------------------------------------------------------------------------
+const AuthLoadingScreen: React.FC = () => (
+  <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: neutral[50] }}>
+    <Spin size="large" />
+  </div>
+);
+
+// ---------------------------------------------------------------------------
 // Protected Route Component using Clerk auth
 // ---------------------------------------------------------------------------
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  // Wait for Clerk to resolve before evaluating the session (Clerk docs:
+  // isSignedIn is undefined until isLoaded is true).
+  if (!isLoaded) return <AuthLoadingScreen />;
   return isSignedIn ? <>{children}</> : <Navigate to="/sign-in" replace />;
 };
 
@@ -56,6 +70,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // Sign In Page using Clerk
 // ---------------------------------------------------------------------------
 const SignInPage = () => {
+  const { isLoaded, isSignedIn } = useAuth();
+  // While Clerk resolves, hold the route — never bounce on unresolved state.
+  if (!isLoaded) return <AuthLoadingScreen />;
+  // Already authenticated: leave /sign-in exactly once, deterministically.
+  if (isSignedIn) return <Navigate to="/" replace />;
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
       <SignIn />
@@ -179,7 +198,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
-        <Route path="/" element={
+        <Route path="/*" element={
           <ProtectedRoute>
             <CurrencySeeder />
             <AppLayout>

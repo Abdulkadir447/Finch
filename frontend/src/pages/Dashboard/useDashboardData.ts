@@ -73,12 +73,12 @@ export function useDashboardData(): DashboardData {
           params: { days: 30 },
         }),
         api.get<CategoryValue[]>('/dashboard/inventory/by-category'),
-        api.get<ApiOrder[]>('/orders', { params: { limit: 8 } }),
+        api.get<{ items: ApiOrder[] }>('/orders', { params: { limit: 8 } }),
       ]);
       setSummary(s.data);
       setTimeseries(ts.data);
       setCategories(cats.data);
-      setOrders(ords.data);
+      setOrders(Array.isArray(ords.data?.items) ? ords.data.items : []);
     } catch (e) {
       setError(
         e instanceof ApiError ? e : new ApiError('Unable to reach the Finch API.'),
