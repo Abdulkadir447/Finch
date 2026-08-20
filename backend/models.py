@@ -26,10 +26,13 @@ from sqlalchemy import (
     Enum as SAEnum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -50,9 +53,16 @@ class Business(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    owner_email = Column(String(255), index=True)
+    owner_id = Column(String(255), index=True)        # Clerk user id of the owner
+    owner_email = Column(String(255), index=True)     # business contact email (editable)
     industry = Column(String(100))
     currency = Column(String(8), default="USD")
+    # Company profile fields (UXDS 15.6, Task 9) — additive, nullable.
+    address = Column(String(500))
+    phone = Column(String(20))
+    tax_id = Column(String(100))
+    website = Column(String(255))
+    timezone = Column(String(64))
     created_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     updated_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     created_at = Column(DateTime, server_default=func.now())
@@ -66,10 +76,24 @@ class Product(Base):
     """Product entity. Includes relationship to ``OrderItem``."""
 
     __tablename__ = "products"
+    # SKU uniqueness is TENANT-SCOPED and applies only to live rows
+    # (Task 10 / audit fix B-1): two businesses may share a SKU, and a
+    # soft-deleted product's SKU can be re-used. Partial unique index —
+    # supported natively by Postgres/Supabase and SQLite.
+    __table_args__ = (
+        Index(
+            "uq_products_business_sku",
+            "business_id",
+            "sku",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True)            # tenant isolation
-    sku = Column(String(100), unique=True, nullable=False, index=True)
+    sku = Column(String(100), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(String(1000))
     category = Column(String(100))
@@ -99,11 +123,16 @@ class Customer(Base):
     """Customer entity (``customers`` table)."""
 
     __tablename__ = "customers"
+    # Email is unique PER BUSINESS (multi-tenant): two different businesses
+    # may both have the same customer email (Task 6 fix).
+    __table_args__ = (
+        UniqueConstraint("business_id", "email", name="uq_customers_business_email"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True)            # tenant isolation
     full_name = Column(String(255), nullable=False)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
     phone = Column(String(20))
     address = Column(String(500))
     company = Column(String(255))
@@ -197,22 +226,59 @@ class OrderItem(Base):
 
 
 # ---------------------------------------------------------------------------
-# Profile — local user profile, keyed to Supabase Auth (BSD Ch3.11)
+# Stock movements — append-only inventory ledger (BSD Ch9 ``stock_movements``,
+# UXDS 11.12). Every change to ``products.current_stock`` writes exactly one
+# row here. Movements are immutable: no update/delete columns by design.
+# ---------------------------------------------------------------------------
+class StockMovementReason(str, Enum):
+    initial = "initial"                      # initial stock at product creation
+    purchase = "purchase"                    # manual adjustment reasons (UXDS 11.11)
+    sale = "sale"
+    damaged = "damaged"
+    returned = "returned"
+    correction = "correction"
+    order = "order"                          # automatic: order created
+    order_cancelled = "order_cancelled"      # automatic: order cancelled
+    order_deleted = "order_deleted"          # automatic: order deleted
+
+
+class StockMovement(Base):
+    """One immutable row per stock change (audit trail, Task 8)."""
+
+    __tablename__ = "stock_movements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)   # tenant isolation
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    change = Column(Integer, nullable=False)                    # signed quantity delta
+    reason = Column(SAEnum(StockMovementReason), nullable=False)
+    note = Column(String(500))
+    order_id = Column(Integer, nullable=True)                   # set for order-driven moves
+    actor = Column(String(255))                                 # Clerk user id
+    created_at = Column(DateTime, server_default=func.now())
+
+    product = relationship("Product")
+
+
+# ---------------------------------------------------------------------------
+# Profile — local user profile, keyed to the Clerk identity (BSD Ch3.11).
+# Supabase is the storage layer for Finch; identity comes from Clerk, so the
+# profile is keyed by the Clerk user id and lives in Supabase Postgres.
 # ---------------------------------------------------------------------------
 class Profile(Base):
-    """Local user profile, linked to the Supabase Auth identity.
+    """Local user profile, linked to the Clerk identity.
 
-    ``supabase_user_id`` stores the external auth user id; the local
-    integer ``id`` keeps the ORM/SQLite layer backward-compatible
-    with the rest of the schema (UUID primary keys are deferred per
-    BSD Ch2.5). Authentication *tokens* are intentionally NOT
-    stored here — they live in Supabase per BSD Ch3.17.
+    ``clerk_user_id`` stores the external auth user id (Clerk ``sub`` claim);
+    the local integer ``id`` keeps the ORM layer backward-compatible with the
+    rest of the schema (UUID primary keys are deferred per BSD Ch2.5).
+    Authentication *tokens* are intentionally NOT stored here (BSD Ch3.17) —
+    Clerk session tokens are verified per-request against Clerk's public JWKS.
     """
 
     __tablename__ = "profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    supabase_user_id = Column(String(255), unique=True, nullable=False, index=True)
+    clerk_user_id = Column(String(255), unique=True, nullable=False, index=True)
     full_name = Column(String(255))
     email = Column(String(255), unique=True, index=True)
     avatar_url = Column(String(1024))

@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigProvider, Layout, Avatar, Space, Switch, Typography, Spin } from 'antd';
-import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
+import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, InboxOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
 import { Menu } from 'antd';
 import { theme as finchTheme, brand, neutral } from './theme';
 import 'antd/dist/reset.css';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, useUser, SignIn, SignUp } from '@clerk/react';
+import { useAuth, useUser, useClerk, SignIn, SignUp } from '@clerk/react';
 import { message } from 'antd';
+import DashboardPage from './pages/Dashboard';
+import ProductsPage from './pages/Products';
+import InventoryPage from './pages/Inventory';
+import CustomersPage from './pages/Customers';
+import OrdersPage from './pages/Orders';
+import SettingsPage from './pages/Settings';
+import { setCurrency } from './services/currency';
+import { useApiClient } from './services/api/client';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -16,6 +24,7 @@ const { Title } = Typography;
 const NAV_ITEMS = [
   { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/' },
   { key: 'products', icon: <ShoppingCartOutlined />, label: 'Products', path: '/products' },
+  { key: 'inventory', icon: <InboxOutlined />, label: 'Inventory', path: '/inventory' },
   { key: 'customers', icon: <UserOutlined />, label: 'Customers', path: '/customers' },
   { key: 'orders', icon: <TeamOutlined />, label: 'Orders', path: '/orders' },
   { key: 'settings', icon: <SettingOutlined />, label: 'Settings', path: '/settings' },
@@ -60,9 +69,29 @@ const SignInPage = () => {
 const SignUpPage: React.FC = () => {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <SignUp afterSignOutUrl="/" afterSignUpUrl="/" fallbackRedirectUrl="/" />
+      <SignUp afterSignOutUrl="/" fallbackRedirectUrl="/" />
     </div>
   );
+};
+
+/**
+ * Seeds the app-wide currency store from the caller's business settings
+ * (Task 9) so money formatting follows the company setting. Runs once per
+ * signed-in session inside the protected layout; failures are silent.
+ */
+const CurrencySeeder: React.FC = () => {
+  const api = useApiClient();
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/business/settings')
+      .then((r) => !cancelled && setCurrency(r.data.currency))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+  return null;
 };
 
 // Main App Layout
@@ -72,11 +101,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUser();
+  const { signOut } = useClerk();
 
   const toggleTheme = (checked: boolean) => setDarkMode(checked);
 
   const handleLogout = async () => {
-    await useAuth().signOut();
+    await signOut();
     message.info('Logged out successfully');
   };
 
@@ -131,40 +161,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // Placeholder Pages
-const Dashboard: React.FC = () => (
-  <div>
-    <h2>Dashboard</h2>
-    <p>Dashboard analytics will be displayed here.</p>
-  </div>
-);
-
-const Products: React.FC = () => (
-  <div>
-    <h2>Products</h2>
-    <p>Product management will be displayed here.</p>
-  </div>
-);
-
-const Customers: React.FC = () => (
-  <div>
-    <h2>Customers</h2>
-    <p>Customer management will be displayed here.</p>
-  </div>
-);
-
-const Orders: React.FC = () => (
-  <div>
-    <h2>Orders</h2>
-    <p>Order management will be displayed here.</p>
-  </div>
-);
-
-const Settings: React.FC = () => (
-  <div>
-    <h2>Settings</h2>
-    <p>Settings will be displayed here.</p>
-  </div>
-);
 
 // Main App Component
 const App: React.FC = () => {
@@ -185,13 +181,15 @@ const App: React.FC = () => {
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/" element={
           <ProtectedRoute>
+            <CurrencySeeder />
             <AppLayout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/inventory" element={<InventoryPage />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

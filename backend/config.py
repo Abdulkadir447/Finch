@@ -73,6 +73,11 @@ def database_url() -> str:
     """Build the SQLAlchemy database URL, preferring ``DATABASE_URL`` secret."""
     explicit = secret("DATABASE_URL")
     if explicit:
+        # Canonical postgres URLs need the async driver scheme for SQLAlchemy.
+        if explicit.startswith("postgres://"):
+            explicit = "postgresql+asyncpg://" + explicit[len("postgres://"):]
+        elif explicit.startswith("postgresql://"):
+            explicit = "postgresql+asyncpg://" + explicit[len("postgresql://"):]
         return explicit
     cfg = load_config().get("database", {})
     driver = cfg.get("driver", "mysql+aiomysql")
