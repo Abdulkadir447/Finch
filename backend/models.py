@@ -26,11 +26,13 @@ from sqlalchemy import (
     Enum as SAEnum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -74,10 +76,24 @@ class Product(Base):
     """Product entity. Includes relationship to ``OrderItem``."""
 
     __tablename__ = "products"
+    # SKU uniqueness is TENANT-SCOPED and applies only to live rows
+    # (Task 10 / audit fix B-1): two businesses may share a SKU, and a
+    # soft-deleted product's SKU can be re-used. Partial unique index —
+    # supported natively by Postgres/Supabase and SQLite.
+    __table_args__ = (
+        Index(
+            "uq_products_business_sku",
+            "business_id",
+            "sku",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True)            # tenant isolation
-    sku = Column(String(100), unique=True, nullable=False, index=True)
+    sku = Column(String(100), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(String(1000))
     category = Column(String(100))

@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import case, func, or_, select
 from sqlalchemy import update as sa_update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -220,13 +221,25 @@ async def create_product(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> ProductOut:
-    stmt = select(Product).where(Product.sku == product.sku, Product.business_id == business.id)
+    # Duplicate check: live rows only — a soft-deleted product's SKU is
+    # reusable (Task 10). The partial unique index enforces the same rule
+    # at the database level.
+    stmt = select(Product).where(
+        Product.sku == product.sku,
+        Product.business_id == business.id,
+        Product.deleted_at.is_(None),
+    )
     if (await db.execute(stmt)).scalars().first():
         raise HTTPException(status_code=409, detail="SKU already exists")
 
     new_product = Product(**product.model_dump(), business_id=business.id, created_by=business.owner_id)
     db.add(new_product)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Safety net: any uniqueness collision (e.g. race) surfaces as a
+        # clean 409 instead of an unhandled 500 (Task 10 / audit fix B-1).
+        raise HTTPException(status_code=409, detail="SKU already exists")
     # Initial stock (if any) is the first ledger entry (UXDS 11.9).
     if new_product.current_stock:
         _log_movement(

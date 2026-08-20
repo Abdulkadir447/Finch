@@ -45,28 +45,12 @@ CREATE TABLE IF NOT EXISTS businesses (
 CREATE INDEX IF NOT EXISTS idx_businesses_email ON businesses(owner_email);
 
 -- ---------------------------------------------------------------------------
--- Users
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    business_id   INTEGER,
-    username      TEXT UNIQUE NOT NULL,
-    email         TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role          TEXT DEFAULT 'user',
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    deleted_at    DATETIME,
-    version       INTEGER NOT NULL DEFAULT 1
-);
-
--- ---------------------------------------------------------------------------
 -- Products
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS products (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     business_id   INTEGER,
-    sku           TEXT UNIQUE NOT NULL,
+    sku           TEXT NOT NULL,
     name          TEXT NOT NULL,
     description   TEXT,
     category      TEXT,
@@ -84,20 +68,10 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE INDEX IF NOT EXISTS idx_products_business ON products(business_id);
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
-
--- ---------------------------------------------------------------------------
--- Categories
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS categories (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    business_id   INTEGER,
-    name          TEXT NOT NULL UNIQUE,
-    description   TEXT,
-    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    deleted_at    DATETIME,
-    version       INTEGER NOT NULL DEFAULT 1
-);
+-- SKU is unique per business among live rows only (Task 10): soft-deleted
+-- products' SKUs are reusable; two businesses may share a SKU.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_products_business_sku
+    ON products(business_id, sku) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Customers
@@ -182,30 +156,14 @@ CREATE INDEX IF NOT EXISTS idx_order_items_business ON order_items(business_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
 -- ---------------------------------------------------------------------------
--- Inventory movements
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS inventory_movements (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    business_id     INTEGER,
-    product_id      INTEGER NOT NULL,
-    quantity_change INTEGER NOT NULL,
-    reason          TEXT,
-    reference_type  TEXT,
-    reference_id    INTEGER,
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products (id)
-);
-CREATE INDEX IF NOT EXISTS idx_inv_movements_product ON inventory_movements(product_id);
-
--- ---------------------------------------------------------------------------
--- Profiles (local user profile, keyed to Supabase Auth — BSD Ch3.11)
--- UUID PK (BSD Ch2.5) is deferred; supabase_user_id carries the
+-- Profiles (local user profile, keyed to the Clerk identity — BSD Ch3.11)
+-- UUID PK (BSD Ch2.5) is deferred; clerk_user_id carries the
 -- external auth identity. Auth tokens are intentionally NOT stored
--- locally (BSD Ch3.17 — tokens live in Supabase).
+-- locally (BSD Ch3.17 — tokens are verified per-request against Clerk JWKS).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS profiles (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-    supabase_user_id  TEXT NOT NULL UNIQUE,
+    clerk_user_id      TEXT NOT NULL UNIQUE,
     full_name          TEXT,
     email              TEXT UNIQUE,
     avatar_url         TEXT,
@@ -220,7 +178,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     deleted_by         TEXT,
     version            INTEGER NOT NULL DEFAULT 1
 );
-CREATE INDEX IF NOT EXISTS idx_profiles_supabase_user ON profiles(supabase_user_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_clerk_user ON profiles(clerk_user_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 
 -- ---------------------------------------------------------------------------

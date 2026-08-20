@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Card, Empty, Space, Table, Tag, Typography, theme as antdTheme } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { semantic } from '../../theme';
+import { formatCurrency } from '../../pages/Dashboard/kpiConfig';
 
 /** Order status vocabulary shared with the backend (backend/models.py). */
 export type OrderStatus =
@@ -94,7 +95,7 @@ const RecentOrdersTable: React.FC<{ orders?: OrderRow[] }> = ({ orders = [] }) =
       align: 'right',
       render: (value: number) => (
         <Typography.Text style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {value.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+          {formatCurrency(value)}
         </Typography.Text>
       ),
     },
