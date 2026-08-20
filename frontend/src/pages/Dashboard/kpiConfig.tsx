@@ -8,6 +8,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons';
 import { brand, semantic } from '../../theme';
+import { getCurrency } from '../../services/currency';
 
 /**
  * KPI definitions for the Dashboard first row (UXDS 9.7):
@@ -89,6 +90,10 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
 ];
 
-/** Shared currency formatter (Business model default currency is USD). */
-export const formatCurrency = (value: number, currency = 'USD'): string =>
-  value.toLocaleString(undefined, { style: 'currency', currency });
+/**
+ * Shared currency formatter. Defaults to the business currency from the
+ * Settings store (Task 9) so money formatting follows the company setting;
+ * pass an explicit code to override.
+ */
+export const formatCurrency = (value: number, currency?: string): string =>
+  value.toLocaleString(undefined, { style: 'currency', currency: currency ?? getCurrency() });

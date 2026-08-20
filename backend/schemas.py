@@ -303,6 +303,69 @@ class CategoryValue(BaseModel):
     value: float
 
 
+# ---------------------------------------------------------------------------
+# Settings schemas (Task 9 — Company Settings, UXDS 15.6)
+# ---------------------------------------------------------------------------
+
+# Explicit currency whitelist — garbage codes would corrupt money formatting
+# app-wide. Includes NGN (primary market) plus common trading currencies.
+ALLOWED_CURRENCIES = {
+    "USD", "EUR", "GBP", "NGN", "CAD", "AUD", "JPY", "CNY",
+    "ZAR", "GHS", "KES", "EGY", "INR", "AED", "CHF",
+}
+
+# Curated timezone list (UXDS 15.6 Time Zone field).
+ALLOWED_TIMEZONES = {
+    "UTC",
+    "Africa/Lagos", "Africa/Accra", "Africa/Nairobi", "Africa/Johannesburg",
+    "Africa/Cairo", "Africa/Casablanca",
+    "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Istanbul",
+    "America/New_York", "America/Chicago", "America/Denver",
+    "America/Los_Angeles", "America/Sao_Paulo", "America/Toronto",
+    "Asia/Dubai", "Asia/Riyadh", "Asia/Kolkata", "Asia/Singapore",
+    "Asia/Shanghai", "Asia/Tokyo",
+    "Australia/Sydney",
+}
+
+
+class BusinessSettingsUpdate(BaseModel):
+    """PATCH /business/settings — whitelisted fields only.
+
+    `owner_id`, `id`, timestamps etc. are NOT part of this schema, so they
+    can never be mutated through the API (Task 9 security rule).
+    """
+
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    industry: Optional[str] = Field(None, max_length=100)
+    currency: Optional[str] = Field(None, max_length=8)
+    owner_email: Optional[EmailStr] = Field(None, max_length=255)
+    address: Optional[str] = Field(None, max_length=500)
+    phone: Optional[str] = Field(None, max_length=20)
+    tax_id: Optional[str] = Field(None, max_length=100)
+    website: Optional[str] = Field(None, max_length=255)
+    timezone: Optional[str] = Field(None, max_length=64)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BusinessSettingsOut(BaseModel):
+    """Company settings for the caller's tenant (owner_id never exposed)."""
+
+    name: str
+    industry: Optional[str] = None
+    currency: str
+    owner_email: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    tax_id: Optional[str] = None
+    website: Optional[str] = None
+    timezone: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AuthMeResponse(BaseModel):
     """Identity + tenant info for the signed-in Finch user."""
 

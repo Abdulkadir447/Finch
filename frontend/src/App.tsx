@@ -12,6 +12,9 @@ import ProductsPage from './pages/Products';
 import InventoryPage from './pages/Inventory';
 import CustomersPage from './pages/Customers';
 import OrdersPage from './pages/Orders';
+import SettingsPage from './pages/Settings';
+import { setCurrency } from './services/currency';
+import { useApiClient } from './services/api/client';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -69,6 +72,26 @@ const SignUpPage: React.FC = () => {
       <SignUp afterSignOutUrl="/" fallbackRedirectUrl="/" />
     </div>
   );
+};
+
+/**
+ * Seeds the app-wide currency store from the caller's business settings
+ * (Task 9) so money formatting follows the company setting. Runs once per
+ * signed-in session inside the protected layout; failures are silent.
+ */
+const CurrencySeeder: React.FC = () => {
+  const api = useApiClient();
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/business/settings')
+      .then((r) => !cancelled && setCurrency(r.data.currency))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+  return null;
 };
 
 // Main App Layout
@@ -138,12 +161,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // Placeholder Pages
-const Settings: React.FC = () => (
-  <div>
-    <h2>Settings</h2>
-    <p>Settings will be displayed here.</p>
-  </div>
-);
 
 // Main App Component
 const App: React.FC = () => {
@@ -164,6 +181,7 @@ const App: React.FC = () => {
         <Route path="/sign-up" element={<SignUpPage />} />
         <Route path="/" element={
           <ProtectedRoute>
+            <CurrencySeeder />
             <AppLayout>
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
@@ -171,7 +189,7 @@ const App: React.FC = () => {
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<SettingsPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

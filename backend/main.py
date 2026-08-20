@@ -25,8 +25,12 @@ from .clerk_auth import ClerkUser, verify_clerk_token
 from .database import get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
 from .schemas import (
+    ALLOWED_CURRENCIES,
+    ALLOWED_TIMEZONES,
     AdjustStockRequest,
     AuthMeResponse,
+    BusinessSettingsOut,
+    BusinessSettingsUpdate,
     CategoryValue,
     CustomerCreate,
     CustomerListResponse,
@@ -131,6 +135,55 @@ async def auth_me(business: Business = Depends(get_current_business)) -> AuthMeR
         business_name=business.name,
         currency=business.currency or "USD",
     )
+
+
+# ---------------------------------------------------------------------------
+# Settings — Company Settings (tenant-scoped, Task 9, UXDS 15.6)
+# ---------------------------------------------------------------------------
+
+@app.get("/business/settings", response_model=BusinessSettingsOut, tags=["Settings"])
+async def get_business_settings(
+    business: Business = Depends(get_current_business),
+) -> Business:
+    """Company settings for the caller's tenant (auto-provisioned)."""
+    return business
+
+
+@app.patch("/business/settings", response_model=BusinessSettingsOut, tags=["Settings"])
+async def update_business_settings(
+    updates: BusinessSettingsUpdate,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> Business:
+    """Update whitelisted company settings. Identity fields are immutable."""
+    data = updates.model_dump(exclude_unset=True)
+
+    # Explicit enum validation beyond Pydantic length checks.
+    if "currency" in data and data["currency"] is not None:
+        code = data["currency"].upper()
+        if code not in ALLOWED_CURRENCIES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unsupported currency '{data['currency']}'. "
+                       f"Allowed: {', '.join(sorted(ALLOWED_CURRENCIES))}",
+            )
+        data["currency"] = code
+    if "timezone" in data and data["timezone"] is not None:
+        if data["timezone"] not in ALLOWED_TIMEZONES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unsupported timezone '{data['timezone']}'.",
+            )
+
+    # Only schema-whitelisted fields can ever be set here (owner_id, id,
+    # timestamps, version are not part of BusinessSettingsUpdate).
+    for field, value in data.items():
+        setattr(business, field, value)
+    business.updated_by = business.owner_id
+
+    await db.flush()
+    await db.refresh(business)
+    return business
 
 
 # ---------------------------------------------------------------------------

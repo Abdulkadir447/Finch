@@ -52,9 +52,15 @@ class Business(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     owner_id = Column(String(255), index=True)        # Clerk user id of the owner
-    owner_email = Column(String(255), index=True)
+    owner_email = Column(String(255), index=True)     # business contact email (editable)
     industry = Column(String(100))
     currency = Column(String(8), default="USD")
+    # Company profile fields (UXDS 15.6, Task 9) — additive, nullable.
+    address = Column(String(500))
+    phone = Column(String(20))
+    tax_id = Column(String(100))
+    website = Column(String(255))
+    timezone = Column(String(64))
     created_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     updated_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     created_at = Column(DateTime, server_default=func.now())
