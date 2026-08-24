@@ -1,8 +1,11 @@
 """
 Database connection and session management for FastAPI + SQLAlchemy (async).
 
-Uses MySQL with aiomysql driver. All API endpoints depend on the `get_db()` generator
-which yields an AsyncSession that is automatically closed after the request.
+Targets Supabase/Postgres via asyncpg. All API endpoints depend on the
+`get_db()` generator which yields an AsyncSession that is automatically closed
+after the request. The URL is resolved lazily on first engine use so importing
+this module never touches the environment or loads a DB driver (Task 11 /
+audit H3).
 """
 
 from typing import AsyncGenerator
@@ -17,22 +20,20 @@ from sqlalchemy.orm import sessionmaker
 from .config import database_url as _resolve_database_url
 from .models import Base  # Relative import for package mode
 
-# Resolve the database URL via the central config loader (config.py), which pulls
-# credentials from the environment only (IPD 1.11 — no secrets in the repo).
-# When no cloud credentials are present we fall back to a local SQLite file,
-# honouring the offline-first principle (BSD Ch1.11): the app stays usable with
-# no cloud connection.
-try:
-    DATABASE_URL = _resolve_database_url()
-except (RuntimeError, FileNotFoundError):
-    DATABASE_URL = "sqlite+aiosqlite:///./finch_local.db"
-
 # Engine is created lazily on first use so that importing this module never
-# forces the async DB driver to load (which would fail in environments where
-# the driver isn't installed). The dialect/driver is only imported when the
-# engine is actually instantiated — at runtime, inside the container/podman
-# compose stack where the driver is present.
+# forces the async DB driver to load or the DB URL to resolve. The dialect/
+# driver is only imported when the engine is actually instantiated.
 _engine: AsyncEngine | None = None
+
+
+def resolve_database_url() -> str:
+    """Resolve the database URL via the central config loader.
+
+    Raises (rather than silently falling back) outside the testing environment
+    when no DATABASE_URL is configured — a missing production database must be
+    a loud failure, not a local SQLite file.
+    """
+    return _resolve_database_url()
 
 
 def get_engine() -> AsyncEngine:
@@ -40,7 +41,7 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         # echo=False: enable only for debugging; never log sensitive data.
-        _engine = create_async_engine(DATABASE_URL, echo=False)
+        _engine = create_async_engine(resolve_database_url(), echo=False)
     return _engine
 
 

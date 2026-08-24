@@ -1,30 +1,43 @@
-# Podman Compose file (compatible with docker-compose syntax)
-# This file mirrors docker-compose.yml for use with podman-compose.
+# Finch local stack (podman-compose / docker-compose compatible).
+#
+# Production deploys against a hosted Supabase/Postgres database via the
+# DATABASE_URL environment variable. This file provides a local Postgres for
+# development; it does NOT run MySQL (Task 11 / audit H3).
 version: '3.8'
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://finch:finch_password@db:5432/finch
+      - FINCH_ENV=development
+      - CLERK_FRONTEND_API=${CLERK_FRONTEND_API:-}
+      - CLERK_ALLOWED_ORIGINS=${CLERK_ALLOWED_ORIGINS:-}
     ports:
       - "8000:8000"
+    depends_on:
+      - db
     restart: always
 
   db:
-    image: mysql:8.0
+    image: postgres:16-alpine
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=erp_business_db
-      - MYSQL_USER=erp
-      - MYSQL_PASSWORD=erp_password
+      - POSTGRES_USER=finch
+      - POSTGRES_PASSWORD=finch_password
+      - POSTGRES_DB=finch
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data:/var/lib/postgresql/data
     restart: always
 
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
+    depends_on:
+      - backend
     restart: always
 
 volumes:

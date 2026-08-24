@@ -23,6 +23,8 @@ export interface Order {
   customer_id: number;
   customer: { full_name: string } | null;
   status: OrderStatus;
+  /** Legal next statuses, published by the backend (Task 12 / M4). */
+  allowed_transitions: OrderStatus[];
   total_amount: number;
   order_date: string;
   created_at: string;
@@ -56,16 +58,6 @@ export const STATUS_META: Record<OrderStatus, { label: string; color: string; bg
   shipped: { label: 'Shipped', color: brand.primary, bg: brand.primarySurface },
   delivered: { label: 'Delivered', color: semantic.success, bg: semantic.successBg },
   cancelled: { label: 'Cancelled', color: semantic.error, bg: semantic.errorBg },
-};
-
-/** Mirrors the server's ALLOWED_ORDER_TRANSITIONS (single source of truth
- * stays on the backend — the server re-validates every transition). */
-export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
-  delivered: [],
-  cancelled: [],
 };
 
 export function useOrders() {

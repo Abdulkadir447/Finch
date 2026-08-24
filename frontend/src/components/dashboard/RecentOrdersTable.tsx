@@ -55,8 +55,8 @@ export const OrderStatusTag: React.FC<{ status: OrderStatus }> = ({ status }) =>
  *
  * Column structure is adapted from the project's "Table with products"
  * template (item cell + status badge + amount + action) onto the existing
- * antd Table primitive themed by the Finch ConfigProvider. The backend is
- * not connected yet, so the table renders its empty state.
+ * antd Table primitive themed by the Finch ConfigProvider. Live rows are
+ * passed in from /orders; an empty list renders the empty state.
  */
 const RecentOrdersTable: React.FC<{ orders?: OrderRow[] }> = ({ orders = [] }) => {
   const { token } = antdTheme.useToken();

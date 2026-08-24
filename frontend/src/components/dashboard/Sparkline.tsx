@@ -16,9 +16,9 @@ export interface SparklineProps {
 /**
  * KPI mini trend graph rendered with ApexCharts sparkline mode.
  *
- * Empty state: when there is no data yet (backend not connected), a quiet
- * placeholder band keeps the card layout stable (UXDS 9.21 — skeletons
- * preserve layout) instead of rendering a misleading chart.
+ * Empty state: when there are no data points yet, a quiet placeholder band
+ * keeps the card layout stable (UXDS 9.21 — skeletons preserve layout)
+ * instead of rendering a misleading chart.
  */
 const Sparkline: React.FC<SparklineProps> = ({
   data,

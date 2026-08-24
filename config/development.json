@@ -11,10 +11,10 @@
     "timeoutMs": 30000
   },
   "database": {
-    "driver": "mysql+aiomysql",
+    "driver": "postgresql+asyncpg",
     "host": "localhost",
-    "port": 3306,
-    "name": "erp_business_db"
+    "port": 5432,
+    "name": "finch"
   },
   "sync": {
     "enabled": false,

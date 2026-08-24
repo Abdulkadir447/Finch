@@ -70,8 +70,14 @@ def get(key: str, default: Any = None) -> Any:
 
 # Commonly referenced settings exposed as module-level helpers.
 def database_url() -> str:
-    """Build the SQLAlchemy database URL, preferring ``DATABASE_URL`` secret."""
-    explicit = secret("DATABASE_URL")
+    """Resolve the SQLAlchemy database URL.
+
+    Finch targets Supabase/Postgres. Production and development both require an
+    explicit ``DATABASE_URL`` (or ``SUPABASE_DB_URL``); SQLite is available ONLY
+    in the ``testing`` environment. There is no silent fallback that could mask
+    a missing or misconfigured production database (Task 11 / audit H3).
+    """
+    explicit = secret("DATABASE_URL") or secret("SUPABASE_DB_URL")
     if explicit:
         # Canonical postgres URLs need the async driver scheme for SQLAlchemy.
         if explicit.startswith("postgres://"):
@@ -79,18 +85,12 @@ def database_url() -> str:
         elif explicit.startswith("postgresql://"):
             explicit = "postgresql+asyncpg://" + explicit[len("postgresql://"):]
         return explicit
-    cfg = load_config().get("database", {})
-    driver = cfg.get("driver", "mysql+aiomysql")
-    host = cfg.get("host", "localhost")
-    port = cfg.get("port", 3306)
-    name = cfg.get("name", "erp_business_db")
-    user = secret("DB_USER", "erp")
-    # No hardcoded default password: secrets come from the environment (IPD 1.11).
-    # Local dev supplies this via podman-compose's DB_PASSWORD env var.
-    password = secret("DB_PASSWORD")
-    if password is None:
-        raise RuntimeError(
-            "DB_PASSWORD environment variable is not set. "
-            "Supply it (e.g. via podman-compose) rather than a hardcoded value."
-        )
-    return f"{driver}://{user}:{password}@{host}:{port}/{name}"
+
+    if get_env() == "testing":
+        return "sqlite+aiosqlite:///./finch_test.db"
+
+    raise RuntimeError(
+        "DATABASE_URL is not set. Finch requires a Postgres/Supabase connection "
+        "string (e.g. postgresql://user:pass@host:5432/finch). SQLite is only "
+        "available in the testing environment."
+    )

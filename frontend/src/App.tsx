@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ConfigProvider, Layout, Avatar, Space, Switch, Typography, Spin } from 'antd';
 import { BulbOutlined, BulbFilled, DashboardOutlined, ShoppingCartOutlined, InboxOutlined, UserOutlined, TeamOutlined, SettingOutlined, LogoutOutlined, SearchOutlined, RobotOutlined } from '@ant-design/icons';
 import { Menu } from 'antd';
@@ -13,6 +13,7 @@ import InventoryPage from './pages/Inventory';
 import CustomersPage from './pages/Customers';
 import OrdersPage from './pages/Orders';
 import SettingsPage from './pages/Settings';
+import NotFoundPage from './pages/NotFound';
 import { setCurrency } from './services/currency';
 import { useApiClient } from './services/api/client';
 
@@ -45,10 +46,24 @@ const SplashScreen: React.FC = () => (
 );
 
 // ---------------------------------------------------------------------------
+// Full-screen loader shown while Clerk resolves the session. Auth state must
+// NEVER be evaluated before `isLoaded` — redirecting on unresolved state is
+// what caused the / <-> /sign-in redirect loop.
+// ---------------------------------------------------------------------------
+const AuthLoadingScreen: React.FC = () => (
+  <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: neutral[50] }}>
+    <Spin size="large" />
+  </div>
+);
+
+// ---------------------------------------------------------------------------
 // Protected Route Component using Clerk auth
 // ---------------------------------------------------------------------------
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  // Wait for Clerk to resolve before evaluating the session (Clerk docs:
+  // isSignedIn is undefined until isLoaded is true).
+  if (!isLoaded) return <AuthLoadingScreen />;
   return isSignedIn ? <>{children}</> : <Navigate to="/sign-in" replace />;
 };
 
@@ -56,6 +71,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // Sign In Page using Clerk
 // ---------------------------------------------------------------------------
 const SignInPage = () => {
+  const { isLoaded, isSignedIn } = useAuth();
+  // While Clerk resolves, hold the route — never bounce on unresolved state.
+  if (!isLoaded) return <AuthLoadingScreen />;
+  // Already authenticated: leave /sign-in exactly once, deterministically.
+  if (isSignedIn) return <Navigate to="/" replace />;
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
       <SignIn />
@@ -72,6 +92,34 @@ const SignUpPage: React.FC = () => {
       <SignUp afterSignOutUrl="/" fallbackRedirectUrl="/" />
     </div>
   );
+};
+
+/**
+ * Session-expiry guard (Task 11 / audit H6).
+ *
+ * The API client dispatches a `finch:unauthorized` event whenever the backend
+ * rejects a request with 401 (session expired/revoked — a case Clerk's normal
+ * token refresh does not cover). This component signs the user out exactly
+ * once in response, after which Clerk's state flips to signed-out and the
+ * ProtectedRoute deterministically navigates to /sign-in. The `handled` ref is
+ * the loop guard: repeated 401s cannot trigger repeated sign-outs or a
+ * sign-in <-> redirect bounce.
+ */
+const SessionExpiryGuard: React.FC = () => {
+  const { signOut } = useClerk();
+  const handled = useRef(false);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      if (handled.current) return;
+      handled.current = true;
+      signOut().catch(() => undefined);
+    };
+    window.addEventListener('finch:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('finch:unauthorized', onUnauthorized);
+  }, [signOut]);
+
+  return null;
 };
 
 /**
@@ -160,8 +208,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-// Placeholder Pages
-
 // Main App Component
 const App: React.FC = () => {
   const [booting, setBooting] = useState(true);
@@ -176,10 +222,11 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <SessionExpiryGuard />
       <Routes>
         <Route path="/sign-in" element={<SignInPage />} />
         <Route path="/sign-up" element={<SignUpPage />} />
-        <Route path="/" element={
+        <Route path="/*" element={
           <ProtectedRoute>
             <CurrencySeeder />
             <AppLayout>
@@ -190,6 +237,7 @@ const App: React.FC = () => {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

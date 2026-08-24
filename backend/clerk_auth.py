@@ -31,6 +31,10 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
+from .config import get_env
+
+# DEVELOPMENT-ONLY default. Production MUST supply CLERK_FRONTEND_API (Task 11
+# / audit H5) — otherwise tokens would be validated against the dev instance.
 DEFAULT_FRONTEND_API = "bursting-swan-43.clerk.accounts.dev"
 JWKS_TTL_SECONDS = 3600  # re-fetch public keys at most once per hour
 
@@ -41,7 +45,21 @@ _jwks_cache: Dict[str, tuple[dict, float]] = {}
 
 
 def get_frontend_api() -> str:
-    return os.getenv("CLERK_FRONTEND_API", DEFAULT_FRONTEND_API)
+    """Return the Clerk Frontend API host to validate tokens against.
+
+    The development default is only allowed outside production; a production
+    boot without CLERK_FRONTEND_API fails fast (called from app startup).
+    """
+    explicit = os.getenv("CLERK_FRONTEND_API")
+    if explicit:
+        return explicit.strip()
+    if get_env() == "production":
+        raise RuntimeError(
+            "CLERK_FRONTEND_API must be set in production (the Clerk Frontend "
+            "API host, e.g. <instance>.clerk.accounts.dev). Refusing to fall "
+            "back to the development instance."
+        )
+    return DEFAULT_FRONTEND_API
 
 
 def _allowed_origins() -> list[str]:
@@ -51,11 +69,14 @@ def _allowed_origins() -> list[str]:
 
 def _origin_allowed(azp: Optional[str]) -> bool:
     """Validate the azp claim. No azp (e.g. Electron file://) is accepted;
-    a present azp must match the allow-list or a dev preview wildcard."""
+    a present azp must match the allow-list. The dev preview wildcards are
+    only honoured outside production."""
     if not azp:
         return True
     if azp in _allowed_origins():
         return True
+    if get_env() == "production":
+        return False
     # Development sandboxes (Arena/e2b previews) use dynamic subdomains.
     return azp.endswith(".e2b.app") or azp.startswith("http://localhost")
 

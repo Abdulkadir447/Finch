@@ -123,10 +123,19 @@ class Customer(Base):
     """Customer entity (``customers`` table)."""
 
     __tablename__ = "customers"
-    # Email is unique PER BUSINESS (multi-tenant): two different businesses
-    # may both have the same customer email (Task 6 fix).
+    # Email is unique PER BUSINESS among LIVE rows only (Task 11 / audit H2):
+    # two businesses may share a customer email, and a soft-deleted customer's
+    # email becomes reusable — mirroring the products SKU rule. Partial unique
+    # index, supported natively by Postgres/Supabase and SQLite.
     __table_args__ = (
-        UniqueConstraint("business_id", "email", name="uq_customers_business_email"),
+        Index(
+            "uq_customers_business_email",
+            "business_id",
+            "email",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -174,7 +183,9 @@ class Order(Base):
     business_id = Column(Integer, index=True)            # tenant isolation
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     order_date = Column(DateTime, server_default=func.now())
-    status = Column(SAEnum(OrderStatus), default=OrderStatus.pending, nullable=False)
+    # native_enum=False keeps `status` a VARCHAR so the ORM-created schema
+    # matches the Alembic baseline migration on every database (Task 11 / H4).
+    status = Column(SAEnum(OrderStatus, native_enum=False), default=OrderStatus.pending, nullable=False)
     total_amount = Column(Float, nullable=False, default=0.0)
     created_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     updated_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
@@ -251,7 +262,9 @@ class StockMovement(Base):
     business_id = Column(Integer, index=True, nullable=False)   # tenant isolation
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     change = Column(Integer, nullable=False)                    # signed quantity delta
-    reason = Column(SAEnum(StockMovementReason), nullable=False)
+    # VARCHAR, not a native Postgres enum, for parity with the Alembic
+    # baseline (Task 11 / H4).
+    reason = Column(SAEnum(StockMovementReason, native_enum=False), nullable=False)
     note = Column(String(500))
     order_id = Column(Integer, nullable=True)                   # set for order-driven moves
     actor = Column(String(255))                                 # Clerk user id
