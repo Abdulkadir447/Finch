@@ -1,28 +1,76 @@
-# Co-op — AI-powered Business Management Platform
+# Co-op — Your Business Advisor, Powered by Real Data
 
-Co-op is a multi-tenant ERP (products, inventory, customers, orders, dashboard
-analytics) with a React + Ant Design frontend, a FastAPI backend, Clerk
-authentication, and a Supabase/Postgres data store.
+Co-op is an AI-powered business management platform for small businesses.
+It is not an ERP with an AI feature bolted on: the product promise is that
+Co-op **understands your business** — it ingests your history, operates on
+your data through controlled workflows, reports on it, explains what
+matters, and drafts the next action for you to confirm.
+
+```
+INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM → METER
+```
+
+## What's live
+
+- **Operational core** — products, inventory (adjustments + immutable stock
+  ledger + optimistic locking), customers, orders (transactional stock,
+  guarded status transitions, printable invoices), dashboard analytics.
+- **Intelligent Import** — bring your history from an old system
+  (CSV/XLSX). Co-op detects the dataset, suggests a column mapping, runs a
+  read-only validation pass, and commits in one transaction with provenance
+  (`import_batch_id`) and idempotency (`source_order_ref` — re-importing the
+  same file never duplicates).
+- **Day 1 Briefing** — verified, deterministic analyses of your business
+  (revenue trend, top products, quiet customers, stock risk, margin), each
+  with its evidence and an optional *Draft Follow-up* that hands off to the
+  real order flow for your confirmation.
+- **Reports + exports** — one deterministic reporting engine (Sales,
+  Profit & Loss, Inventory, Customers) with shared filters and comparison
+  periods, powering the Reports UI and CSV / Excel / PDF exports of exactly
+  what's on screen.
+- **Co-op AI (real model, verified context)** — Ask Co-op answers from a
+  verified business context the backend rebuilds per request: the model
+  never queries the database and never invents numbers. It can explain any
+  report you're looking at and propose *drafts* from a fixed, validated
+  action registry — execution always requires your explicit confirmation.
+- **Real billing + credits** — plans and monthly AI-credit allowances are
+  real server-side state; credits are computed from the `ai_usage` ledger
+  (nothing mutable to drift) and enforced on every AI request (402 when
+  exhausted). Payment collection is the one deliberately unplugged part —
+  the UI says so.
+- **Multi-tenant** — Clerk authentication; every query is scoped to the
+  caller's auto-provisioned business.
+
+Provisional by design: payment provider (nothing is charged yet),
+offline/sync for the desktop wrapper, and the Settings "coming soon"
+sections. See `docs/PRODUCT_READINESS.md` for the full status.
 
 ## Repository layout
 
 ```
 frontend/   React 18 + Vite + Ant Design app (src/), nginx config, Dockerfile
-backend/    FastAPI app (main.py, models.py, schemas.py, services.py),
+backend/    FastAPI app (main.py) + domain modules:
+            ai/ (LLM seam, verified context, action registry, usage)
+            reports/ (reporting engine)  exports/ (CSV/XLSX/PDF)
+            billing.py (plans + credits) briefing.py (Day 1 Briefing)
+            importer.py (intelligent import)
             Alembic migrations (backend/alembic/), pytest suite (backend/tests/)
 database/   Reference SQLite schema (schema.sql)
 tools/      Operational scripts (e.g. inspect_db_schema.py)
-config/     Per-environment, non-secret configuration (JSON)
+config/     Per-environment, non-secret configuration (JSON) — incl. AI
+            credit policy and plan allowances
 electron/   Optional Electron desktop wrapper
+Documents/  Product documentation (PRD, TRD, BSD, AFD, IPD, UXDS chapters)
 ```
 
 ## Prerequisites
 
-- Node.js **>= 22** (see `package.json` engines)
-- Python **3.11+**
-- A Clerk application (publishable key for the frontend, Frontend API host for
-  the backend)
+- Node.js **>= 22**, Python **3.11+**
+- A Clerk application (publishable key for the frontend, Frontend API host
+  for the backend)
 - A Supabase/Postgres database
+- (Optional) an OpenAI API key for the real AI assistant — without it,
+  Ask Co-op gracefully falls back to the deterministic data engine
 
 ## Environment variables
 
@@ -36,10 +84,16 @@ Copy `.env.example` to `.env` and fill in real values. The important ones:
 | `CLERK_ALLOWED_ORIGINS` | optional | Comma-separated `azp` allow-list |
 | `CORS_ORIGINS` | optional | Comma-separated CORS allow-list (defaults to `*`) |
 | `COOP_ENV` | optional | `development` (default) \| `testing` \| `production` |
+| `OPENAI_API_KEY` | optional | Enables the real AI assistant |
+| `OPENAI_MODEL` | optional | Model override (default from `config/*.json`) |
 | `TEST_DATABASE_URL` | tests | Postgres URL to enable true-concurrency tests |
 
 > SQLite is used **only** when `COOP_ENV=testing` (or by the test suite).
 > There is no silent fallback in production/development.
+>
+> Plan names, monthly credit allowances and the AI credit policy live in
+> `config/<env>.json` (`billing` and `ai` sections) — non-secret product
+> configuration, changeable without code.
 
 ## Running locally
 
@@ -59,49 +113,45 @@ npm install
 npm run dev
 ```
 
-## Intelligent Import & Day 1 Briefing (v1 onboarding)
+Desktop wrapper (optional): `npm run start` from the repo root.
 
-Bring your business history from your old system:
+## Key API surface
 
-1. **Import** (sidebar → *Import*, or `/import`): drag & drop a CSV or Excel
-   (.xlsx, first worksheet, clean tables) export — products, customers or
-   sales history. The file is parsed and the columns are **suggested**
-   against the Co-op schema with confidence scores (e.g. `Buyer_Name` →
-   customer name, `Sale_Date` → order date).
-2. **Review & confirm**: you approve/adjust every mapping; nothing is
-   written before you confirm. The import runs in one transaction with a
-   never-overwrite duplicate policy (existing SKU/email rows are skipped,
-   row errors are reported per row).
-3. **Day 1 Briefing** (`/briefing`): verified, deterministic analyses over
-   your imported history — revenue trend, top products & concentration,
-   quiet customers, stock risk and margin (from product cost prices) — each
-   with its evidence and a link to the relevant module. A "Draft
-   Follow-up" action on a quiet-customer insight opens the existing order
-   flow pre-filled for your review; it never creates anything on its own.
-
-Backend endpoints: `GET /import/schemas`, `POST /import/preview`,
-`POST /import/execute`, `GET /dashboard/briefing`.
+```
+CRUD        /products /customers /orders (+ /adjust, /movements, /status)
+Dashboard   /dashboard/summary /revenue/timeseries /inventory/by-category
+            /revenue/today /revenue/month /growth /low-stock /top-products
+Import      GET /imports/schema  POST /imports/preview /imports/map
+            POST /imports/validate  POST /imports/commit
+Reports     GET /reports/meta  GET /reports/{sales|profit-loss|inventory|customers}
+            GET /reports/{key}/export?format=csv|xlsx|pdf
+AI          POST /ai/chat   (verified context, structured answer, 402 when out
+                             of credits)   GET /ai/usage
+Billing     GET /billing/summary   POST /billing/plan
+Onboarding  GET /onboarding/state
+Auth        /auth/me  /business/settings  /healthcheck
+```
 
 ## Database migrations (Supabase/Postgres)
 
-Migrations live in `backend/alembic/` and are applied with Alembic.
+Migrations live in `backend/alembic/` (baseline → import provenance →
+`source_order_ref` → `ai_usage` → `subscriptions`) and are applied with
+Alembic.
 
-1. **Inspect first** — never migrate blind. Dump the live schema and check for
-   conflicting duplicates:
+1. **Inspect first** — never migrate blind:
 
    ```bash
    DATABASE_URL=postgresql://... python tools/inspect_db_schema.py
    ```
 
-2. **Review** the output against
-   `backend/alembic/versions/0001_postgres_baseline.py`, then apply:
+2. **Review** the output, then apply:
 
    ```bash
    DATABASE_URL=postgresql://... alembic upgrade head
    ```
 
-The baseline migration is idempotent (guarded DDL) and only adds objects and
-swaps the products/customers uniqueness rules; it never rewrites business data.
+All migrations are idempotent (guarded DDL), additive, and never rewrite
+business data.
 
 ## Tests
 
@@ -110,20 +160,16 @@ swaps the products/customers uniqueness rules; it never rewrites business data.
 .venv/bin/python -m pytest
 
 # Frontend type check + production build
-cd frontend && npx tsc --noEmit && npm run build
+cd frontend && npx tsc --noEmit -p tsconfig.json && npm run build
 ```
 
-Set `TEST_DATABASE_URL` to a Postgres URL to additionally run the
-true-concurrency stock test.
+The suite includes a **contract test** that scans every frontend API call
+and asserts a matching backend route exists — the guard that makes a
+frontend/backend endpoint mismatch impossible. Set `TEST_DATABASE_URL` to a
+Postgres URL to additionally run the true-concurrency stock test.
 
-## Containers
+## Documentation
 
-`podman-compose.yml` runs a local Postgres plus the backend and frontend
-images:
-
-```bash
-podman-compose up --build
-```
-
-The backend runs `uvicorn backend.main:app` (package-relative imports), and
-nginx proxies `/api/*` to the backend service.
+Product documentation (PRD, TRD, BSD, AFD, IPD, UXDS) lives in
+`Documents/`; engineering docs (branch protection, ADRs, coding standards)
+in `docs/`; current readiness status in `docs/PRODUCT_READINESS.md`.

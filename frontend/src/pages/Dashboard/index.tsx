@@ -26,11 +26,13 @@ import { CoopErrorState } from '../../components/ui';
  *       → NEW Stitch presentation (this file + the dashboard components)
  *
  * Layout (12-col):
- *   1. Header        — business identity + live "last updated"
- *   2. KPI row       — 4 stat cards (Revenue • Orders • Inventory • Products)
- *   3. AI summary    — AI-chromed card (honest "module pending" state)
- *   4. Charts row    — Revenue (Monthly/Weekly) + Inventory breakdown donut
- *   5. Bottom row    — Recent Orders + Quick Actions / Top Products
+ *   1. Briefing banner — Day 1 Briefing headline (dismissable)
+ *   2. Header          — business identity + live "last updated"
+ *   3. KPI row         — 4 stat cards (Revenue • Orders • Inventory • Products)
+ *   4. AI insights     — Co-op AI · Live Insights (real rule-based
+ *                        observations from the live data bundle + Ask Co-op)
+ *   5. Charts row      — Revenue (Monthly/Weekly) + Inventory breakdown donut
+ *   6. Bottom row      — Recent Orders + Quick Actions / Top Products
  *
  * Honesty rule: no fabricated numbers. Real zeros render as zeros, empty
  * series keep the native "no data" state, and the AI summary is a

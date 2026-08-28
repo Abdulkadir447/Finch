@@ -1,322 +1,120 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to Co-op! This document explains how to contribute to this project.
+Thank you for your interest in contributing to Co-op! This document explains
+how to work on this project.
 
 ## Prerequisites
 
-Before contributing, please ensure you have:
+- **Node.js** 22 or higher
+- **Python** 3.11 or higher
+- **npm** (the repo uses npm + lockfiles — not pnpm)
+- **Git**
+- A local Clerk app, a Postgres/Supabase database, and (optionally) an
+  OpenAI API key — see `README.md`
 
-- **Node.js** version 22 or higher
-- **pnpm** (package manager)
-- **Git** (version control)
-- **Docker** (optional, for development with SQLite)
-
-## Development Setup
-
-### Clone the Repository
+## Development setup
 
 ```bash
-gh repo clone coop-project/your-username/coop
-cd coop
+git clone <repo-url> && cd Finch
+
+# Backend
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt pytest pytest-asyncio
+
+# Frontend
+cd frontend && npm install && cd ..
+
+# Environment
+cp .env.example .env   # then fill in real values
 ```
 
-### Install Dependencies
+Key files:
+
+- `README.md` — product overview, running locally, API surface
+- `.env.example` — every environment variable, documented
+- `config/<env>.json` — non-secret product config (AI credit policy, plan
+  allowances)
+- `pytest.ini` — pytest config (run from the repo root)
+- `Documents/` — product documentation (PRD, TRD, BSD, AFD, IPD, UXDS)
+
+## Project structure
+
+```
+frontend/   React 18 + Vite + Ant Design (src/: pages, components, ai,
+            billing, imports, theme/, services/)
+backend/    FastAPI app — main.py (routes) + domain modules:
+            ai/ reports/ exports/ billing.py briefing.py importer.py
+            alembic/ (migrations) tests/ (pytest)
+config/     Per-environment JSON config
+database/   Reference SQLite schema
+docs/       Engineering docs + PRODUCT_READINESS.md
+electron/   Optional desktop wrapper
+```
+
+## Running locally
 
 ```bash
-pnpm install
+# Backend (port 8000)
+DATABASE_URL=postgresql://... .venv/bin/uvicorn backend.main:app --reload
+
+# Frontend (port 3000, proxies /api -> :8000)
+cd frontend && npm run dev
 ```
 
-### Environment Setup
-
-Create a `.env` file with sensitive environment variables:
+## Testing
 
 ```bash
-cat > .env <<EOF
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_key
-OPENAI_API_KEY=your_openai_key
-SECRET_KEY=your_jwt_secret
-EOF
+# Backend — full suite from the repo root (contract test needs both trees)
+.venv/bin/python -m pytest
+
+# Frontend — type check + production build
+cd frontend && npx tsc --noEmit -p tsconfig.json && npm run build
 ```
 
-### Pre-commit Hooks
-
-The project uses `husky` for pre-commit hooks.
-
-```bash
-pnpm prepare
-```
-
-## Project Structure
-
-The project is organized as follows:
-
-```
-Co-op/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── routes/
-│   │   ├── stores/
-│   │   └── api/
-│   ├── theme.ts
-│   ├── theme.d.ts
-│   └── index.html
-│
-├── backend/
-│   ├── models/
-│   ├── schemas/
-│   ├── services/
-│   └── routes/
-│
-├── database/
-│   ├── schema.sql
-│   ├── seed.sql
-│   └── migrations/
-│
-├── .github/workflows/
-├── .husky/
-├── docs/
-├── package*.json
-├── .pre-commit-config.yaml
-├── .commitlintrc.json
-└── .eslintrc.cjs
-```
-
-## Development Workflow
-
-### Branch Naming
-
-All branches must follow the conventional format:
-
-- `feature/<short-description>`
-- `bugfix/<short-description>`
-- `hotfix/<short-description>`
-- `release/<version>`
-
-Example:
-
-```bash
-feature/add-user-dashboard
-bugfix/login-session-timeout
-```
-
-### Committing Code
-
-#### Committing Standards
-
-1. **Use Conventional Commits format**
-
-```bash
-git add .
-git commit -m "feat(user): add profile picture upload"
-git commit -m "fix(orders): resolve order synchronization issue"
-```
-
-2. **Verify commit messages with commitlint**
-
-```bash
-cipanic --edit $(git log --format=%H -n1)
-```
-
-3. **Push to feature branch**
-
-```bash
-git push origin feature/add-user-dashboard
-```
-
-### Pull Request Process
-
-1. **Create a pull request** from your feature branch to `develop`
-
-2. **Follow the PR template**:
-
-   - **Description**: Clear summary of changes
-   - **Background**: Problem and context
-   - **Changes**: List of files changed with purposes
-   - **Testing**: Test results
-   - **Documentation**: Any documentation updates
-
-3. **Resolve required CI checks**:
-
-   - Linting and formatting
-   - Unit and integration tests
-   - Build compilation
-   - Security scan
-
-4. **Request review from team members**
-
-5. **Address feedback**
-
-6. **Merge to `develop`** (after team approval)
-
-### Coding Standards
-
-#### TypeScript
-
-- Use strict mode (`--strict`)
-- Interface-based typing
-- Use `// comments` instead of `/* comments */`
-- Limit `any` type usage
-
-#### JavaScript
-
-- ES6+ syntax
-- No trailing whitespace
-- Consistent indentation (2 spaces)
-
-#### File Organization
-
-- Each module should have:
-  - A clear, readable file structure
-  - Focus on single responsibility
-  - Appropriate TypeScript interfaces for data structures
-  - Comprehensive tests
-
-### Testing
-
-#### Unit Tests
-
-```bash
-pnpm --filter ./backend test:unit
-pnpm --filter ./frontend test:unit
-```
-
-- Minimum **80% code coverage**
-- Use Jest for frontend tests
-- Use pytest for backend tests
-
-#### Integration Tests
-
-```bash
-pnpm --filter ./backend test:integration
-```
-
-- Test API endpoints
-- Test database interactions
-- Test authentication flows
-
-#### E2E Tests
-
-```bash
-pnpm --filter ./frontend test:e2e
-```
-
-- Use Cypress or Playwright
-- Test critical user journeys
-- Parallel execution for efficiency
-
-### Building and Deployment
-
-#### Building
-
-```bash
-pnpm build
-```
-
-- Frontend: builds with Vite
-- Backend: builds with TypeScript
-
-#### Deployment
-
-1. **Staging**: Deploy to staging server for testing
-2. **Production**: Use `git tag` followed by CD pipeline
-
-### GitHub Actions
-
-The project uses GitHub Actions for CI/CD:
-
-- **Linting**: Code style and type checking
-- **Testing**: Unit and integration tests
-- **Building**: Build the application
-- **Security**: Security vulnerability scanning
-
-## Code Review Guidelines
-
-### What to Review
-
-1. **Code Quality**
-   - Readability and maintainability
-   - Adherence to coding standards
-   - Appropriate use of design patterns
-
-2. **Functionality**
-   - Correctness of implementation
-   - Edge cases and error handling
-   - Performance considerations
-
-3. **Architecture**
-   - Consistency with project principles
-   - Layer separation
-   - Dependency management
-
-4. **Testing**
-   - Test coverage adequacy
-   - Test effectiveness
-   - Test organization
-
-5. **Documentation**
-   - API documentation
-   - Code comments
-   - User guides
-
-### Review Process
-
-1. **Initial review**: Check if code meets basic standards
-2. **Deep review**: Focused on architecture and design
-3. **Final review**: Ensure no breaking changes
-
-## Contributing Workflow
-
-1. Fork the repository
-2. Create a feature branch from `develop`
-3. Implement your feature or fix
-4. Update documentation if needed
-5. Commit your changes
-6. Push to your fork
-7. Create a pull request
-8. Wait for review and approvals
-9. Merge after meeting requirements
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-1. **"Could not resolve dependency"**
-   - Run `pnpm install`
-   - Check `package.json` for version conflicts
-
-2. **"Linting errors"**
-   - Run `pnpm lint` to identify specific issues
-   - Fix code according to linting rules
-
-3. **"Tests failing"**
-   - Run specific failing tests with more details
-   - Check logs for error messages
-
-4. **"Build errors"**
-   - Check TypeScript compilation errors
-   - Verify environment variable setup
-
-## Support
-
-For questions or issues:
-
-- **GitHub Issues**: Report bugs or request features
-- **Discussions**: Ask questions and share ideas
-- **Slack/Discord**: Real-time communication (if available)
+A **contract test** scans every `api.get/post/...` call in the frontend and
+asserts a matching backend route exists. If you add a frontend call, add the
+route (or the test will tell you it's missing).
+
+Set `TEST_DATABASE_URL` to a Postgres URL to additionally run the
+true-concurrency stock test.
+
+## Branches, commits, PRs
+
+- The default branch is **`master`**; PRs target `master`.
+- Use conventional commit messages (`feat:`, `fix:`, `chore:`, …).
+- CI runs the backend test suite plus the frontend type check and
+  production build on every push/PR to `master`. Keep it green — a gate that
+  can't pass doesn't belong in CI, so if you change tooling, update
+  `.github/workflows/ci.yml` in the same change.
+
+## Coding conventions
+
+- **Numbers are deterministic**: business figures come from the backend's
+  SQL aggregation (reporting engine, briefing, dashboards). The LLM never
+  computes business numbers — it only explains verified context.
+- **Trust boundary**: AI can only propose actions from the fixed registry
+  (`backend/ai/actions.py`); execution always requires explicit user
+  confirmation through an existing API.
+- **Honesty by construction**: provisional capabilities say so in the UI
+  (billing preview banner, Settings "coming soon" sections, AI fallback
+  messages). Don't fake states to make screens look complete.
+- **Tenant scoping**: every query is scoped by `business_id`; add new
+  models with `business_id` + soft-delete columns to match the rest.
+- TypeScript strict mode; interface-based typing; minimal `any`.
+- Backend: keep routes thin in `main.py`; domain logic in its module
+  (`ai/`, `reports/`, `exports/`, `billing.py`, …).
+
+## Adding a migration
+
+1. Create `backend/alembic/versions/NNNN_name.py` with a `down_revision`
+   pointing at the current head.
+2. Use **guarded, idempotent, additive** DDL (the repo convention).
+3. Add matching ORM models in `backend/models.py`.
+4. Add/extend tests; the suite uses `Base.metadata.create_all`, so the ORM
+   must stay in sync with the migrations.
 
 ## Code of Conduct
 
-Please respect all contributors and maintain a professional, inclusive environment. Harassment, discrimination, or inappropriate behavior will not be tolerated.
-
-## License
-
-This project is licensed under the MIT License.
-
----
-
-_Generated based on Co-op project architecture and IPD Chapter 2 requirements_
-_Updated with comprehensive guidelines for new contributors_
+Please respect all contributors and maintain a professional, inclusive
+environment. Harassment, discrimination, or inappropriate behavior will not
+be tolerated.
