@@ -21,8 +21,9 @@ const ValidationSummary: React.FC<ValidationSummaryProps> = ({ validation }) => 
 
   const dupTotal = Object.values(validation.duplicates).reduce((a, b) => a + b, 0);
   const unknownTotal = Object.values(validation.unknown_refs).reduce((a, b) => a + b, 0);
+  const ambiguousTotal = Object.values(validation.ambiguous ?? {}).reduce((a, b) => a + b, 0);
   const errorTotal = validation.total_rows - validation.valid_rows;
-  const clean = errorTotal === 0 && dupTotal === 0 && unknownTotal === 0;
+  const clean = errorTotal === 0 && dupTotal === 0 && unknownTotal === 0 && ambiguousTotal === 0;
 
   const stat = (label: string, value: number, tone: 'ok' | 'warn' | 'bad') => (
     <div
@@ -58,6 +59,7 @@ const ValidationSummary: React.FC<ValidationSummaryProps> = ({ validation }) => 
         {stat('rows valid', validation.valid_rows, 'ok')}
         {stat('duplicate rows (skipped)', dupTotal, dupTotal ? 'warn' : 'ok')}
         {stat('unknown references', unknownTotal, unknownTotal ? 'warn' : 'ok')}
+        {ambiguousTotal > 0 && stat('need disambiguation (name/phone)', ambiguousTotal, 'warn')}
         {stat('rows with problems', errorTotal, errorTotal ? 'bad' : 'ok')}
       </div>
 

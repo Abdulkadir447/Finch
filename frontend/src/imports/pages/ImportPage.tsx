@@ -200,6 +200,7 @@ const ImportPage: React.FC = () => {
           <FilePreview
             preview={preview}
             schemas={schemas}
+            entity={entity}
             onEntityChange={(e) => {
               setEntity(e);
               // Re-run the mapper for the newly chosen entity.

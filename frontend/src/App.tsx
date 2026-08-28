@@ -27,7 +27,7 @@ const OrdersPage = lazy(() => import('./pages/Orders'));
 const CreateOrderPage = lazy(() => import('./pages/Orders/CreateOrderPage'));
 const OrderDetailsPage = lazy(() => import('./pages/Orders/OrderDetailsPage'));
 const SettingsPage = lazy(() => import('./pages/Settings'));
-const ImportPage = lazy(() => import('./pages/Import'));
+const ImportPage = lazy(() => import('./imports/pages/ImportPage'));
 const WelcomePage = lazy(() => import('./pages/Welcome'));
 const BriefingPage = lazy(() => import('./pages/Briefing'));
 const NotFoundPage = lazy(() => import('./pages/NotFound'));

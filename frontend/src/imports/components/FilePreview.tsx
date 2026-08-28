@@ -11,10 +11,12 @@ import type { PreviewPayload, SchemaPayload } from '../types';
 export interface FilePreviewProps {
   preview: PreviewPayload;
   schemas: SchemaPayload | null;
+  /** The currently selected dataset (page state — the user can override detection). */
+  entity: string;
   onEntityChange: (entity: string) => void;
 }
 
-const FilePreview: React.FC<FilePreviewProps> = ({ preview, schemas, onEntityChange }) => {
+const FilePreview: React.FC<FilePreviewProps> = ({ preview, schemas, entity, onEntityChange }) => {
   const { colors } = useCoopTheme();
   const cols = preview.columns.slice(0, 8);
 
@@ -34,7 +36,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ preview, schemas, onEntityCha
           </span>
         )}
         <select
-          value={preview.entity ?? ''}
+          value={entity}
           onChange={(e) => onEntityChange(e.target.value)}
           aria-label="Dataset type"
           style={{

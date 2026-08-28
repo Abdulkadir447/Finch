@@ -55,6 +55,8 @@ export interface ValidationPayload {
   would_create: Record<string, number>;
   errors: Array<{ row: number; detail: string }>;
   error_fields: Record<string, number>;
+  /** Rows Co-op will NOT import because 2+ records match a name/phone. */
+  ambiguous: Record<string, number>;
   warnings: string[];
 }
 
