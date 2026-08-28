@@ -109,6 +109,7 @@ class Product(Base):
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     order_items = relationship(
         "OrderItem",
@@ -155,6 +156,7 @@ class Customer(Base):
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     orders = relationship(
         "Order",
@@ -236,6 +238,7 @@ class Order(Base):
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
     source_order_ref = Column(String(100), nullable=True)  # external order number from the old system (import idempotency)
 
     customer = relationship("Customer", back_populates="orders")
@@ -269,6 +272,7 @@ class OrderItem(Base):
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
     import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")
@@ -313,6 +317,7 @@ class StockMovement(Base):
     order_id = Column(Integer, nullable=True)                   # set for order-driven moves
     actor = Column(String(255))                                 # Clerk user id
     created_at = Column(DateTime, server_default=func.now())
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     product = relationship("Product")
 

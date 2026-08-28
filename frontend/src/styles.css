@@ -163,6 +163,19 @@ body .ant-table-thead > tr > td {
   }
 }
 
+/* Sync indicator: a gentle pulse while a push is in flight. */
+@keyframes coop-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+
 /*
  * Order details: 12-col grid — left (items + insights) / right (actions),
  * stacked on narrower viewports.

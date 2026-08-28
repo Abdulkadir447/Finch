@@ -33,6 +33,7 @@ from .exports import export_report, ExportError
 from .notifications import build_daily_summary
 from .notifications.schemas import DailySummary as DailySummarySchema
 from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
+from .sync import apply_push
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
@@ -1531,6 +1532,38 @@ async def notifications_daily_summary(
 ) -> DailySummarySchema:
     """Today's verified business summary for the in-app notification panel."""
     return await build_daily_summary(db, business)
+
+
+# ---------------------------------------------------------------------------
+# Sync (offline-first, OFFLINE 3 — one-way push first, ADR-002)
+#
+# The desktop app pushes offline-originated operations here when
+# connectivity returns. Every op is idempotent on its client_id, so a retried
+# batch applies exactly once. Stock arrives as operations (signed movements),
+# never as final values, and the server re-validates (ADR-002 rule 7).
+# ---------------------------------------------------------------------------
+
+class SyncPushOperation(BaseModel):
+    entity: str  # customer | product | order | order_item | stock_movement
+    client_id: str  # client-generated ULID (idempotency key)
+    operation: str  # create | update | delete
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SyncPushRequest(BaseModel):
+    operations: List[SyncPushOperation] = Field(default_factory=list)
+
+
+@app.post("/sync/push", tags=["Sync"])
+async def sync_push(
+    req: SyncPushRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Apply a batch of offline operations idempotently. Returns applied /
+    skipped counts, a client_id -> server id map, and any per-op errors."""
+    ops = [o.model_dump() for o in req.operations]
+    return await apply_push(db, business.id, ops)
 
 
 # ---------------------------------------------------------------------------

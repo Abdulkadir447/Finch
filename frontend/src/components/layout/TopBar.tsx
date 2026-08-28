@@ -19,6 +19,7 @@ import { radius, spacing } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 import { SparkleIcon } from '../ui/icons';
 import NotificationsPopover from './NotificationsPopover';
+import SyncIndicator from './SyncIndicator';
 
 /** Minimal structural user shape (Clerk's UserResource satisfies it). */
 export interface TopBarUser {
@@ -169,6 +170,9 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
         <SparkleIcon size={15} color={colors.secondaryContainer} />
         <span className="coop-topbar-ai-label">AI Assistant</span>
       </button>
+
+      {/* Sync state (offline-first, ADR-002) — never hidden */}
+      <SyncIndicator />
 
       {/* Notifications (real inventory alerts) */}
       <NotificationsPopover />

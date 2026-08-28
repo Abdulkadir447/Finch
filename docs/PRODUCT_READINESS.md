@@ -36,17 +36,37 @@ gateway (Stripe or Paystack, depending on market), add a
 `payment_connected` to true, and remove the preview banner. **No
 engineering should start until the charging decision exists.**
 
-### 2.2 Offline / sync — **largest remaining architectural gap**
-The Electron wrapper is a thin shell (window + CSP); there is no local
-SQLite, no write queue, no conflict resolution. The PRD's "offline-first
-desktop" promise is therefore **not currently true**, and the product
-should not advertise offline capability until this exists. The
-`sync_queue` table exists in schema/ORM but is unused. Recommended scope
-when it's scheduled: local SQLite mirror → offline writes → `sync_queue`
-→ push/pull with the API → field-level conflict policy → desktop
-notifications of sync status. **Decision needed: is offline-first still in
-v1 scope, or does v1 ship as a web app with the desktop wrapper as a
-convenience?** The honest copy choice matters either way.
+### 2.2 Offline / sync — **v1 commitment (ADR-002); foundation built**
+**Decision locked (2026-08-28):** offline-first is a core Co-op v1
+requirement, not a future enhancement. See `docs/architecture/adr-002-
+offline-first-data-layer.md` for the full decision, the offline boundary
+(core operations offline; AI + payments online-only), and the
+non-negotiable rules (UI never calls FastAPI for core data; client ULID
+ids; idempotent writes; operation-based inventory; visible sync state).
+
+**Foundation delivered this phase (OFFLINE 1 + one-way sync protocol):**
+- `electron/db/` — local SQLite data layer: driver contract (better-sqlite3
+  for production Electron / node:sqlite for tests), versioned migrations,
+  ULID `client_id` generation, repositories (business/customers/products/
+  orders/stock) that write locally *and* enqueue sync ops, and a
+  `sync_queue`. 10 passing Node tests.
+- `electron/preload.js` + `main.js` — secure IPC bridge (contextIsolation
+  on, nodeIntegration off) exposing allow-listed data-layer methods;
+  connectivity detection wired.
+- Server idempotency: `client_id` on all syncable entities (migration 0006)
+  + `POST /sync/push` applying a batch idempotently (a retried op applies
+  once), resolving references by client_id, applying stock as operations,
+  and re-validating (refuses negative stock). 8 passing tests.
+- Frontend: `frontend/src/sync/` (types, connectivity, status store, local
+  DB seam) + a visible TopBar **SyncIndicator** (Synced / Offline — saved
+  on this device / Syncing / N to sync).
+
+**Remaining (scheduled sub-phases):** OFFLINE 2 (route the UI's core
+operations through the local repositories instead of FastAPI), OFFLINE 3
+(the push engine: drain the queue on reconnect, retry, pull/refresh),
+OFFLINE 4 (conflict rules: customers merge, products SKU-conflict flag,
+inventory operation-based), OFFLINE 5 (sync UX: manual sync, conflict
+resolution), OFFLINE 6 (E2E offline / restart / duplicate-sync testing).
 
 ### 2.3 Notifications — **partially live; daily summary is the gap**
 Live: low-stock / out-of-stock alerts in the TopBar popover (real data,

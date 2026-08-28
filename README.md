@@ -6,6 +6,22 @@ Co-op **understands your business** — it ingests your history, operates on
 your data through controlled workflows, reports on it, explains what
 matters, and drafts the next action for you to confirm.
 
+> **Run your business anywhere. Co-op works offline and syncs when you're
+> back online.** (v1 commitment — see ADR-002.)
+
+### Offline boundary (v1)
+
+- **Works offline:** Dashboard, Products, Inventory, Customers, Orders,
+  order status changes, local invoices, Reports, CSV/XLSX import, and the
+  locally-calculated deterministic insights.
+- **Requires internet:** real LLM calls, AI model-based explanations, cloud
+  billing/payment, cloud account auth/refresh.
+
+The desktop app owns a local SQLite database (Electron main process); the UI
+writes locally first and syncs to the cloud when connectivity returns. The
+model-based assistant degrades to an honest "unavailable offline" state while
+your data and workflows keep working.
+
 ```
 INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM → METER
 ```

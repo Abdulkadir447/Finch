@@ -1,5 +1,6 @@
-const { app, BrowserWindow, session } = require('electron');
+const { app, BrowserWindow, session, ipcMain, net } = require('electron');
 const path = require('path');
+const { createDataLayer, defaultDbPath } = require('./db');
 
 // ---------------------------------------------------------------------------
 // Content Security Policy for the Co-op desktop app.
@@ -82,12 +83,77 @@ function createWindow () {
   // Use an absolute path relative to this script (frontend/dist/index.html).
   const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
   win.loadFile(indexPath);
+  return win;
+}
+
+// ---------------------------------------------------------------------------
+// Local data layer (offline-first, ADR-002).
+//
+// Electron owns SQLite. The renderer reaches it ONLY through the allow-listed
+// IPC methods below — there is no generic "call any method" channel.
+// ---------------------------------------------------------------------------
+let dataLayer = null;
+let online = true;
+
+function dbHandlers() {
+  return {
+    businessEnsure: (a) => dataLayer.business.ensure(a),
+    customerCreate: (a) => dataLayer.customers.create(a.business_id, a.data),
+    customerUpdate: (a) => dataLayer.customers.update(a.id, a.data),
+    customerDelete: (id) => dataLayer.customers.softDelete(id),
+    customerGet: (id) => dataLayer.customers.get(id),
+    customerList: (bizId) => dataLayer.customers.list(bizId),
+    productCreate: (a) => dataLayer.products.create(a.business_id, a.data),
+    productUpdate: (a) => dataLayer.products.update(a.id, a.data),
+    productDelete: (id) => dataLayer.products.softDelete(id),
+    productGet: (id) => dataLayer.products.get(id),
+    productList: (bizId) => dataLayer.products.list(bizId),
+    orderCreate: (a) => dataLayer.orders.create(a.business_id, a.data),
+    orderSetStatus: (a) => dataLayer.orders.setStatus(a.business_id, a.order_id, a.status),
+    orderGet: (id) => dataLayer.orders.get(id),
+    orderList: (bizId) => dataLayer.orders.list(bizId),
+    stockAdjust: (a) => dataLayer.stock.adjust(a.business_id, a.product_id, a.change, a.reason, a.opts || {}),
+    stockMovements: (a) => dataLayer.stock.movements(a.business_id, a.product_id || null),
+    syncStatus: () => ({
+      online,
+      pending: dataLayer.queue.countPending(),
+      // The push/pull engine lands in OFFLINE 3; until then syncing is idle.
+      syncing: false,
+    }),
+  };
+}
+
+function registerDataLayerIpc() {
+  ipcMain.handle('coop:db', (event, { method, arg }) => {
+    const handlers = dbHandlers();
+    if (typeof method !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, method)) {
+      throw new Error(`Blocked non-allow-listed data-layer method: ${method}`);
+    }
+    return handlers[method](arg);
+  });
+}
+
+// Connectivity detection (the engine that consumes this is OFFLINE 3).
+function watchConnectivity(win) {
+  const update = () => {
+    online = net.isOnline();
+    if (win && !win.isDestroyed()) win.webContents.send('coop:net', { online });
+  };
+  net.on('online', update);
+  net.on('offline', update);
+  update();
 }
 
 app.whenReady().then(() => {
-  createWindow();
+  dataLayer = createDataLayer(defaultDbPath(app.getPath('userData')));
+  registerDataLayerIpc();
+  const win = createWindow();
+  watchConnectivity(win);
   app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const w = createWindow();
+      watchConnectivity(w);
+    }
   });
 });
 
