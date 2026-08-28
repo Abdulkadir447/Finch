@@ -1,0 +1,700 @@
+Co-op Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 3 — System Architecture & Monorepo Design
+3.1 Purpose
+
+This chapter defines the overall architecture of Co-op, including the software architecture, monorepo organization, module boundaries, dependency rules, communication mechanisms, and engineering principles.
+
+The architecture is designed to ensure that Co-op remains:
+
+Modular
+Maintainable
+Scalable
+Testable
+Secure
+Offline-first
+AI-ready
+
+This chapter establishes the structural blueprint that every future feature must follow.
+
+3.2 Architectural Goals
+
+The architecture must achieve the following goals:
+
+Scalability
+
+Support future expansion without major rewrites.
+
+Examples include:
+
+Multiple users
+Multiple companies
+Mobile applications
+AI agents
+Plugin ecosystem
+Third-party integrations
+Maintainability
+
+Every module should:
+
+Have a single responsibility.
+Be independently testable.
+Be replaceable.
+Avoid hidden dependencies.
+Reliability
+
+Co-op should continue operating during:
+
+Internet outages
+Cloud failures
+AI service interruptions
+Synchronization delays
+Performance
+
+The architecture should minimize:
+
+Startup time
+Memory usage
+Database calls
+UI re-renders
+IPC communication
+3.3 Architectural Principles
+
+Co-op follows multiple complementary architectural patterns.
+
+Clean Architecture
+
+Business logic must remain independent of frameworks.
+
+┌──────────────────────────────┐
+│ Presentation Layer           │
+├──────────────────────────────┤
+│ Application Layer            │
+├──────────────────────────────┤
+│ Domain Layer                 │
+├──────────────────────────────┤
+│ Infrastructure Layer         │
+└──────────────────────────────┘
+
+Dependencies always point inward.
+
+Domain-Driven Design (DDD)
+
+Co-op is divided into business domains.
+
+Domains include:
+
+Orders
+Inventory
+Customers
+Reports
+Authentication
+AI
+Licensing
+Notifications
+Synchronization
+Settings
+
+Each domain owns:
+
+Entities
+Services
+Validation
+Repositories
+Events
+Repository Pattern
+
+Business logic never communicates directly with SQLite or Supabase.
+
+Instead:
+
+UI
+
+↓
+
+Application Service
+
+↓
+
+Repository Interface
+
+↓
+
+SQLite Repository
+
+OR
+
+Supabase Repository
+
+Repositories abstract storage implementations, allowing future changes without modifying business logic.
+
+CQRS (Selective)
+
+CQRS is used only where beneficial.
+
+Applied to:
+
+AI
+Reporting
+Forecasting
+
+Not applied to:
+
+Customers
+Orders
+Inventory
+
+This keeps the architecture simple while enabling scalability for computationally intensive features.
+
+3.4 High-Level System Architecture
+                    Co-op Desktop
+
+                   Electron Shell
+                         │
+        ┌────────────────┴────────────────┐
+        │                                 │
+        ▼                                 ▼
+ Main Process                     Renderer Process
+                                       │
+                                React + TypeScript
+                                       │
+                                Feature Modules
+                                       │
+                             Application Services
+                                       │
+                                Repository Layer
+                                       │
+          ┌────────────────────────────┴──────────────────────────┐
+          ▼                                                       ▼
+     SQLite Database                                      Supabase Cloud
+(Local Offline Storage)                           (Auth + Storage + PostgreSQL)
+
+                                       │
+                                       ▼
+                              OpenAI Responses API
+                          (via Supabase Edge Functions)
+3.5 Monorepo Architecture
+
+The entire Co-op ecosystem is managed inside a single monorepo.
+
+coop/
+
+├── apps/
+│   └── desktop/
+│
+├── packages/
+│   ├── ui/
+│   ├── database/
+│   ├── auth/
+│   ├── ai/
+│   ├── sync/
+│   ├── reports/
+│   ├── shared/
+│   ├── config/
+│   └── utils/
+│
+├── supabase/
+│
+├── docs/
+│
+├── assets/
+│
+├── scripts/
+│
+└── .github/
+
+Each package should have a clearly defined purpose and public API.
+
+3.6 Package Responsibilities
+apps/desktop
+
+Contains the Electron desktop application.
+
+Responsibilities:
+
+UI
+Navigation
+Windows
+IPC
+User interaction
+packages/ui
+
+Reusable UI components.
+
+Examples:
+
+Buttons
+Cards
+Dialogs
+Tables
+Forms
+Charts
+
+No business logic is allowed.
+
+packages/database
+
+Responsibilities:
+
+SQLite access
+Database helpers
+Query builders
+Migrations
+Repository implementations
+packages/auth
+
+Responsibilities:
+
+Login
+Sessions
+Token management
+Two-factor authentication
+Authorization helpers
+packages/ai
+
+Responsibilities:
+
+Prompt generation
+Context builder
+AI response parsing
+AI utilities
+packages/sync
+
+Responsibilities:
+
+Synchronization queue
+Conflict detection
+Retry logic
+Connectivity monitoring
+packages/reports
+
+Responsibilities:
+
+PDF generation
+Excel export
+Report formatting
+Forecast calculations
+packages/shared
+
+Contains:
+
+Types
+Enums
+Interfaces
+Constants
+Shared validation schemas
+3.7 Dependency Rules
+
+Dependencies follow a strict hierarchy.
+
+UI
+
+↓
+
+Feature Module
+
+↓
+
+Application Service
+
+↓
+
+Repository Interface
+
+↓
+
+Infrastructure
+
+↓
+
+Database
+
+Forbidden dependencies:
+
+UI → SQLite
+UI → Supabase
+UI → Edge Functions
+Components → Components (cross-feature)
+Database → UI
+3.8 Feature-Based Architecture
+
+Each feature owns its implementation.
+
+Example:
+
+features/
+
+orders/
+
+├── components/
+├── pages/
+├── hooks/
+├── services/
+├── repositories/
+├── types/
+├── validation/
+├── utils/
+└── index.ts
+
+Benefits:
+
+Isolation
+Easier testing
+Faster onboarding
+Independent evolution
+3.9 Layer Responsibilities
+Presentation Layer
+
+Responsible for:
+
+Rendering UI
+User interactions
+Navigation
+Forms
+Accessibility
+
+Must not contain business logic.
+
+Application Layer
+
+Coordinates use cases.
+
+Examples:
+
+Create Order
+Generate Report
+Update Inventory
+
+This layer orchestrates workflows but does not directly access infrastructure.
+
+Domain Layer
+
+Contains:
+
+Entities
+Value Objects
+Domain Services
+Business Rules
+
+This is the heart of Co-op and should remain framework-independent.
+
+Infrastructure Layer
+
+Responsible for:
+
+SQLite
+Supabase
+File system
+Electron APIs
+OpenAI integration
+Logging
+3.10 Electron Architecture
+
+Electron consists of three processes.
+
+Main Process
+
+Responsibilities:
+
+Window management
+File system access
+Auto updates
+Printing
+Licensing
+Native dialogs
+IPC registration
+Renderer Process
+
+Responsibilities:
+
+React application
+UI rendering
+User interaction
+Feature modules
+Preload Process
+
+Provides a secure API bridge.
+
+Example:
+
+window.coop.database.backup()
+
+window.coop.updater.check()
+
+window.coop.files.exportPDF()
+
+Node.js APIs must never be exposed directly to the renderer.
+
+3.11 Inter-Process Communication (IPC)
+
+All communication between Electron processes must use secure IPC channels.
+
+Example:
+
+Renderer
+
+↓
+
+IPC Request
+
+↓
+
+Main Process
+
+↓
+
+Native API
+
+↓
+
+Response
+
+↓
+
+Renderer
+
+Rules:
+
+Validate all IPC messages.
+Whitelist allowed channels.
+Reject unknown requests.
+Never execute arbitrary commands.
+3.12 Data Flow
+
+Typical workflow:
+
+User Clicks Save
+
+↓
+
+React Form
+
+↓
+
+Validation (Zod)
+
+↓
+
+Application Service
+
+↓
+
+Repository
+
+↓
+
+SQLite
+
+↓
+
+Sync Queue
+
+↓
+
+UI Update
+
+When internet is available:
+
+Sync Queue
+
+↓
+
+Supabase
+
+↓
+
+Update Complete
+
+↓
+
+Local Metadata Updated
+3.13 AI Request Flow
+User Prompt
+
+↓
+
+Context Builder
+
+↓
+
+Prompt Generator
+
+↓
+
+Supabase Edge Function
+
+↓
+
+OpenAI Responses API
+
+↓
+
+Structured Response
+
+↓
+
+Formatter
+
+↓
+
+UI
+
+Advantages:
+
+API keys remain secure.
+Centralized rate limiting.
+Logging and monitoring.
+Prompt version control.
+3.14 Event-Driven Architecture
+
+Modules communicate through domain events where appropriate.
+
+Examples:
+
+OrderCreated
+
+InventoryUpdated
+
+CustomerCreated
+
+LowStockDetected
+
+ReportGenerated
+
+BackupCompleted
+
+Event handlers should remain loosely coupled.
+
+3.15 Offline-First Workflow
+
+Every mutation follows this sequence:
+
+User Action
+
+↓
+
+SQLite
+
+↓
+
+Mark Record Dirty
+
+↓
+
+Queue Sync Job
+
+↓
+
+Internet Available?
+
+↓
+
+Yes
+
+↓
+
+Supabase
+
+↓
+
+Mark Synced
+
+The UI should never wait for cloud synchronization before confirming a successful local operation.
+
+3.16 Error Propagation
+
+Errors flow upward through the application.
+
+Infrastructure
+
+↓
+
+Repository
+
+↓
+
+Application Service
+
+↓
+
+UI
+
+↓
+
+User Notification
+
+Each layer should add context without exposing sensitive implementation details.
+
+3.17 Configuration Management
+
+Configuration is centralized.
+
+Sources include:
+
+Environment variables
+User settings
+Feature flags
+Build configuration
+
+No hardcoded secrets or environment-specific values are permitted.
+
+3.18 Cross-Cutting Concerns
+
+The following concerns apply across all modules:
+
+Logging
+Authentication
+Authorization
+Validation
+Error handling
+Telemetry
+Performance monitoring
+
+These should be implemented through shared services or middleware rather than duplicated logic.
+
+3.19 Architectural Decision Records (ADRs)
+
+Significant architectural decisions must be documented as ADRs.
+
+Each ADR should include:
+
+Title
+Status
+Context
+Decision
+Consequences
+Alternatives considered
+
+Example topics:
+
+Why Electron was selected
+Why SQLite is used locally
+Why Supabase was chosen
+Why OpenAI Responses API is used
+Why CQRS is limited to AI and reporting
+3.20 Extensibility
+
+The architecture should allow future additions without disrupting existing modules.
+
+Examples:
+
+New business modules
+Additional AI providers
+macOS and Linux support
+Mobile clients
+Plugin marketplace
+Public APIs
+
+Extensions should integrate through interfaces and well-defined boundaries.
+
+3.21 Chapter Summary
+
+This chapter defines the structural foundation of Co-op. By combining Clean Architecture, Domain-Driven Design, feature-based organization, selective CQRS, and a monorepo approach, Co-op achieves a modular and maintainable architecture that supports offline-first operation, secure AI integration, and long-term scalability.
+
+The defined dependency rules, package responsibilities, and communication patterns provide a consistent blueprint for every engineer contributing to the project.

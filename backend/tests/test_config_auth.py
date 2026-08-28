@@ -16,26 +16,26 @@ def clean_env(monkeypatch):
         "DATABASE_URL",
         "SUPABASE_DB_URL",
         "CLERK_FRONTEND_API",
-        "FINCH_ENV",
+        "COOP_ENV",
         "APP_ENV",
     ):
         monkeypatch.delenv(var, raising=False)
 
 
 def test_database_url_required_outside_testing(clean_env, monkeypatch):
-    monkeypatch.setenv("FINCH_ENV", "production")
+    monkeypatch.setenv("COOP_ENV", "production")
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         config.database_url()
 
 
 def test_database_url_sqlite_only_in_testing(clean_env, monkeypatch):
-    monkeypatch.setenv("FINCH_ENV", "testing")
+    monkeypatch.setenv("COOP_ENV", "testing")
     assert config.database_url().startswith("sqlite+aiosqlite")
 
 
 def test_postgres_url_rewritten_to_asyncpg(clean_env, monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host:5432/finch")
-    assert config.database_url() == "postgresql+asyncpg://u:p@host:5432/finch"
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@host:5432/coop")
+    assert config.database_url() == "postgresql+asyncpg://u:p@host:5432/coop"
 
 
 def test_supabase_db_url_alias(clean_env, monkeypatch):
@@ -44,17 +44,17 @@ def test_supabase_db_url_alias(clean_env, monkeypatch):
 
 
 def test_clerk_frontend_api_required_in_production(clean_env, monkeypatch):
-    monkeypatch.setenv("FINCH_ENV", "production")
+    monkeypatch.setenv("COOP_ENV", "production")
     with pytest.raises(RuntimeError, match="CLERK_FRONTEND_API"):
         clerk_auth.get_frontend_api()
 
 
 def test_clerk_frontend_api_dev_default(clean_env, monkeypatch):
-    monkeypatch.setenv("FINCH_ENV", "development")
+    monkeypatch.setenv("COOP_ENV", "development")
     assert clerk_auth.get_frontend_api() == clerk_auth.DEFAULT_FRONTEND_API
 
 
 def test_clerk_frontend_api_explicit_wins(clean_env, monkeypatch):
-    monkeypatch.setenv("FINCH_ENV", "production")
+    monkeypatch.setenv("COOP_ENV", "production")
     monkeypatch.setenv("CLERK_FRONTEND_API", "prod.clerk.accounts.dev")
     assert clerk_auth.get_frontend_api() == "prod.clerk.accounts.dev"

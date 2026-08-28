@@ -1,4 +1,4 @@
--- SQLite Schema for Finch (BSD Chapter 1 backend foundation + Chapter 2 standards)
+-- SQLite Schema for Co-op (BSD Chapter 1 backend foundation + Chapter 2 standards)
 --
 -- Implements:
 --   * Multi-tenant isolation : business_id on every business table (BSD Ch1.8/1.17)

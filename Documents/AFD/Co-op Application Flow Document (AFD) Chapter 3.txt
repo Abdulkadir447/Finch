@@ -1,0 +1,494 @@
+Co-op Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 3 — Authentication & User Session Flow
+3.1 Purpose
+
+This chapter defines how users authenticate, create sessions, recover accounts, manage security, and access Co-op. It also specifies how sessions are maintained, restored, and terminated.
+
+The authentication system is designed to provide:
+
+Secure access
+Fast login
+Offline capability
+Seamless session restoration
+Future scalability for multiple user roles
+Integration with Supabase Authentication
+
+The primary objective is to make authentication nearly invisible while maintaining enterprise-grade security.
+
+3.2 Authentication Goals
+
+The authentication system must:
+
+Protect business data from unauthorized access.
+Support online authentication through Supabase.
+Allow offline login using previously verified credentials.
+Support Two-Factor Authentication (2FA).
+Restore valid sessions automatically.
+Prevent unauthorized session hijacking.
+Scale to support future multi-user environments.
+3.3 Authentication Architecture
+                 User
+                   │
+                   ▼
+          Login Screen
+                   │
+                   ▼
+          Supabase Auth
+                   │
+         ┌─────────┴─────────┐
+         ▼                   ▼
+ Authentication Success   Authentication Failed
+         │                   │
+         ▼                   ▼
+ Session Created       Display Error
+         │
+         ▼
+ Dashboard
+
+Supabase is the source of truth for authentication.
+
+SQLite never stores passwords.
+
+3.4 Authentication States
+
+Every authentication session exists in one of the following states:
+
+Logged Out
+      │
+      ▼
+Authenticating
+      │
+      ▼
+Authenticated
+      │
+      ▼
+Session Active
+      │
+      ▼
+Session Expired
+      │
+      ▼
+Reauthentication
+
+The application transitions smoothly between these states without unnecessary interruptions.
+
+3.5 Registration Flow
+
+New users must create an account before using Co-op.
+
+Flow:
+
+Launch Co-op
+      │
+      ▼
+Create Account
+      │
+      ▼
+Enter Information
+      │
+      ▼
+Validate Fields
+      │
+      ▼
+Supabase Creates User
+      │
+      ▼
+Email Verification
+      │
+      ▼
+Company Setup
+
+Required fields:
+
+Full Name
+Email Address
+Password
+Confirm Password
+
+Optional fields:
+
+Phone Number
+3.6 Login Flow
+
+Returning users authenticate through the Login screen.
+
+Open Co-op
+      │
+      ▼
+Login Screen
+      │
+      ▼
+Enter Email
+      │
+      ▼
+Enter Password
+      │
+      ▼
+Authenticate
+      │
+ ┌────┴────┐
+ │         │
+Success   Failure
+ │         │
+ ▼         ▼
+Dashboard Error Message
+
+After successful authentication:
+
+User profile loads.
+Session is created.
+Preferences are restored.
+Dashboard opens.
+3.7 Login Validation
+
+Before sending credentials to Supabase:
+
+Validate:
+
+Email format
+Password length
+Required fields
+
+Display inline validation errors immediately.
+
+Example:
+
+✖ Email address is invalid.
+
+✖ Password must contain at least 8 characters.
+3.8 Password Requirements
+
+Passwords should satisfy the following requirements:
+
+Minimum:
+
+8 characters
+
+Recommended:
+
+Uppercase letter
+Lowercase letter
+Number
+Special character
+
+Password strength meter:
+
+Weak
+
+■■□□□□□□□□
+
+Medium
+
+■■■■■□□□□□
+
+Strong
+
+■■■■■■■■■■
+3.9 Password Recovery Flow
+Forgot Password
+       │
+       ▼
+Enter Email
+       │
+       ▼
+Supabase Sends Reset Link
+       │
+       ▼
+User Opens Email
+       │
+       ▼
+Create New Password
+       │
+       ▼
+Login
+
+Password reset links should expire after a limited time.
+
+3.10 Email Verification
+
+During registration:
+
+Create Account
+      │
+      ▼
+Verification Email
+      │
+      ▼
+User Clicks Link
+      │
+      ▼
+Account Activated
+
+Until verified:
+
+AI usage is disabled.
+Cloud synchronization is disabled.
+Dashboard access is limited.
+3.11 Two-Factor Authentication (2FA)
+
+Users may enable Two-Factor Authentication from Settings.
+
+Flow:
+
+Login
+   │
+   ▼
+Password Verified
+   │
+   ▼
+Enter Verification Code
+   │
+   ▼
+Verify
+   │
+   ▼
+Dashboard
+
+If the code is incorrect:
+
+Incorrect Code
+      │
+      ▼
+Retry
+
+After multiple failed attempts, temporary rate limiting should apply.
+
+3.12 Remember Me
+
+The Login screen includes a Remember Me option.
+
+If enabled:
+
+Authentication tokens are securely stored.
+Future launches automatically restore the session.
+Users are not prompted to log in again unless the session expires or is revoked.
+
+Sensitive credentials are never stored in plain text.
+
+3.13 Auto Login Flow
+Launch Co-op
+      │
+      ▼
+Stored Session?
+      │
+ ┌────┴────┐
+ │         │
+Yes        No
+ │         │
+ ▼         ▼
+Dashboard Login
+
+If the stored session has expired:
+
+Session Expired
+       │
+       ▼
+Login Screen
+3.14 Offline Authentication
+
+If internet access is unavailable:
+
+Launch
+   │
+   ▼
+Internet?
+   │
+ ┌─┴────┐
+ │      │
+No     Yes
+ │
+ ▼
+Cached Session?
+ │
+ ┌─┴────┐
+ │      │
+Yes     No
+ │      │
+ ▼      ▼
+Dashboard Login Required
+
+Offline authentication requires:
+
+Previous successful login.
+Valid cached session.
+Device not manually signed out.
+3.15 User Session Lifecycle
+Login
+   │
+   ▼
+Session Created
+   │
+   ▼
+Session Active
+   │
+   ▼
+User Activity
+   │
+   ▼
+Session Refreshed
+   │
+   ▼
+Logout
+
+Sessions refresh automatically before expiration while online.
+
+3.16 Session Restoration
+
+After a crash or forced shutdown:
+
+Application Restart
+        │
+        ▼
+Session Exists
+        │
+        ▼
+Restore Session
+        │
+        ▼
+Dashboard
+
+The following should be restored:
+
+Current module
+Search filters
+Draft forms
+Open AI conversation
+Theme
+Sidebar state
+Window size and position
+3.17 Logout Flow
+User Clicks Logout
+        │
+        ▼
+Confirm Logout
+        │
+        ▼
+Clear Session
+        │
+        ▼
+Return to Login
+
+During logout:
+
+Authentication tokens are removed.
+Cached sensitive information is cleared.
+Background synchronization stops.
+
+Local business data remains intact.
+
+3.18 Future Role Support
+
+Although Co-op Version 1.0 supports only a single Business Owner, the authentication flow is designed for future expansion.
+
+Planned roles include:
+
+Administrator
+Manager
+Sales Staff
+Inventory Staff
+Accountant
+Viewer
+
+Future login flow:
+
+Login
+   │
+   ▼
+Authenticate
+   │
+   ▼
+Determine Role
+   │
+   ▼
+Load Permissions
+   │
+   ▼
+Dashboard
+
+Role-based permissions will determine module access without changing the core authentication flow.
+
+3.19 Authentication Error Handling
+
+Possible authentication errors include:
+
+Error	User Action
+Invalid email	Correct email
+Incorrect password	Retry
+Email not verified	Resend verification email
+Network unavailable	Use offline mode if eligible
+Session expired	Log in again
+Too many failed attempts	Wait and retry
+Server unavailable	Retry later
+
+All error messages should be user-friendly and avoid exposing internal system details.
+
+3.20 Security Measures
+
+Authentication security includes:
+
+HTTPS for all communication.
+JWT-based authentication via Supabase.
+Encrypted local token storage.
+Password hashing handled by Supabase.
+Secure session refresh.
+Automatic token expiration.
+Rate limiting on login attempts.
+Optional Two-Factor Authentication.
+Automatic logout after explicit user sign-out.
+3.21 Authentication State Diagram
+Logged Out
+      │
+      ▼
+Logging In
+      │
+      ▼
+Authenticated
+      │
+      ▼
+Session Active
+      │
+ ┌────┴────┐
+ │         │
+Logout  Session Expired
+ │         │
+ ▼         ▼
+Logged Out Reauthenticate
+
+This state machine ensures predictable authentication behavior throughout the application.
+
+3.22 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use Supabase Authentication as the identity provider.
+Store session tokens securely using Electron's secure storage mechanisms.
+Never store passwords locally.
+Validate inputs before network requests.
+Support offline login only for previously authenticated users.
+Restore sessions automatically after crashes.
+Keep authentication logic independent from business modules.
+Prepare authentication middleware for future role-based access control (RBAC).
+3.23 Acceptance Criteria
+
+The authentication system is considered complete when:
+
+Users can register and verify their email.
+Login works online and offline (where applicable).
+Password recovery functions correctly.
+Two-Factor Authentication is supported.
+Sessions restore automatically after crashes.
+"Remember Me" enables seamless auto-login.
+Logout clears active sessions securely.
+Authentication errors are handled gracefully.
+Security best practices are implemented.
+The architecture supports future multi-user role expansion.
+3.24 Chapter Summary
+
+This chapter defines the complete authentication and session lifecycle for Co-op. By combining secure Supabase authentication, offline-capable session management, automatic restoration, and future-ready role support, the system provides a seamless yet secure experience for business owners. The authentication flow is designed to minimize friction while protecting sensitive business data and preparing the application for future multi-user capabilities.

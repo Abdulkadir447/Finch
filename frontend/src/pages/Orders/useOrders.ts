@@ -4,8 +4,8 @@
  * hook only transports data through the Clerk-authenticated API client.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { brand, semantic } from '../../theme';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -51,13 +51,13 @@ export interface OrderCreateInput {
 
 export const ORDERS_PAGE_SIZE = 10;
 
-/** Tag colors from the Finch semantic palette. */
-export const STATUS_META: Record<OrderStatus, { label: string; color: string; bg: string }> = {
-  pending: { label: 'Pending', color: semantic.warning, bg: semantic.warningBg },
-  confirmed: { label: 'Confirmed', color: semantic.info, bg: semantic.infoBg },
-  shipped: { label: 'Shipped', color: brand.primary, bg: brand.primarySurface },
-  delivered: { label: 'Delivered', color: semantic.success, bg: semantic.successBg },
-  cancelled: { label: 'Cancelled', color: semantic.error, bg: semantic.errorBg },
+/** Status labels (display chrome lives in the page's CoopBadge variants). */
+export const STATUS_META: Record<OrderStatus, { label: string }> = {
+  pending: { label: 'Pending' },
+  confirmed: { label: 'Confirmed' },
+  shipped: { label: 'Shipped' },
+  delivered: { label: 'Delivered' },
+  cancelled: { label: 'Cancelled' },
 };
 
 export function useOrders() {
@@ -66,6 +66,14 @@ export function useOrders() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  // Command-palette deep links (Stage 2): apply ?q= when the palette
+  // navigates to this module — including while it is already mounted.
+  const location = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q');
+    if (q != null) setSearch(q);
+  }, [location.search]);
+
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -88,7 +96,7 @@ export function useOrders() {
         setPage(data.page);
       } catch (e) {
         setError(
-          e instanceof ApiError ? e : new ApiError('Unable to reach the Finch API.'),
+          e instanceof ApiError ? e : new ApiError('Unable to reach the Co-op API.'),
         );
       } finally {
         setLoading(false);

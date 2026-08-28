@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for Finch backend.
+"""SQLAlchemy ORM models for Co-op backend.
 
 Implements the BSD Chapter 1 backend foundation:
 
@@ -108,6 +108,7 @@ class Product(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
 
     order_items = relationship(
         "OrderItem",
@@ -153,6 +154,7 @@ class Customer(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
 
     orders = relationship(
         "Order",
@@ -174,10 +176,49 @@ class OrderStatus(str, Enum):
     cancelled = "cancelled"
 
 
+# ---------------------------------------------------------------------------
+# Import provenance (v1 Instant Onboarding, item 9)
+#
+# Every row created by the Intelligent Importer is stamped with the
+# ``ImportBatch`` that created it. ``import_batch_id IS NULL`` means the
+# record was created live in Co-op (manual/live); a set value means it came
+# from that import batch — giving a clean split between "imported history"
+# and "today's live sales", and making undoing an import a batch delete.
+# ---------------------------------------------------------------------------
+class ImportBatch(Base):
+    """One uploaded file that was imported (one dataset per batch)."""
+
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    dataset = Column(String(20), nullable=False)  # products | customers | orders
+    filename = Column(String(255))
+    row_count = Column(Integer, default=0)
+    created_count = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+
 class Order(Base):
     """Order entity (``orders`` table)."""
 
     __tablename__ = "orders"
+    # Imported orders carry the source system's order reference
+    # (``source_order_ref``) so a re-import of the same file is idempotent:
+    # the same external reference can never create a second order per
+    # business (partial unique index — mirrors the products SKU rule).
+    # Native (live) orders leave it NULL.
+    __table_args__ = (
+        Index(
+            "uq_orders_business_source_ref",
+            "business_id",
+            "source_order_ref",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL AND source_order_ref IS NOT NULL"),
+            sqlite_where=text("deleted_at IS NULL AND source_order_ref IS NOT NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True)            # tenant isolation
@@ -194,6 +235,8 @@ class Order(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    source_order_ref = Column(String(100), nullable=True)  # external order number from the old system (import idempotency)
 
     customer = relationship("Customer", back_populates="orders")
     items = relationship(
@@ -225,6 +268,7 @@ class OrderItem(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")
@@ -275,7 +319,7 @@ class StockMovement(Base):
 
 # ---------------------------------------------------------------------------
 # Profile — local user profile, keyed to the Clerk identity (BSD Ch3.11).
-# Supabase is the storage layer for Finch; identity comes from Clerk, so the
+# Supabase is the storage layer for Co-op; identity comes from Clerk, so the
 # profile is keyed by the Clerk user id and lives in Supabase Postgres.
 # ---------------------------------------------------------------------------
 class Profile(Base):

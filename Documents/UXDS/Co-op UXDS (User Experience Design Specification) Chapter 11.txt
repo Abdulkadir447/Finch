@@ -1,0 +1,581 @@
+Co-op UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 11 — Inventory Module Screen Specification
+11.1 Purpose
+
+The Inventory module is the operational center for managing all products and stock within Co-op.
+
+It provides business owners with real-time visibility into inventory levels, product performance, inventory valuation, and stock movement while leveraging AI to proactively identify risks and opportunities.
+
+The module is designed around four principles:
+
+Accuracy — Inventory should always reflect the current business state.
+Speed — Stock updates should require minimal effort.
+Visibility — Important inventory information should always be easy to find.
+Intelligence — AI should help users make better stocking decisions.
+11.2 Objectives
+
+The Inventory module enables users to:
+
+Add products
+Edit products
+Delete products
+View inventory levels
+Monitor inventory value
+Track stock movement
+Receive low-stock alerts
+Import and export inventory
+Search and filter products
+View AI inventory insights
+Work completely offline
+Automatically synchronize with Supabase
+11.3 Screen Layout
+
+The Inventory module follows a table-first design.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Inventory Header                                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Search │ Filters │ Import │ Export │ Add Product │ AI                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Product Table                                                              │
+│                                                                             │
+│ ▼ Expandable Rows                                                          │
+│ ▼ Expandable Rows                                                          │
+│ ▼ Expandable Rows                                                          │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Status Bar                                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+The product table occupies most of the available workspace.
+
+11.4 Inventory Header
+
+The page header contains:
+
+Left
+
+Inventory title
+Total products
+Total inventory value
+
+Center
+
+Search
+
+Right
+
+Import
+Export
+Add Product
+AI Assistant
+
+Example
+
+Inventory
+
+1,245 Products
+
+₦52,480,000 Inventory Value
+
+[Search]
+
+Import
+
+Export
+
++ Add Product
+
+🤖
+11.5 Inventory Dashboard
+
+Above the product table are four KPI cards.
+
+┌────────────┬────────────┬────────────┬────────────┐
+│ Products   │ Value      │ Low Stock  │ Categories │
+└────────────┴────────────┴────────────┴────────────┘
+
+Each card displays:
+
+Icon
+Title
+Current value
+Percentage change
+Mini trend graph
+11.6 Product Table
+
+Each row contains:
+
+Column	Description
+Image	Product image
+Product Name	Display name
+SKU	Unique stock identifier
+Category	Product category
+Stock	Current quantity
+Unit Price	Selling price
+Cost Price	Purchase price
+Inventory Value	Stock × Cost
+Status	In Stock / Low Stock / Out of Stock
+Last Updated	Timestamp
+
+Rows support sorting and filtering.
+
+11.7 Expandable Product Rows
+
+Clicking the expand icon reveals additional information.
+
+Expanded view includes:
+
+Product description
+Product image gallery
+Supplier information (future)
+Stock movement history
+Sales history
+AI insights
+Notes
+
+The expanded section opens inline without leaving the page.
+
+11.8 Product Details Drawer
+
+Selecting a product opens a right-side drawer.
+
+Contains:
+
+Product Information
+Pricing
+Inventory
+History
+Attachments
+Notes
+
+Quick actions:
+
+Edit Product
+Adjust Stock
+Duplicate Product
+Delete Product
+11.9 Add Product Flow
+Inventory
+
+↓
+
+Add Product
+
+↓
+
+Enter Details
+
+↓
+
+Save
+
+↓
+
+Inventory Updated
+
+↓
+
+Dashboard Refreshes
+
+Required fields:
+
+Product Name
+SKU
+Category
+Cost Price
+Selling Price
+Initial Stock
+
+Optional:
+
+Description
+Product Image
+Barcode (future)
+Notes
+11.10 Edit Product
+
+Users can modify:
+
+Name
+Pricing
+Category
+Description
+Images
+Notes
+
+Changes save instantly after confirmation.
+
+11.11 Stock Adjustment
+
+Stock adjustments use a dedicated dialog.
+
+Options:
+
+Increase Stock
+Decrease Stock
+Set Exact Quantity
+
+Users must provide:
+
+Quantity
+Reason
+
+Example reasons:
+
+Purchase
+Sale
+Damaged
+Returned
+Manual Correction
+
+Every adjustment is logged.
+
+11.12 Stock Movement History
+
+Each product maintains a complete movement log.
+
+Example:
+
++50
+
+Purchase
+
+09:15
+
+Yesterday
+
+────────────
+
+-5
+
+Sale
+
+10:42
+
+Today
+
+────────────
+
+-2
+
+Damaged
+
+13:18
+
+Today
+
+Movement history cannot be edited.
+
+11.13 Low Stock Management
+
+Products below the configured threshold display:
+
+Warning badge
+Dashboard notification
+Notification Center alert
+
+AI also recommends:
+
+Suggested reorder quantity
+Best reorder timing
+11.14 Search Experience
+
+Search supports:
+
+Product Name
+SKU
+Category
+Notes
+
+Search updates instantly.
+
+Expected response:
+
+Under 150 milliseconds
+
+11.15 Filtering
+
+Supported filters:
+
+Stock
+
+In Stock
+Low Stock
+Out of Stock
+
+Category
+
+Price
+
+Inventory Value
+
+Date Updated
+
+Supplier (future)
+
+Multiple filters may be active simultaneously.
+
+11.16 Bulk Actions
+
+Multiple products can be selected.
+
+Supported actions:
+
+Export
+Delete
+Update Category
+Adjust Stock
+Print Labels (future)
+
+Destructive actions require confirmation.
+
+11.17 Import Products
+
+Supported formats:
+
+CSV
+Excel
+
+Import wizard:
+
+Choose File
+
+↓
+
+Preview
+
+↓
+
+Map Columns
+
+↓
+
+Import
+
+↓
+
+Summary
+
+Validation occurs before importing.
+
+11.18 Export Products
+
+Supported formats:
+
+CSV
+Excel
+PDF
+
+Export options:
+
+Entire inventory
+Filtered inventory
+Selected products
+11.19 Inventory Charts
+
+The Inventory module includes two charts.
+
+Inventory Value
+
+Shows:
+
+Total inventory value over time
+
+Low Stock Trends
+
+Shows:
+
+Number of low-stock products
+Historical stock shortages
+
+Charts support:
+
+Zoom
+Hover
+Export
+11.20 AI Inventory Insights
+
+AI analyzes inventory continuously.
+
+Examples:
+
+Product A may run out in approximately 6 days.
+
+Product B has not sold in 90 days.
+
+Product C demand is expected to increase next month.
+
+Users can ask:
+
+Which products should I reorder?
+Which products are overstocked?
+Which products sell the fastest?
+11.21 Notifications
+
+Inventory notifications include:
+
+Low Stock
+Out of Stock
+Import Completed
+Export Completed
+Inventory Sync Complete
+
+Notifications link directly to affected products.
+
+11.22 Empty State
+
+When no products exist:
+
+Display:
+
+Illustration
+
+Message:
+
+Your inventory is empty.
+
+Primary button:
+
+Add Your First Product
+
+AI suggestion:
+
+Import your existing inventory using a CSV or Excel file.
+
+11.23 Loading State
+
+Loading order:
+
+KPI cards
+Product table
+Charts
+AI insights
+
+Skeleton loaders maintain layout consistency.
+
+11.24 Error State
+
+Example:
+
+Unable to load inventory.
+
+Retry
+
+Continue Offline
+
+Existing cached inventory remains available.
+
+11.25 Offline Behavior
+
+Available offline:
+
+Add products
+Edit products
+Delete products
+Adjust stock
+Search
+Filter
+Export
+
+Unavailable:
+
+AI
+Cloud synchronization
+
+Changes queue automatically for synchronization when connectivity returns.
+
+11.26 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + N	Add Product
+Ctrl + F	Search Products
+Ctrl + S	Save Product
+Ctrl + I	Import Inventory
+Ctrl + E	Export Inventory
+Ctrl + Shift + A	Ask AI
+Delete	Delete Product
+Esc	Close Drawer
+11.27 Animations
+
+Animations include:
+
+Expand row
+Drawer slide
+KPI hover
+Success notification
+Stock adjustment confirmation
+
+Duration:
+
+180–220 milliseconds
+
+Animations should emphasize state changes without slowing interaction.
+
+11.28 Accessibility
+
+The Inventory module supports:
+
+Keyboard-only navigation
+Screen readers
+Accessible data tables
+High-contrast mode
+Zoom up to 200%
+Visible focus indicators
+
+Status indicators use icons and labels in addition to color.
+
+11.29 Performance Targets
+Metric	Target
+Page Load	<2 seconds
+Product Search	<150 ms
+Product Save	<500 ms
+Table Scroll	60 FPS
+Stock Update	<300 ms
+Chart Render	<1 second
+11.30 Developer Component Structure
+InventoryPage
+├── InventoryHeader
+├── InventoryKPIs
+├── SearchBar
+├── FilterBar
+├── ProductTable
+│   ├── ProductRow
+│   ├── ExpandedRow
+│   └── ContextMenu
+├── ProductDrawer
+├── StockAdjustmentDialog
+├── InventoryCharts
+├── AIInsightsCard
+├── ImportWizard
+├── ExportDialog
+└── FloatingAI
+
+Each component should:
+
+Be independently testable.
+Support loading, empty, and error states.
+Use Co-op design tokens.
+Respect Light and Dark themes.
+Integrate with SQLite (local) and Supabase (cloud).
+11.31 Acceptance Criteria
+
+The Inventory module is complete when:
+
+Users can efficiently manage products and stock.
+Expandable rows provide detailed product information without disrupting workflows.
+Inventory updates propagate immediately to the Dashboard and Reports.
+AI generates actionable inventory recommendations.
+Import and export workflows are reliable.
+Offline changes synchronize automatically when connectivity returns.
+Accessibility and performance requirements are satisfied.
+All interactions follow the Co-op design system.
+Chapter Summary
+
+The Inventory module is the operational hub for managing products and stock within Co-op. Its table-first layout, expandable product rows, stock adjustment workflows, AI-driven insights, and offline-first architecture enable business owners to maintain accurate inventory with minimal effort. By combining powerful data management with intelligent recommendations, the module helps users optimize stock levels, reduce shortages, and make informed purchasing decisions.

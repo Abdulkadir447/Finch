@@ -1,0 +1,450 @@
+Co-op Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 14 — Notifications & Activity Schema
+14.1 Purpose
+
+The Notifications & Activity module is responsible for informing users about important business events while maintaining a complete timeline of actions performed throughout the application. It serves as the communication layer between Co-op's backend services and the user interface.
+
+This module integrates with every major subsystem including:
+
+Orders
+Inventory
+Customers
+Payments
+Reports
+AI Assistant
+Synchronization
+Security
+Settings
+
+Notifications help users react to business events in real time, while the Activity Timeline provides a permanent history of important actions for auditing, troubleshooting, and operational awareness.
+
+14.2 Objectives
+
+The Notifications & Activity module must:
+
+Support in-app notifications.
+Support desktop notifications.
+Track read and unread states.
+Support notification expiration.
+Store activity history.
+Support AI-generated alerts.
+Support system announcements.
+Support notification actions.
+Synchronize efficiently.
+Work offline.
+14.3 Architecture
+Business Events
+       │
+       ▼
+ Notification Engine
+       │
+ ┌─────┼─────────┬─────────┐
+ ▼     ▼         ▼         ▼
+Alerts Activity Desktop In-App
+       │
+       ▼
+ Notification Center
+
+Every module can generate notifications through the Notification Engine.
+
+14.4 Core Tables
+Table	Purpose
+notifications	Notification records
+notification_preferences	User preferences
+notification_delivery	Delivery status
+notification_actions	User interaction
+activity_log	System activity
+activity_categories	Activity classification
+system_announcements	Global announcements
+notification_queue	Pending notifications
+14.5 Notifications Table
+Table: notifications
+Column	Type
+id	UUID
+business_id	UUID
+user_id	UUID
+title	TEXT
+message	TEXT
+notification_type	TEXT
+priority	TEXT
+related_module	TEXT
+related_record_id	UUID
+is_read	BOOLEAN
+expires_at	TIMESTAMPTZ
+created_at	TIMESTAMPTZ
+version	INTEGER
+
+Notifications are soft-deleted after expiration and permanently removed by scheduled cleanup jobs.
+
+14.6 Notification Types
+
+Supported notification types include:
+
+Information
+Success
+Warning
+Error
+Reminder
+AI Recommendation
+Security Alert
+System Update
+
+Future notification types can be added without modifying the database structure.
+
+14.7 Notification Priority
+
+Priority levels determine display order.
+
+Critical
+
+↓
+
+High
+
+↓
+
+Normal
+
+↓
+
+Low
+
+Critical notifications always appear before lower-priority notifications.
+
+14.8 Notification Preferences
+Table: notification_preferences
+
+Stores per-user settings.
+
+Column	Type
+id	UUID
+user_id	UUID
+desktop_enabled	BOOLEAN
+in_app_enabled	BOOLEAN
+ai_notifications	BOOLEAN
+order_notifications	BOOLEAN
+inventory_notifications	BOOLEAN
+report_notifications	BOOLEAN
+quiet_hours_enabled	BOOLEAN
+quiet_hours_start	TIME
+quiet_hours_end	TIME
+updated_at	TIMESTAMPTZ
+
+These preferences override company defaults where permitted.
+
+14.9 Notification Delivery
+Table: notification_delivery
+
+Tracks delivery status.
+
+Fields include:
+
+Notification ID
+Delivery Channel
+Delivery Status
+Delivered Time
+Failure Reason
+Retry Count
+
+Delivery channels:
+
+In-App
+Desktop
+Email (Future)
+Mobile Push (Future)
+14.10 Notification Actions
+
+Notifications may contain quick actions.
+
+Table: notification_actions
+
+Examples:
+
+Open Order
+
+View Customer
+
+Restock Product
+
+Open Report
+
+Approve AI Action
+
+Dismiss
+
+Each action is linked to the related business object, allowing the application to open the correct page automatically.
+
+14.11 Notification Workflow
+Business Event
+      │
+      ▼
+Create Notification
+      │
+      ▼
+Check User Preferences
+      │
+      ▼
+Queue Delivery
+      │
+      ▼
+Display Notification
+      │
+      ▼
+User Action
+      │
+      ▼
+Update Status
+
+Notifications respect user preferences and business rules before delivery.
+
+14.12 Activity Log
+Table: activity_log
+
+Stores every significant application event.
+
+Column	Type
+id	UUID
+business_id	UUID
+user_id	UUID
+category_id	UUID
+module	TEXT
+action	TEXT
+description	TEXT
+related_record_id	UUID
+created_at	TIMESTAMPTZ
+
+Unlike notifications, activity records are permanent until archived according to retention policies.
+
+14.13 Activity Categories
+Table: activity_categories
+
+Examples:
+
+Orders
+
+Inventory
+
+Customers
+
+Payments
+
+Reports
+
+AI
+
+Security
+
+Settings
+
+System
+
+Categories simplify filtering and reporting.
+
+14.14 Activity Timeline
+
+Timeline example:
+
+User Logged In
+
+↓
+
+Order Created
+
+↓
+
+Payment Received
+
+↓
+
+Inventory Updated
+
+↓
+
+AI Generated Report
+
+↓
+
+Customer Added
+
+The timeline provides a chronological history of business operations.
+
+14.15 AI Notifications
+
+The AI Assistant generates notifications for:
+
+Inventory shortages.
+Sales opportunities.
+High-value customers.
+Unusual financial activity.
+Business performance summaries.
+Forecast updates.
+AI action approvals.
+
+AI notifications are clearly identified to distinguish them from system-generated alerts.
+
+14.16 System Announcements
+Table: system_announcements
+
+Stores global messages.
+
+Fields:
+
+Title
+Message
+Severity
+Publish Date
+Expiration Date
+Target Version
+
+Examples:
+
+Maintenance notices
+Feature releases
+Security advisories
+Critical updates
+14.17 Notification Expiration
+
+Based on your earlier requirements:
+
+Notifications are automatically deleted after a configurable period.
+
+Lifecycle:
+
+Created
+
+↓
+
+Delivered
+
+↓
+
+Read
+
+↓
+
+Expired
+
+↓
+
+Automatically Deleted
+
+Expired notifications remain visible only until the configured retention period ends.
+
+14.18 Relationships
+notifications
+      │
+      ├── notification_delivery
+      ├── notification_actions
+      └── notification_preferences
+
+activity_log
+      │
+      └── activity_categories
+
+system_announcements
+
+Notifications are linked to the originating business module using related_module and related_record_id.
+
+14.19 Synchronization
+
+The module synchronizes:
+
+Notifications
+Read status
+Activity records
+User preferences
+AI alerts
+Announcement status
+
+Only incremental changes are synchronized to reduce bandwidth.
+
+14.20 Security
+
+Notifications and activity records are protected using:
+
+Authentication
+Business isolation
+Role-Based Access Control (RBAC)
+Row Level Security (RLS)
+
+Users only receive notifications for data they are authorized to access.
+
+14.21 Performance
+
+Indexes should exist on:
+
+business_id
+user_id
+notification_type
+priority
+is_read
+expires_at
+created_at
+module
+category_id
+
+Frequently accessed notifications are cached locally to ensure the Notification Center opens instantly.
+
+14.22 Audit Logging
+
+Although the Activity Log already records operational events, the notification system also audits:
+
+Notification created
+Notification delivered
+Notification read
+Notification dismissed
+Notification expired
+Notification deleted
+Announcement published
+User preference changed
+
+This provides complete traceability.
+
+14.23 Offline Behavior
+
+The Notifications & Activity module fully supports offline operation.
+
+Users can:
+
+View cached notifications.
+Read activity history.
+Mark notifications as read.
+Dismiss notifications.
+View AI recommendations already stored locally.
+
+Actions performed offline are synchronized automatically when connectivity is restored.
+
+14.24 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all notification-related tables.
+Separate notifications, delivery tracking, preferences, and activity logs into normalized tables.
+Use a background worker to process the notification queue.
+Automatically remove expired notifications according to retention settings.
+Support actionable notifications by linking them to business records.
+Cache recent notifications locally for fast access.
+Protect all notification data using Row Level Security (RLS).
+14.25 Acceptance Criteria
+
+The Notifications & Activity Schema is complete when:
+
+Both in-app and desktop notifications are supported.
+Read and unread states function correctly.
+Notifications respect user preferences.
+Action buttons open the correct application page.
+AI-generated alerts are displayed separately.
+Activity history records all significant events.
+Expired notifications are automatically removed.
+Offline notification management synchronizes successfully.
+All notification and activity data is secured by RLS and fully audited.
+14.26 Chapter Summary
+
+The Notifications & Activity Schema provides Co-op with a centralized event communication system that keeps users informed while maintaining a comprehensive history of business operations. Through support for in-app and desktop notifications, AI-generated alerts, configurable preferences, actionable notifications, and a permanent activity timeline, the module enhances usability, accountability, and operational awareness. Its offline-first architecture, efficient synchronization strategy, and secure RBAC/RLS integration ensure reliability and scalability as Co-op grows.

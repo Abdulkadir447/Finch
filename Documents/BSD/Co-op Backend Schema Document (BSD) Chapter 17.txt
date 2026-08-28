@@ -1,0 +1,411 @@
+Co-op Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 17 — Backup, Recovery & Data Lifecycle Schema
+17.1 Purpose
+
+The Backup, Recovery & Data Lifecycle module ensures that business data remains protected against accidental deletion, hardware failure, software corruption, and other unexpected events. It provides secure backup management, automatic recovery, data retention policies, and lifecycle management while supporting Co-op's offline-first architecture.
+
+This module integrates with:
+
+Synchronization
+Security
+Audit Logs
+Storage
+AI
+Notifications
+Settings
+
+Together, these systems ensure that business data is recoverable, traceable, and managed efficiently throughout its lifecycle.
+
+17.2 Objectives
+
+The Backup & Recovery module must:
+
+Create automatic backups.
+Support manual backups.
+Restore backups safely.
+Support soft deletion.
+Provide a recycle bin (Trash).
+Permanently remove expired data.
+Compress backup files.
+Verify backup integrity.
+Support disaster recovery.
+Maintain backup history.
+17.3 Architecture
+SQLite Database
+        │
+        ▼
+ Backup Manager
+        │
+ ┌──────┼─────────┐
+ ▼      ▼         ▼
+Local  Cloud   Verification
+Backup Backup   Engine
+        │
+        ▼
+ Recovery Manager
+
+Backups can be stored locally, in the cloud, or both depending on user settings.
+
+17.4 Core Tables
+Table	Purpose
+backups	Backup records
+backup_history	Backup events
+restore_history	Restore operations
+deleted_items	Soft-deleted records
+archive_records	Archived data
+backup_settings	Backup configuration
+backup_integrity	Verification results
+disaster_recovery	Recovery sessions
+17.5 Backups Table
+Table: backups
+Column	Type
+id	UUID
+business_id	UUID
+backup_name	TEXT
+backup_type	TEXT
+storage_location	TEXT
+file_size	BIGINT
+checksum	TEXT
+created_by	UUID
+created_at	TIMESTAMPTZ
+expires_at	TIMESTAMPTZ
+
+Each backup receives a unique identifier and integrity checksum.
+
+17.6 Backup Types
+
+Supported backup types:
+
+Automatic Backup
+Manual Backup
+Scheduled Backup
+Before Major Update
+Before Database Migration
+Before Restore Operation
+
+Future enterprise editions may support incremental snapshot backups.
+
+17.7 Backup Settings
+Table: backup_settings
+
+Stores user preferences.
+
+Fields include:
+
+Automatic Backups Enabled
+Backup Frequency
+Local Backup Enabled
+Cloud Backup Enabled
+Compression Enabled
+Encryption Enabled
+Retention Period
+Last Backup
+
+Settings are configurable per business.
+
+17.8 Automatic Backups
+
+Automatic backups run:
+
+Daily (default)
+Before major application updates
+Before database migrations
+Before large imports
+Before restore operations
+
+Users may also configure weekly or monthly schedules.
+
+17.9 Manual Backups
+
+Users can create backups at any time.
+
+Workflow:
+
+User Selects Backup
+
+↓
+
+Prepare Database
+
+↓
+
+Compress Backup
+
+↓
+
+Encrypt Backup
+
+↓
+
+Verify Integrity
+
+↓
+
+Save Backup
+
+A success notification is displayed once the process completes.
+
+17.10 Soft Delete & Trash
+
+Following your requirements:
+
+Deleted records are not immediately removed.
+
+Instead:
+
+Record Deleted
+
+↓
+
+Moved to Trash
+
+↓
+
+Retention Period
+
+↓
+
+Automatically Deleted
+
+Users can restore records during the retention period.
+
+17.11 Deleted Items
+Table: deleted_items
+
+Stores:
+
+Original Table
+Record ID
+Deleted By
+Deleted At
+Scheduled Deletion Date
+Restore Status
+
+This enables safe recovery of accidentally deleted data.
+
+17.12 Restore Workflow
+Select Backup
+
+↓
+
+Validate Backup
+
+↓
+
+Verify Integrity
+
+↓
+
+Preview Changes
+
+↓
+
+Confirm Restore
+
+↓
+
+Restore Database
+
+↓
+
+Log Operation
+
+The user is always prompted before a restore begins.
+
+17.13 Archive Records
+Table: archive_records
+
+Stores inactive but valuable data.
+
+Examples:
+
+Completed orders older than several years
+Historical reports
+Closed projects
+Legacy inventory records
+
+Archived data remains searchable but is excluded from most operational queries to improve performance.
+
+17.14 Backup Integrity
+Table: backup_integrity
+
+Stores verification results.
+
+Fields:
+
+Backup ID
+Verification Time
+Checksum Result
+Validation Status
+Error Details
+
+Every backup is verified before it is considered usable.
+
+17.15 Disaster Recovery
+Table: disaster_recovery
+
+Stores recovery attempts.
+
+Fields include:
+
+Recovery Session ID
+Backup Used
+Started At
+Completed At
+Recovery Status
+Recovery Notes
+
+This table assists administrators during major recovery events.
+
+17.16 Backup Compression
+
+To minimize storage usage:
+
+Database backups are compressed.
+Duplicate information is removed where possible.
+Metadata is stored separately from binary files.
+Attachments are referenced rather than embedded when appropriate.
+
+This keeps backup sizes manageable while preserving completeness.
+
+17.17 Data Retention Policy
+
+Lifecycle:
+
+Active Data
+
+↓
+
+Archived
+
+↓
+
+Soft Deleted
+
+↓
+
+Trash
+
+↓
+
+Permanent Deletion
+
+Retention periods are configurable by the business and can differ by data type.
+
+17.18 Relationships
+backups
+    │
+    ├── backup_history
+    ├── backup_integrity
+    ├── restore_history
+    └── disaster_recovery
+
+deleted_items
+      │
+      ▼
+archive_records
+
+The Backup module references all business-owned tables but does not duplicate live operational data unnecessarily.
+
+17.19 Synchronization
+
+The following synchronize across devices:
+
+Backup metadata
+Backup settings
+Restore history
+Deleted item metadata
+Archive status
+
+Actual backup files remain in their configured storage locations and are downloaded only when needed.
+
+17.20 Security
+
+Backup data is protected using:
+
+AES-256 encryption (when enabled)
+HTTPS/TLS during transfers
+JWT-authenticated access
+Row Level Security (RLS)
+Business isolation
+
+Only authorized users may create, restore, or delete backups.
+
+17.21 Performance
+
+Performance optimizations include:
+
+Background backup processing.
+Compression before storage.
+Incremental metadata synchronization.
+Automatic cleanup of expired backups.
+Archive separation from operational data.
+
+These measures minimize performance impact during normal application use.
+
+17.22 Audit Logging
+
+The following events are recorded:
+
+Backup created
+Backup deleted
+Backup restored
+Backup verified
+Automatic backup completed
+Restore cancelled
+Record restored from Trash
+Record permanently deleted
+Archive created
+Archive restored
+
+All events include the acting user, business, timestamp, and affected resources.
+
+17.23 Offline Behavior
+
+The Backup & Recovery module supports offline operation.
+
+Users can:
+
+Create local backups.
+Restore from locally stored backups.
+Browse backup history.
+Recover items from the Trash.
+Archive or restore archived records.
+
+Cloud backup synchronization resumes automatically once connectivity is restored.
+
+17.24 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all backup-related tables.
+Separate backup metadata from backup files.
+Compress and optionally encrypt backups before storage.
+Verify integrity using checksums after every backup.
+Implement configurable retention policies.
+Store deleted records in a dedicated Trash before permanent removal.
+Archive inactive records to improve operational performance.
+Protect all backup operations with RBAC and RLS.
+17.25 Acceptance Criteria
+
+The Backup, Recovery & Data Lifecycle Schema is complete when:
+
+Automatic and manual backups function correctly.
+Backup settings are configurable per business.
+Backups are compressed and integrity-checked.
+Deleted records move to Trash before permanent deletion.
+Users can restore records during the retention period.
+Restore operations validate backups before execution.
+Archive functionality improves performance without data loss.
+Backup metadata synchronizes correctly.
+All backup operations are secure, audited, and recoverable.
+17.26 Chapter Summary
+
+The Backup, Recovery & Data Lifecycle Schema ensures that Co-op protects business data throughout its entire lifecycle. By combining automated and manual backups, secure restoration workflows, configurable retention policies, soft deletion, archival storage, and disaster recovery capabilities, the module provides resilience against data loss while maintaining performance and security. Its offline-first design, encrypted backup support, and comprehensive audit logging make it suitable for businesses ranging from small startups to future enterprise deployments.

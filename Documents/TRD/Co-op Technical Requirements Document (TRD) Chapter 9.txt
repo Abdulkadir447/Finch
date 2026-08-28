@@ -1,0 +1,379 @@
+Co-op Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 9 — AI Architecture & OpenAI Integration
+9.1 Purpose
+
+This chapter defines the artificial intelligence architecture of Co-op, including the integration with the OpenAI Responses API, prompt management, context building, AI workflows, response validation, security, and performance requirements.
+
+The AI system is designed to function as an intelligent business assistant, helping business owners understand their business, make informed decisions, automate repetitive tasks, and generate actionable insights.
+
+Unlike traditional chatbots, Co-op AI is deeply integrated into the application's business data and workflows.
+
+9.2 AI Design Goals
+
+The AI system must achieve the following objectives:
+
+Understand business data
+Generate accurate insights
+Produce structured outputs
+Respond quickly
+Protect business information
+Scale to future AI capabilities
+Support additional AI providers in the future
+9.3 AI Technology Stack
+Component	Technology
+AI Model	OpenAI GPT-5.5
+API	OpenAI Responses API
+Gateway	Supabase Edge Functions
+Prompt Engine	Custom Prompt Templates
+Response Format	Structured JSON + Markdown
+Context Store	SQLite + Supabase
+AI History	SQLite + Supabase
+Logging	Pino
+9.4 AI System Architecture
+                 User
+
+                  │
+
+                  ▼
+
+          AI Assistant UI
+
+                  │
+
+                  ▼
+
+         Context Builder
+
+                  │
+
+                  ▼
+
+         Prompt Generator
+
+                  │
+
+                  ▼
+
+      Supabase Edge Function
+
+                  │
+
+                  ▼
+
+      OpenAI Responses API
+
+                  │
+
+                  ▼
+
+      Structured AI Response
+
+                  │
+
+                  ▼
+
+     Response Validator
+
+                  │
+
+                  ▼
+
+            Co-op UI
+
+The desktop application never communicates directly with OpenAI.
+
+9.5 AI Request Lifecycle
+
+Every AI interaction follows the same lifecycle.
+
+User Request
+
+↓
+
+Collect Context
+
+↓
+
+Generate Prompt
+
+↓
+
+Call Edge Function
+
+↓
+
+OpenAI Processing
+
+↓
+
+Receive Response
+
+↓
+
+Validate Output
+
+↓
+
+Display Result
+
+↓
+
+Save Conversation
+9.6 Context Builder
+
+The Context Builder collects relevant business information before generating a prompt.
+
+Possible context includes:
+
+Orders
+Customers
+Inventory
+Sales history
+Profit and Loss
+Forecast history
+Business settings
+Previous AI conversations
+
+Only the information required for the current task should be included.
+
+9.7 Prompt Engineering
+
+Prompts are generated from reusable templates rather than being hardcoded.
+
+Prompt components include:
+
+System Instructions
+Business Context
+User Request
+Formatting Rules
+Output Schema
+Safety Constraints
+
+This modular approach simplifies maintenance and future model upgrades.
+
+9.8 AI Capabilities (Version 1.0)
+
+Co-op AI supports the following capabilities:
+
+Business Analysis
+
+Examples:
+
+Analyze sales performance
+Identify best-selling products
+Detect slow-moving inventory
+Explain revenue trends
+Report Summarization
+
+Generate concise summaries for:
+
+Profit & Loss reports
+Sales reports
+Inventory reports
+Forecast reports
+Forecast Generation
+
+Generate forecasts for:
+
+Sales
+Revenue
+Inventory demand
+Customer growth
+
+Forecasts use a hybrid approach that combines historical business data with AI interpretation.
+
+Chart Explanation
+
+Explain charts including:
+
+Revenue over time
+Inventory value
+Customer growth
+
+The AI should describe trends, anomalies, and potential actions.
+
+Invoice Assistance
+
+Assist with:
+
+Invoice summaries
+Payment reminders
+Customer communication drafts
+9.9 AI Response Formats
+
+Responses may include:
+
+Plain text
+Markdown
+Tables
+JSON (structured output)
+Lists
+
+Structured JSON should be preferred for data consumed programmatically.
+
+9.10 Response Validation
+
+All AI responses must be validated before use.
+
+Validation includes:
+
+JSON schema validation (when applicable)
+Required fields
+Data type verification
+Length limits
+Content safety checks
+
+Invalid responses should trigger a retry or a user-friendly error message.
+
+9.11 AI Conversation History
+
+Conversation history is stored locally and synchronized to the cloud.
+
+Each conversation includes:
+
+Conversation ID
+User ID
+Timestamp
+Prompt
+Response
+Context reference
+Token usage (if available)
+
+Users should be able to review previous conversations.
+
+9.12 AI Privacy
+
+Business data shared with the AI should be limited to what is necessary for the request.
+
+Rules:
+
+Do not send unrelated customer data.
+Minimize personally identifiable information (PII).
+Avoid unnecessary historical records.
+Respect user privacy settings.
+9.13 AI Security
+
+Security measures include:
+
+API keys stored only in Supabase Edge Functions
+HTTPS for all communication
+Authentication required for AI requests
+Input validation
+Output validation
+Rate limiting
+Audit logging
+
+The desktop application must never expose OpenAI credentials.
+
+9.14 AI Rate Limiting
+
+The backend should enforce limits to prevent abuse.
+
+Example controls:
+
+Requests per minute
+Requests per hour
+Maximum prompt size
+Maximum response size
+
+Limits may vary based on licensing tiers in future releases.
+
+9.15 Error Handling
+
+Common AI errors include:
+
+Network unavailable
+Rate limit exceeded
+Invalid response
+Timeout
+Service unavailable
+
+The application should present clear, actionable messages and allow users to retry requests.
+
+9.16 Offline Behavior
+
+AI features require an internet connection.
+
+When offline:
+
+AI Assistant is unavailable.
+Existing AI history remains accessible.
+Users should be informed that AI functionality will resume when connectivity returns.
+
+No requests should be queued automatically for later submission.
+
+9.17 Performance Targets
+Operation	Target
+Request Preparation	< 200 ms
+Edge Function Processing	< 500 ms
+AI Response Start	< 2 seconds
+Typical AI Response	< 10 seconds
+Response Validation	< 100 ms
+
+Performance may vary depending on prompt complexity and model response time.
+
+9.18 Prompt Templates
+
+Prompt templates should be version-controlled.
+
+Examples:
+
+Business Analysis
+Sales Forecast
+Inventory Forecast
+Report Summary
+Chart Explanation
+Invoice Assistant
+
+Each template should include metadata such as version number and intended use.
+
+9.19 AI Logging
+
+The following events should be logged:
+
+Request received
+Prompt template used
+Processing time
+Success or failure
+Validation results
+Error codes
+
+Prompt contents and business data should be logged only when necessary and in accordance with privacy requirements.
+
+9.20 Future AI Capabilities
+
+The architecture is designed to support future enhancements, including:
+
+Voice AI
+Autonomous AI agents
+Workflow automation
+Natural language database queries
+Predictive inventory optimization
+Multi-step planning
+Document understanding
+Email drafting and sending
+Multi-model support
+
+These features can be added without major architectural changes.
+
+9.21 Acceptance Criteria
+
+The AI implementation is considered complete when:
+
+AI requests are routed securely through Supabase Edge Functions.
+GPT-5.5 responses are displayed correctly.
+Structured outputs are validated.
+Business context is included appropriately.
+Conversation history is stored and synchronized.
+AI remains unavailable while offline without affecting other application features.
+Performance targets are met under normal operating conditions.
+Chapter Summary
+
+This chapter defines Co-op's AI architecture, integrating GPT-5.5 through the OpenAI Responses API and Supabase Edge Functions. The AI system combines structured prompt engineering, context-aware business analysis, secure request routing, response validation, and conversation history to deliver intelligent assistance while protecting user data and maintaining a clear separation between the desktop application and cloud-based AI services.

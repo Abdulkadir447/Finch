@@ -1,6 +1,7 @@
 import React from 'react';
-import { Button, Result, theme as antdTheme } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import CoopButton from '../components/ui/CoopButton';
+import { CoopEmptyState } from '../components/ui';
 
 /**
  * In-app 404 (Task 12 / M10). Unknown routes render this instead of an empty
@@ -8,20 +9,17 @@ import { useNavigate } from 'react-router-dom';
  */
 const NotFound: React.FC = () => {
   const navigate = useNavigate();
-  const { token } = antdTheme.useToken();
 
   return (
-    <Result
-      status="404"
-      title="Page not found"
-      subTitle="The page you're looking for doesn't exist or may have moved."
-      style={{ color: token.colorText }}
-      extra={
-        <Button type="primary" onClick={() => navigate('/')}>
-          Back to Dashboard
-        </Button>
-      }
-    />
+    <div style={{ paddingTop: 48 }}>
+      <CoopEmptyState
+        title="Page not found"
+        description="The page you're looking for doesn't exist or may have moved."
+        action={
+          <CoopButton onClick={() => navigate('/')}>Back to Dashboard</CoopButton>
+        }
+      />
+    </div>
   );
 };
 

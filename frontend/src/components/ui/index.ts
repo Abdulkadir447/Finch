@@ -1,0 +1,26 @@
+/** Co-op UI primitives (Stage 1) — the shared design-layer components. */
+export { default as CoopButton } from './CoopButton';
+export type { CoopButtonProps, CoopButtonVariant, CoopButtonSize } from './CoopButton';
+export { default as CoopCard } from './CoopCard';
+export type { CoopCardProps } from './CoopCard';
+export { default as CoopBadge } from './CoopBadge';
+export type { CoopBadgeProps, CoopBadgeVariant } from './CoopBadge';
+export { default as CoopInput } from './CoopInput';
+export type { CoopInputProps } from './CoopInput';
+export { default as CoopSelect } from './CoopSelect';
+export type { CoopSelectProps, CoopOption } from './CoopSelect';
+export { default as CoopModal } from './CoopModal';
+export type { CoopModalProps } from './CoopModal';
+export { default as CoopTable } from './CoopTable';
+export type { CoopTableProps, CoopTableEmpty } from './CoopTable';
+export { default as CoopEmptyState, EmptyWithCta } from './CoopEmptyState';
+export type { CoopEmptyStateProps } from './CoopEmptyState';
+export { default as CoopLoading } from './CoopLoading';
+export type { CoopLoadingProps } from './CoopLoading';
+export { default as CoopErrorState } from './CoopErrorState';
+export type { CoopErrorStateProps } from './CoopErrorState';
+export { SparkleIcon, DashboardMark, TrendUpIcon, TrendDownIcon } from './icons';
+export { default as AiNoticeBox } from './AiNoticeBox';
+export type { AiNoticeBoxProps } from './AiNoticeBox';
+export { default as CustomerAvatar } from './CustomerAvatar';
+export type { CustomerAvatarProps } from './CustomerAvatar';

@@ -1,0 +1,443 @@
+Co-op Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 12 — Authentication, Licensing & Session Management Flow
+12.1 Purpose
+
+The Authentication, Licensing, and Session Management module ensures that only authorized users can access Co-op while providing a secure, seamless, and reliable sign-in experience. It also manages software licensing, session persistence, device registration, and offline access.
+
+Version 1.0 is designed for a single business owner, but the architecture is built to support multiple user roles in future releases without requiring significant changes.
+
+12.2 Objectives
+
+The Authentication system must:
+
+Secure user accounts.
+Support Email/Password authentication.
+Support Google Sign-In.
+Validate online activation keys.
+Support Two-Factor Authentication (2FA).
+Restore previous sessions automatically.
+Allow password recovery.
+Support offline login after successful activation.
+Encrypt authentication data.
+Prepare for future multi-user support.
+12.3 Authentication Architecture
+                User
+                  │
+                  ▼
+         Login / Sign Up Screen
+                  │
+        ┌─────────┴──────────┐
+        ▼                    ▼
+ Email & Password      Google Sign-In
+        │                    │
+        └─────────┬──────────┘
+                  ▼
+          Supabase Authentication
+                  │
+                  ▼
+          License Validation
+                  │
+                  ▼
+        Session Creation
+                  │
+                  ▼
+          Load Application
+
+Authentication is handled by Supabase Auth, while licensing is managed by Co-op's licensing service.
+
+12.4 Authentication Methods
+
+Co-op Version 1.0 supports:
+
+Email & Password
+Create account
+Sign in
+Password recovery
+Two-factor authentication
+Google Sign-In
+
+Users may sign in using their Google account.
+
+Google authentication automatically creates a Co-op account if one does not already exist.
+
+12.5 Sign-Up Flow
+Open Co-op
+     │
+     ▼
+Sign Up
+     │
+     ▼
+Enter:
+
+• Name
+• Email
+• Password
+     │
+     ▼
+Validate
+     │
+     ▼
+Create Supabase Account
+     │
+     ▼
+Verify Email
+     │
+     ▼
+Activation Key
+     │
+     ▼
+Company Setup
+     │
+     ▼
+Dashboard
+
+Company setup begins immediately after successful account activation, as defined in the application flow.
+
+12.6 Login Flow
+Launch Co-op
+      │
+      ▼
+Login Screen
+      │
+      ▼
+Enter Credentials
+      │
+      ▼
+Authenticate
+      │
+      ▼
+Validate License
+      │
+      ▼
+Load Session
+      │
+      ▼
+Dashboard
+
+The login process should complete in less than 3 seconds under normal network conditions.
+
+12.7 Google Sign-In Flow
+Login
+   │
+   ▼
+Continue with Google
+   │
+   ▼
+Google Authentication
+   │
+   ▼
+Supabase Login
+   │
+   ▼
+Validate License
+   │
+   ▼
+Dashboard
+
+If the account is new:
+
+Create Co-op account.
+Prompt for activation key.
+Launch company setup.
+12.8 Password Recovery Flow
+Forgot Password
+        │
+        ▼
+Enter Email
+        │
+        ▼
+Send Recovery Email
+        │
+        ▼
+Open Email
+        │
+        ▼
+Reset Password
+        │
+        ▼
+Login
+
+Password reset links expire automatically for security.
+
+12.9 Two-Factor Authentication Flow
+
+If 2FA is enabled:
+
+Login
+   │
+   ▼
+Password Correct
+   │
+   ▼
+Request Verification Code
+   │
+   ▼
+Enter Code
+   │
+   ▼
+Verify
+   │
+   ▼
+Dashboard
+
+Future versions may support:
+
+Authenticator apps
+Hardware security keys
+Biometric authentication
+12.10 Online Activation Key Flow
+
+Co-op requires an activation key after account creation.
+
+Login Successful
+      │
+      ▼
+Activation Required
+      │
+      ▼
+Enter Activation Key
+      │
+      ▼
+Validate Online
+      │
+ ┌────┴─────┐
+ │          │
+Valid     Invalid
+ │          │
+ ▼          ▼
+Continue  Retry
+
+Once activated:
+
+The license is linked to the account.
+The current device is registered.
+Offline access becomes available.
+12.11 Device Registration
+
+Each activation registers the current device.
+
+Stored information:
+
+Device ID
+Operating System
+App Version
+Activation Date
+
+Future versions may include:
+
+Device management
+Device limits
+Remote sign-out
+12.12 Session Management
+
+Co-op automatically restores the previous session.
+
+Launch App
+     │
+     ▼
+Session Exists?
+     │
+ ┌───┴────┐
+ │        │
+Yes      No
+ │        │
+ ▼        ▼
+Restore Login
+        Login Screen
+
+The application also restores:
+
+Last opened page
+Window size
+Theme
+Sidebar state
+Recent activity
+12.13 Automatic Session Restoration
+
+Following your application flow requirements:
+
+Launch Co-op
+      │
+      ▼
+Load Previous Session
+      │
+      ▼
+Restore Dashboard
+      │
+      ▼
+Continue Working
+
+Users can continue exactly where they left off.
+
+12.14 Logout Flow
+Profile
+   │
+   ▼
+Logout
+   │
+   ▼
+Confirmation
+   │
+ ┌──┴────┐
+ │       │
+Yes     No
+ │
+ ▼
+End Session
+ │
+ ▼
+Login Screen
+
+Local business data remains intact.
+
+Only the authenticated session is removed.
+
+12.15 Offline Login Flow
+
+After successful activation:
+
+Launch App
+      │
+      ▼
+Internet?
+      │
+ ┌────┴─────┐
+ │          │
+Yes        No
+ │          │
+ ▼          ▼
+Normal     Offline Login
+
+Offline login requires:
+
+Existing authenticated account
+Valid local license
+Active local database
+
+Cloud synchronization resumes automatically when connectivity returns.
+
+12.16 License Validation
+
+During startup:
+
+Application Start
+       │
+       ▼
+Check License
+       │
+ ┌─────┴──────┐
+ │            │
+Valid      Invalid
+ │            │
+ ▼            ▼
+Continue    Activation Screen
+
+License validation occurs online when possible and falls back to the locally cached license for offline use.
+
+12.17 Session Expiration
+
+Sessions may expire because of:
+
+Password change
+Manual logout
+License revocation
+Authentication token expiration
+
+Flow:
+
+Session Invalid
+       │
+       ▼
+Notify User
+       │
+       ▼
+Login Again
+
+Unsaved local work is preserved whenever possible.
+
+12.18 Security Features
+
+Authentication includes:
+
+Encrypted passwords (handled by Supabase Auth)
+TLS-secured communication
+Two-Factor Authentication
+Password recovery
+Secure session tokens
+Automatic session timeout after prolonged inactivity (configurable)
+Device registration
+Encrypted local session storage
+12.19 Error Handling
+Error	Recovery
+Invalid email/password	Display error and allow retry
+Google login failed	Retry or use email login
+Activation key invalid	Prompt for another key
+License server unavailable	Use cached license if valid
+Session expired	Redirect to login
+Internet unavailable	Offer offline login if eligible
+Too many failed login attempts	Temporarily delay additional attempts
+12.20 Authentication State Machine
+Logged Out
+      │
+      ▼
+Authenticating
+      │
+      ▼
+License Validation
+      │
+      ▼
+Authenticated
+      │
+ ┌────┴────┐
+ │         │
+Logout   Session Expired
+ │         │
+ ▼         ▼
+Logged Out
+
+The state machine ensures a predictable and secure authentication experience.
+
+12.21 Performance Targets
+Operation	Target
+Open Login Screen	<500 ms
+Login	<3 seconds
+Google Sign-In	<4 seconds
+Session Restore	<1 second
+Offline Login	<1 second
+License Validation	<2 seconds
+Logout	<500 ms
+12.22 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use Supabase Auth for authentication and user management.
+Store session tokens securely using Electron's secure storage mechanisms.
+Cache license validation data locally to enable offline access.
+Validate activation keys through a secure backend endpoint before enabling the application.
+Restore the user's previous session and workspace after successful authentication.
+Encrypt locally stored authentication and licensing data.
+Design the authentication layer to support future roles such as Managers, Employees, and Accountants without major architectural changes.
+12.23 Acceptance Criteria
+
+The Authentication, Licensing & Session Management Flow is complete when:
+
+Users can sign up using email/password or Google.
+Password recovery works correctly.
+Two-factor authentication is supported.
+Online activation keys are validated successfully.
+Devices are registered after activation.
+Sessions are restored automatically.
+Offline login functions after successful activation.
+License validation protects access to the application.
+Logout clears only the authenticated session while preserving local business data.
+Performance targets are consistently achieved.
+12.24 Chapter Summary
+
+The Authentication, Licensing & Session Management Flow provides the security foundation for Co-op. By combining Supabase Authentication, online activation keys, automatic session restoration, offline-capable licensing, and strong encryption, the module delivers a secure yet frictionless experience. Its scalable architecture also prepares Co-op for future enterprise features such as multi-user organizations, advanced device management, and role-based access control.

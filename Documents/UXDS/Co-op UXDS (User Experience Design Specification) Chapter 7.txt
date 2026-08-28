@@ -1,0 +1,497 @@
+Co-op UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 7 — Dashboard Experience & Workspace
+7.1 Purpose
+
+The Dashboard is the central workspace of Co-op.
+
+It is the first screen users see after signing in and serves as the command center for monitoring business performance, reviewing AI insights, managing tasks, and accessing the most frequently used features.
+
+The Dashboard should answer one question immediately:
+
+"How is my business performing right now?"
+
+The user should understand the health of their business within 5–10 seconds of opening Co-op.
+
+7.2 Dashboard Goals
+
+The Dashboard should:
+
+Display the most important business metrics.
+Surface AI-generated insights.
+Highlight urgent issues.
+Provide quick access to common tasks.
+Reduce navigation to other modules.
+Adapt gracefully to different window sizes.
+Refresh automatically when business data changes.
+7.3 Dashboard Philosophy
+
+The Dashboard follows three principles:
+
+Inform
+
+Show the current state of the business.
+
+Explain
+
+Help users understand why something happened.
+
+Recommend
+
+Suggest meaningful actions through AI.
+
+Rather than showing only numbers, Co-op explains what those numbers mean and recommends what to do next.
+
+7.4 Dashboard Layout
+
+The Dashboard follows a modular grid layout.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Welcome • Search • Notifications • Profile                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Profit │ Revenue │ Orders │ Inventory │ Customer Growth │ Forecast          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Revenue Chart                 │ Inventory Value Chart                       │
+├───────────────────────────────┼─────────────────────────────────────────────┤
+│ AI Business Summary           │ AI Recommendations                          │
+├───────────────────────────────┼─────────────────────────────────────────────┤
+│ Recent Activity               │ Tasks                                       │
+├───────────────────────────────┼─────────────────────────────────────────────┤
+│ Calendar                      │ Quick Actions                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+The layout should remain balanced regardless of theme.
+
+7.5 Welcome Section
+
+The Dashboard begins with a personalized greeting.
+
+Example:
+
+Good Morning, Abdulkadir 👋
+
+Below the greeting:
+
+Current date
+Company name
+Sync status
+Today's summary
+
+Example:
+
+Friday, July 10
+
+Co-op Manufacturing
+
+✓ Synced 2 minutes ago
+7.6 KPI Cards
+
+The first section contains six primary KPI cards.
+
+Based on your priority order:
+
+Profit
+Revenue
+Orders
+Inventory
+Customer Growth
+Forecast
+
+Each KPI card includes:
+
+Icon
+Title
+Current value
+Percentage change
+Comparison period
+Small trend graph
+Tooltip
+
+Example:
+
+Profit
+
+₦4,850,000
+
+▲ 18.6%
+
+Compared to last month
+
+────╱╲────
+7.7 Revenue Widget
+
+Displays:
+
+Today's revenue
+Weekly revenue
+Monthly revenue
+Year-to-date revenue
+
+Features:
+
+Hover tooltips
+Date range selector
+Drill-down capability
+Export option
+
+Chart:
+
+Interactive line chart.
+
+7.8 Profit Widget
+
+Shows:
+
+Gross profit
+Net profit
+Profit margin
+Monthly comparison
+
+Color indicators:
+
+Positive → Success color
+Negative → Error color
+
+AI should explain sudden increases or decreases.
+
+7.9 Orders Widget
+
+Displays:
+
+Total Orders
+Pending
+Processing
+Completed
+Cancelled
+
+Quick actions:
+
+Create Order
+View Orders
+
+Clicking any status filters the Orders module accordingly.
+
+7.10 Inventory Widget
+
+Shows:
+
+Total products
+Inventory value
+Low stock count
+Out-of-stock items
+
+Low stock warnings should be highlighted prominently.
+
+Quick action:
+
+Restock Products
+
+7.11 Customer Growth Widget
+
+Displays:
+
+New customers
+Returning customers
+Growth percentage
+Monthly trend
+
+Users can drill down into customer acquisition data.
+
+7.12 Forecast Widget
+
+Displays AI-generated forecasts using the hybrid forecasting model.
+
+Metrics include:
+
+Predicted revenue
+Predicted sales
+Inventory demand
+Growth projection
+
+Each prediction includes a confidence indicator.
+
+Example:
+
+Revenue Forecast
+
+₦5.2M
+
+Confidence
+
+94%
+7.13 Revenue Chart
+
+A large interactive chart visualizes revenue over time.
+
+Supported periods:
+
+7 Days
+30 Days
+90 Days
+1 Year
+Custom
+
+Users can:
+
+Zoom
+Pan
+Hover
+Export
+Compare periods
+7.14 Inventory Value Chart
+
+Displays:
+
+Inventory value trends
+Product category breakdown
+Restocking impact
+
+Users can switch between:
+
+Bar Chart
+Area Chart
+Pie Chart
+7.15 AI Business Summary
+
+One of the Dashboard's signature features.
+
+Example:
+
+Today's Business Summary
+
+Revenue increased by 12% compared to yesterday.
+Two products are running low on stock.
+Customer growth continues to improve.
+Profit margins remain healthy.
+Sales are expected to increase over the weekend.
+
+Users can ask follow-up questions directly from this card.
+
+7.16 AI Recommendations
+
+Separate from the summary.
+
+Focuses on actions.
+
+Example:
+
+Recommended Actions
+
+Restock Product A.
+Follow up with Customer X.
+Generate this week's financial report.
+Increase stock before expected demand.
+Send invoices for pending orders.
+
+Each recommendation includes an action button.
+
+7.17 Recent Activity
+
+Displays recent events.
+
+Examples:
+
+Order created
+Invoice generated
+Inventory updated
+Customer added
+Backup completed
+AI report generated
+
+Each activity includes:
+
+Icon
+Timestamp
+Description
+7.18 Tasks Widget
+
+Future-ready task management.
+
+Version 1.0 supports:
+
+Manual tasks
+AI-created reminders
+Completed tasks
+
+Future versions may integrate calendars and team assignments.
+
+7.19 Calendar Widget
+
+Displays:
+
+Today's date
+Upcoming reminders
+Scheduled reports
+Backup reminders
+
+The calendar serves as a quick reference without becoming a full scheduling tool.
+
+7.20 Quick Actions
+
+Provides one-click access to common tasks.
+
+Buttons include:
+
+New Order
+Add Product
+Add Customer
+Generate Report
+Ask AI
+Create Backup
+Import Data
+
+Quick Actions reduce the need for navigation.
+
+7.21 Search Integration
+
+Global search remains accessible from the Dashboard.
+
+Supports:
+
+Products
+Orders
+Customers
+Reports
+AI history
+Settings
+
+Shortcut:
+
+Ctrl + K
+
+7.22 Notification Integration
+
+The Dashboard highlights:
+
+Low stock alerts
+Daily sales summary
+Sync status
+Backup reminders
+AI completions
+
+Unread notifications appear with badges.
+
+7.23 Empty Dashboard
+
+For new businesses.
+
+Displays:
+
+Welcome illustration
+Interactive onboarding
+AI setup assistant
+Quick setup checklist
+
+Example checklist:
+
+Add Company Information
+Create First Product
+Add First Customer
+Create First Order
+
+Progress updates automatically.
+
+7.24 Loading State
+
+Dashboard loads progressively.
+
+Order:
+
+KPI cards
+Charts
+AI Summary
+Activity
+Tasks
+
+Skeleton loaders replace blank content.
+
+7.25 Error State
+
+If dashboard data cannot load:
+
+Display:
+
+Friendly message
+Retry button
+Offline indicator (if applicable)
+
+Example:
+
+"We couldn't load your latest business data. You can continue working offline or try again."
+
+7.26 Refresh Behavior
+
+Dashboard refreshes automatically when:
+
+Orders change
+Inventory updates
+Customers are added
+Reports finish generating
+Sync completes
+
+Users can also manually refresh.
+
+Shortcut:
+
+F5
+
+7.27 Dashboard Personalization
+
+Version 1.0 offers limited customization.
+
+Users can:
+
+Collapse widget sections.
+Choose default date range.
+Select preferred chart type.
+Remember widget expansion states.
+
+Advanced drag-and-drop customization is planned for a future release.
+
+7.28 Performance Requirements
+
+Dashboard targets:
+
+Metric	Target
+Initial Load	<2 seconds
+KPI Refresh	<500 ms
+Chart Rendering	<1 second
+AI Summary	<2 seconds
+Widget Interaction	<100 ms
+
+Animations should never reduce responsiveness.
+
+7.29 Accessibility
+
+Dashboard must support:
+
+Full keyboard navigation.
+Screen readers.
+High-contrast mode.
+Zoom up to 200%.
+Visible focus indicators.
+Color-independent charts where possible.
+
+Every chart should include accessible labels and summaries.
+
+7.30 Acceptance Criteria
+
+The Dashboard is complete when:
+
+Users understand business performance within 10 seconds.
+KPI cards update in real time.
+Charts are interactive and responsive.
+AI provides useful summaries and recommendations.
+Quick actions reduce navigation effort.
+Empty, loading, and error states are fully defined.
+The layout works across supported window sizes.
+Accessibility standards are satisfied.
+Chapter Summary
+
+The Dashboard is the operational heart of Co-op, combining business metrics, AI intelligence, charts, recent activity, and quick actions into a single workspace. Its balanced layout, contextual recommendations, and responsive design help business owners monitor their operations and take action with minimal effort. The Dashboard establishes the overall tone of the application by making complex business data understandable, actionable, and visually engaging.

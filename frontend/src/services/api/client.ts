@@ -1,5 +1,5 @@
 /**
- * Finch API client — the single place for authenticated backend requests.
+ * Co-op API client — the single place for authenticated backend requests.
  *
  * Auth model: the Clerk SESSION token (from `useAuth().getToken()`) is sent
  * as `Authorization: Bearer <token>`; the backend verifies it against
@@ -55,7 +55,7 @@ export function createApiClient(
       // Notify the session guard so it can sign the user out and route them
       // to /sign-in. The guard de-duplicates, so repeated 401s are harmless.
       if (status === 401 && typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('finch:unauthorized'));
+        window.dispatchEvent(new CustomEvent('coop:unauthorized'));
       }
       const message =
         detail ||

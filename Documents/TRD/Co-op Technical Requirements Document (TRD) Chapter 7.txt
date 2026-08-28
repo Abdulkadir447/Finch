@@ -1,0 +1,640 @@
+Co-op Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 7 — Database Architecture & Offline Synchronization
+7.1 Purpose
+
+This chapter defines the data architecture of Co-op, including the local SQLite database, the cloud PostgreSQL database on Supabase, synchronization mechanisms, repository implementations, migration strategies, conflict resolution, backup systems, and data integrity policies.
+
+The database architecture is designed around an Offline-First philosophy. Every business operation is written locally before being synchronized with the cloud, ensuring uninterrupted use even when internet connectivity is unavailable.
+
+7.2 Database Philosophy
+
+Co-op follows four core principles:
+
+Local First – All writes occur in SQLite first.
+Cloud as Synchronization Layer – Supabase acts as the authoritative cloud replica for synchronization, authentication, and cross-device support.
+Eventual Consistency – Local and cloud databases will converge automatically after synchronization.
+Data Integrity – No operation should result in silent data loss.
+7.3 Database Architecture
+                    Co-op Desktop
+
+                         │
+                 Repository Layer
+                         │
+        ┌────────────────┴────────────────┐
+        ▼                                 ▼
+ SQLite Local Database          Synchronization Engine
+        │                                 │
+        │                           HTTPS / WebSocket
+        │                                 │
+        └──────────────────────► Supabase PostgreSQL
+
+SQLite remains the primary operational database.
+
+Supabase acts as the cloud synchronization backend.
+
+7.4 Database Responsibilities
+SQLite
+
+Responsibilities:
+
+Business data
+Orders
+Inventory
+Customers
+Reports
+AI conversation cache
+User preferences
+Sync queue
+Offline operation
+Supabase PostgreSQL
+
+Responsibilities:
+
+Cloud synchronization
+Authentication
+Multi-device synchronization
+Cloud reporting
+AI history
+License verification
+Cloud backups (future)
+7.5 Repository Pattern
+
+Every database operation passes through repositories.
+
+React Component
+
+↓
+
+Application Service
+
+↓
+
+Repository Interface
+
+↓
+
+SQLite Repository
+
+↓
+
+Synchronization Queue
+
+↓
+
+Supabase Repository
+
+No UI component may access SQLite directly.
+
+7.6 Local Database Structure
+
+SQLite contains the following tables:
+
+users
+
+companies
+
+customers
+
+products
+
+inventory
+
+orders
+
+order_items
+
+reports
+
+forecasts
+
+settings
+
+notifications
+
+licenses
+
+sync_queue
+
+sync_history
+
+audit_logs
+
+ai_history
+
+backups
+
+Each table follows consistent naming conventions.
+
+7.7 Standard Table Structure
+
+Every table should include:
+
+Column	Purpose
+id	UUID Primary Key
+created_at	Creation timestamp
+updated_at	Last modification
+deleted_at	Soft delete timestamp (optional)
+sync_status	Synchronization state
+version	Optimistic locking version
+7.8 UUID Strategy
+
+Every entity uses UUID Version 4.
+
+Example:
+
+5f17d84b-0d82-41b7-bfd0-1d2bc57f44e6
+
+UUIDs eliminate ID conflicts during synchronization.
+
+7.9 Entity Relationships
+Company
+
+├── Customers
+
+├── Products
+
+├── Inventory
+
+├── Orders
+
+│      └── Order Items
+
+├── Reports
+
+├── Forecasts
+
+└── AI History
+
+Foreign keys must be enforced locally and in Supabase.
+
+7.10 Soft Deletes
+
+Co-op uses soft deletes for critical business records.
+
+Example:
+
+Instead of:
+
+DELETE FROM customers;
+
+Use:
+
+UPDATE customers
+SET deleted_at = CURRENT_TIMESTAMP;
+
+Advantages:
+
+Recovery
+Audit history
+Synchronization safety
+7.11 Synchronization Status
+
+Each record contains:
+
+PENDING
+
+SYNCING
+
+SYNCED
+
+FAILED
+
+CONFLICT
+
+These values determine synchronization behavior.
+
+7.12 Synchronization Queue
+
+Every local modification creates a queue item.
+
+Example:
+
+User Creates Order
+
+↓
+
+SQLite
+
+↓
+
+sync_queue
+
+↓
+
+Background Worker
+
+↓
+
+Supabase
+
+↓
+
+Mark Complete
+
+The UI should never wait for synchronization.
+
+7.13 Sync Queue Structure
+
+Fields include:
+
+Queue ID
+Entity Type
+Entity ID
+Operation
+Timestamp
+Retry Count
+Status
+Error Message
+7.14 Synchronization Operations
+
+Supported operations:
+
+INSERT
+
+UPDATE
+
+DELETE
+
+Each operation is atomic.
+
+7.15 Synchronization Engine
+
+The engine runs automatically.
+
+Triggers include:
+
+Application startup
+Internet restored
+Manual sync
+Scheduled interval
+User login
+7.16 Synchronization Algorithm
+Read Queue
+
+↓
+
+Validate Record
+
+↓
+
+Upload
+
+↓
+
+Wait Response
+
+↓
+
+Success?
+
+↓
+
+Yes
+
+↓
+
+Update Metadata
+
+↓
+
+Remove Queue Item
+
+↓
+
+Next Item
+
+Failures are retried automatically.
+
+7.17 Conflict Detection
+
+Conflicts occur when:
+
+Local record changed
+Cloud record changed
+
+Since last synchronization.
+
+Detection uses:
+
+Version number
+Timestamp
+Checksum (where applicable)
+7.18 Conflict Resolution Strategy
+
+Resolution priority:
+
+Automatic merge (non-overlapping fields)
+Latest valid update
+User decision (complex conflicts)
+
+Example:
+
+Inventory Quantity
+
+Local = 24
+
+Cloud = 27
+
+Co-op should notify the user when automatic reconciliation is not possible.
+
+7.19 Retry Strategy
+
+Failed synchronization uses exponential backoff.
+
+Example:
+
+Retry 1 → 5 sec
+
+Retry 2 → 15 sec
+
+Retry 3 → 30 sec
+
+Retry 4 → 60 sec
+
+Retry 5 → Manual Review
+
+Infinite retry loops are prohibited.
+
+7.20 Offline Workflow
+User Action
+
+↓
+
+SQLite
+
+↓
+
+Update UI
+
+↓
+
+Queue Sync
+
+↓
+
+Offline?
+
+↓
+
+Yes
+
+↓
+
+Store Queue
+
+↓
+
+Reconnect
+
+↓
+
+Upload
+
+↓
+
+Complete
+
+Users should never lose data because of internet outages.
+
+7.21 Data Validation
+
+Validation occurs before persistence.
+
+Layers:
+
+React Form
+
+↓
+
+Zod Validation
+
+↓
+
+Business Rules
+
+↓
+
+Repository Validation
+
+↓
+
+SQLite
+
+Invalid data should never reach the database.
+
+7.22 Database Transactions
+
+Transactions are mandatory for:
+
+Creating orders
+Invoice generation
+Inventory adjustments
+Backup restoration
+Import operations
+
+Example:
+
+Begin Transaction
+
+↓
+
+Insert Order
+
+↓
+
+Insert Items
+
+↓
+
+Update Inventory
+
+↓
+
+Commit
+
+Any failure triggers a rollback.
+
+7.23 Database Migrations
+
+Schema changes use versioned migrations.
+
+Structure:
+
+001_initial
+
+002_inventory
+
+003_reports
+
+004_ai
+
+005_notifications
+
+Migrations must be:
+
+Reproducible
+Reversible (where possible)
+Version-controlled
+7.24 Indexing Strategy
+
+Indexes should exist on:
+
+Primary Keys
+Foreign Keys
+Email
+Customer Name
+Product Name
+SKU
+Invoice Number
+Sync Status
+Created Date
+
+Avoid unnecessary indexes that increase write costs.
+
+7.25 Query Optimization
+
+Guidelines:
+
+Prefer indexed lookups.
+Avoid SELECT *.
+Use pagination for large datasets.
+Batch writes when appropriate.
+Minimize repeated queries.
+7.26 Backup Strategy
+
+Version 1.0 supports manual local backups.
+
+Backup contents:
+
+SQLite database
+User settings
+AI history
+Reports
+Configuration
+
+Output format:
+
+.coopbackup
+
+Backups should include metadata for version compatibility.
+
+7.27 Restore Process
+Select Backup
+
+↓
+
+Validate Version
+
+↓
+
+Verify Integrity
+
+↓
+
+Create Restore Point
+
+↓
+
+Restore Database
+
+↓
+
+Restart Application
+
+Restoration should never overwrite data without confirmation.
+
+7.28 Data Integrity
+
+Integrity checks include:
+
+Foreign key validation
+Required fields
+Unique constraints
+Version consistency
+Checksum validation (where applicable)
+
+Corrupted records should be quarantined and logged.
+
+7.29 Encryption at Rest
+
+Sensitive local data should be encrypted, including:
+
+Authentication tokens
+License information
+API configuration
+Cached AI context
+
+The SQLite database may remain unencrypted in Version 1.0, but sensitive fields must use operating system–level secure storage (such as Windows Credential Manager) where appropriate. Full database encryption is planned for a future release.
+
+7.30 Audit Logging
+
+Critical actions generate audit entries.
+
+Examples:
+
+Login
+Order creation
+Inventory adjustment
+Report generation
+Backup creation
+Restore
+License activation
+
+Audit logs are immutable and timestamped.
+
+7.31 Database Maintenance
+
+Maintenance tasks:
+
+Vacuum SQLite periodically
+Remove expired temporary data
+Archive old logs
+Optimize indexes
+Validate database integrity
+
+Maintenance should occur in the background.
+
+7.32 Performance Targets
+Operation	Target
+Local Insert	< 50 ms
+Local Update	< 50 ms
+Local Query	< 100 ms
+Sync Upload	< 5 sec
+Conflict Detection	< 200 ms
+Backup Creation	< 10 sec
+Restore	< 20 sec
+7.33 Failure Recovery
+
+Recovery mechanisms include:
+
+Automatic transaction rollback
+Sync queue persistence
+Corruption detection
+Backup restoration
+Error logging
+User notification
+
+No database error should cause silent data loss.
+
+7.34 Acceptance Criteria
+
+The database architecture is considered complete when:
+
+All business operations function offline.
+Synchronization reliably updates Supabase.
+Conflicts are detected and resolved appropriately.
+Transactions maintain data consistency.
+Backups and restores are successful.
+Performance targets are met.
+Database migrations are repeatable.
+Data integrity is preserved under failure conditions.
+Chapter Summary
+
+This chapter defines Co-op's offline-first database architecture, combining SQLite for fast, reliable local storage with Supabase PostgreSQL for secure cloud synchronization. By using repositories, transactions, migration management, synchronization queues, and conflict resolution, the data layer ensures resilience, consistency, and scalability while allowing users to continue working regardless of network availability.

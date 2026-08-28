@@ -1,5 +1,5 @@
 """
-Clerk authentication for the Finch backend.
+Clerk authentication for the Co-op backend.
 
 Verifies Clerk **session tokens** (JWTs, RS256) presented by the frontend as
 ``Authorization: Bearer <token>``. The frontend obtains the token from
@@ -100,7 +100,7 @@ async def fetch_jwks(frontend_api: str, force: bool = False) -> dict:
 
 @dataclass(frozen=True)
 class ClerkUser:
-    """Authenticated Finch user, identified by their Clerk user id (``sub``)."""
+    """Authenticated Co-op user, identified by their Clerk user id (``sub``)."""
 
     user_id: str
     session_id: Optional[str] = None

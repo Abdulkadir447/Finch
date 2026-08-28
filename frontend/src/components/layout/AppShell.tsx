@@ -1,0 +1,172 @@
+/**
+ * Co-op AppShell — the chrome every module lives inside (Stitch app-shell,
+ * Stage 2 rebuild).
+ *
+ *   ┌────────────┬────────────────────────────────────────┐
+ *   │            │  TopBar (sticky: search · AI · alerts · │
+ *   │  Sidebar   │          theme · account)               │
+ *   │  240/72px  ├────────────────────────────────────────┤
+ *   │  (fixed)   │  Page content (transition on route)     │
+ *   └────────────────────────────────────────────────────┘
+ *
+ * Stage-2 additions:
+ *   - Collapsed sidebar (72px icon rail, persisted preference).
+ *   - Command palette (⌘K / Ctrl+K anywhere, or click the search field).
+ *   - Notifications + theme toggle in the TopBar.
+ *   - Window title follows the active module ("<Module> · Co-op").
+ *   - Global transitions: page fade/rise on route change, sidebar width
+ *     and theme cross-fades.
+ */
+import React, { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { radius, spacing } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
+import { NAV_ITEMS, NAV_SECONDARY } from './nav';
+import Sidebar, { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from './Sidebar';
+import TopBar from './TopBar';
+import CommandPalette from './CommandPalette';
+import { CoopMark } from '../brand/CoopLogo';
+
+const COLLAPSE_KEY = 'coop:sidebar-collapsed';
+
+export interface AppShellProps {
+  children: React.ReactNode;
+  user?: TopBarUserLike | null;
+  onSignOut: () => void;
+}
+
+type TopBarUserLike = {
+  fullName?: string | null;
+  firstName?: string | null;
+  email?: string | null;
+  imageUrl?: string | null;
+};
+
+const AppShell: React.FC<AppShellProps> = ({ children, user, onSignOut }) => {
+  const { colors } = useCoopTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(COLLAPSE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapse = useCallback(() => {
+    setCollapsed((c) => {
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1');
+      } catch {
+        /* persistence is a nicety */
+      }
+      return !c;
+    });
+  }, []);
+
+  // Global ⌘K / Ctrl+K — open or close the command palette from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Lock body scroll while the mobile drawer is open.
+  useEffect(() => {
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [drawerOpen]);
+
+  // Window/title area: "<Module> · Co-op" follows the active route.
+  useEffect(() => {
+    const active = [...NAV_ITEMS, ...NAV_SECONDARY].find((i) => i.path === location.pathname);
+    document.title = active ? `${active.label} · Co-op` : 'Co-op';
+  }, [location.pathname]);
+
+  const railWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
+  return (
+    <div style={{ minHeight: '100vh', background: colors.surface, transition: 'background-color 300ms' }}>
+      <Sidebar
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
+
+      <div
+        className="coop-main-col"
+        style={{
+          marginLeft: railWidth,
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'margin-left 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <TopBar
+          user={user}
+          onSignOut={onSignOut}
+          onMenuClick={() => setDrawerOpen(true)}
+          onOpenPalette={() => setPaletteOpen(true)}
+        />
+        <main
+          className="coop-main"
+          style={{ flex: 1, padding: `${spacing.lg}px ${spacing.lg}px ${spacing.xl}px` }}
+        >
+          {/* Keyed by path so each navigation replays the entrance transition. */}
+          <div key={location.pathname} className="coop-page-enter">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
+      {/* Floating Co-op AI entry (bottom-left; hidden on the assistant page) */}
+      {location.pathname !== '/coop-ai' && (
+        <button
+          type="button"
+          onClick={() => navigate('/coop-ai')}
+          aria-label="Open Co-op AI assistant"
+          title="Ask Co-op"
+          style={{
+            position: 'fixed',
+            left: 20,
+            bottom: 24,
+            width: 48,
+            height: 48,
+            borderRadius: radius.lg,
+            border: `1px solid ${colors.borderSubtle}`,
+            background: colors.surfaceContainerLowest,
+            color: colors.onPrimary,
+            cursor: 'pointer',
+            zIndex: 55,
+            boxShadow: '0 8px 24px rgba(91, 95, 239, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'transform 200ms cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.06)')}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        >
+          <CoopMark size={30} title="Co-op AI" />
+        </button>
+      )}
+    </div>
+  );
+};
+
+export default AppShell;

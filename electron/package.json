@@ -1,7 +1,7 @@
 {
-  "name": "finch-electron",
+  "name": "coop-electron",
   "version": "0.1.0",
-  "description": "Electron wrapper for Finch frontend",
+  "description": "Electron wrapper for the Co-op frontend",
   "main": "main.js",
   "scripts": {
     "start": "npm run electron",

@@ -4,6 +4,7 @@
  * an empty tenant produces an honest empty envelope.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
 
 export interface Product {
@@ -40,17 +41,31 @@ export interface ProductFormValues {
 
 export const PRODUCTS_PAGE_SIZE = 10;
 
+export type ProductStockFilter = 'all' | 'low' | 'out';
+
 export function useProducts() {
   const api = useApiClient();
   const [items, setItems] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  // Command-palette deep links (Stage 2): apply ?q= when the palette
+  // navigates to this module — including while it is already mounted.
+  const location = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q');
+    if (q != null) setSearch(q);
+  }, [location.search]);
+
+  // Catalog tabs (Stage 5): All Products / Low Stock / Out of Stock — maps
+  // to the backend's existing `stock` filter param (no new queries).
+  const [stockFilter, setStockFilter] = useState<ProductStockFilter>('all');
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
 
   const load = useCallback(
-    async (requestedPage: number, query: string) => {
+    async (requestedPage: number, query: string, filter: ProductStockFilter) => {
       setLoading(true);
       setError(null);
       try {
@@ -59,6 +74,7 @@ export function useProducts() {
             page: requestedPage,
             limit: PRODUCTS_PAGE_SIZE,
             ...(query ? { search: query } : {}),
+            ...(filter !== 'all' ? { stock: filter } : {}),
           },
         });
         setItems(data.items);
@@ -66,7 +82,7 @@ export function useProducts() {
         setPage(data.page);
       } catch (e) {
         setError(
-          e instanceof ApiError ? e : new ApiError('Unable to reach the Finch API.'),
+          e instanceof ApiError ? e : new ApiError('Unable to reach the Co-op API.'),
         );
       } finally {
         setLoading(false);
@@ -77,9 +93,9 @@ export function useProducts() {
 
   // Debounced search always returns to page 1.
   useEffect(() => {
-    const timer = setTimeout(() => load(1, search.trim()), search ? 350 : 0);
+    const timer = setTimeout(() => load(1, search.trim(), stockFilter), search ? 350 : 0);
     return () => clearTimeout(timer);
-  }, [search, load]);
+  }, [search, stockFilter, load]);
 
   const createProduct = (values: ProductFormValues) =>
     api.post<Product>('/products', values);
@@ -96,10 +112,12 @@ export function useProducts() {
     pageSize: PRODUCTS_PAGE_SIZE,
     search,
     setSearch,
+    stockFilter,
+    setStockFilter,
     loading,
     error,
-    reload: () => load(page, search.trim()),
-    goToPage: (p: number) => load(p, search.trim()),
+    reload: () => load(page, search.trim(), stockFilter),
+    goToPage: (p: number) => load(p, search.trim(), stockFilter),
     createProduct,
     updateProduct,
     deleteProduct,

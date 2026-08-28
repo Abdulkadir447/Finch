@@ -1,5 +1,5 @@
 """
-Finch Backend Services (BSD Chapter 1.5 — Backend Components)
+Co-op Backend Services (BSD Chapter 1.5 — Backend Components)
 
 The backend is organised as isolated, modular domains per the BSD. Each business
 domain (orders, inventory, customers, reports, AI) owns its own service and
@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Optional
 
-logger = logging.getLogger("finch.services")
+logger = logging.getLogger("coop.services")
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ class Service(abc.ABC):
 
     @property
     def logger(self) -> logging.Logger:
-        return logging.getLogger(f"finch.services.{self.name}")
+        return logging.getLogger(f"coop.services.{self.name}")
 
 
 # ---------------------------------------------------------------------------

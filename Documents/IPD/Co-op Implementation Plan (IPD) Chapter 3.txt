@@ -1,0 +1,468 @@
+Co-op Implementation Plan (IPD)
+
+Document: Implementation Plan Document (IPD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 3 — Architecture & Coding Standards
+3.1 Purpose
+
+This chapter defines the software architecture, engineering principles, coding standards, and implementation guidelines that every part of Co-op must follow.
+
+The objective is to ensure that Co-op remains scalable, maintainable, secure, and easy to extend as new features are added over time.
+
+Every line of code written for Co-op must comply with the standards defined in this chapter.
+
+3.2 Objectives
+
+The architecture must:
+
+Support modular development.
+Be easy to maintain.
+Minimize coupling.
+Maximize code reuse.
+Support offline-first functionality.
+Separate UI from business logic.
+Allow future expansion.
+Ensure consistent coding practices.
+Simplify testing.
+Support AI-assisted development.
+3.3 High-Level Architecture
+
+Co-op follows a layered architecture.
+
+             User
+
+               │
+
+               ▼
+
+      Presentation Layer
+
+               │
+
+               ▼
+
+      Application Layer
+
+               │
+
+               ▼
+
+      Business Logic Layer
+
+               │
+
+               ▼
+
+       Service Layer
+
+               │
+
+       ┌───────┴────────┐
+
+       ▼                ▼
+
+ SQLite Database   Supabase Cloud
+
+               │
+
+               ▼
+
+      Infrastructure Layer
+
+Each layer communicates only with the layer directly below it.
+
+3.4 Architectural Principles
+
+The architecture follows these principles:
+
+Single Responsibility Principle
+Separation of Concerns
+Loose Coupling
+High Cohesion
+Dependency Injection
+Composition over Inheritance
+Offline-first design
+Security-first implementation
+3.5 Layer Responsibilities
+Presentation Layer
+
+Responsible for:
+
+Qt Widgets UI
+User interaction
+Animations
+Theme management
+Accessibility
+Input validation (basic)
+
+No business logic is allowed here.
+
+Application Layer
+
+Coordinates workflows.
+
+Examples:
+
+Login process
+Create Order
+Generate Report
+AI interactions
+Navigation
+Session management
+
+Acts as the bridge between UI and business logic.
+
+Business Logic Layer
+
+Contains:
+
+Inventory calculations
+Pricing logic
+Stock validation
+Business rules
+Order processing
+Financial calculations
+Customer management
+
+This layer contains the application's core intelligence.
+
+Service Layer
+
+Responsible for:
+
+AI services
+Synchronization
+Authentication
+Notifications
+Reporting
+Backup
+Database abstraction
+Infrastructure Layer
+
+Contains:
+
+SQLite
+Supabase
+File system
+Networking
+Logging
+Encryption
+Configuration
+3.6 Module Architecture
+
+Each module follows the same structure.
+
+Module
+
+├── UI
+
+├── Controller
+
+├── Service
+
+├── Repository
+
+├── Models
+
+├── Validators
+
+└── Tests
+
+This structure improves consistency across the project.
+
+3.7 Core Modules
+
+The application consists of:
+
+Authentication
+Business Management
+Dashboard
+Inventory
+Customers
+Orders
+Payments
+Reports
+AI Assistant
+Notifications
+Settings
+Synchronization
+Backup
+Security
+
+Each module operates independently while communicating through defined interfaces.
+
+3.8 SOLID Principles
+
+Co-op strictly follows SOLID.
+
+Single Responsibility
+
+Every class performs one job.
+
+Open/Closed
+
+Classes are open for extension but closed for modification.
+
+Liskov Substitution
+
+Derived classes must behave like their base classes.
+
+Interface Segregation
+
+Small, focused interfaces are preferred.
+
+Dependency Inversion
+
+Depend on abstractions instead of concrete implementations.
+
+3.9 Design Patterns
+
+Recommended patterns:
+
+Pattern	Usage
+Repository	Database access
+Factory	Object creation
+Singleton	Configuration manager (used sparingly)
+Observer	Notifications
+Strategy	AI providers and pricing algorithms
+Command	Undo/Redo and actions
+Builder	Complex report generation
+State	Application state management
+
+Patterns should only be used when they improve clarity and maintainability.
+
+3.10 Dependency Management
+
+Dependencies must always point inward.
+
+UI
+
+↓
+
+Application
+
+↓
+
+Business Logic
+
+↓
+
+Services
+
+↓
+
+Infrastructure
+
+Lower layers must never depend on higher layers.
+
+3.11 Naming Conventions
+Item	Standard
+Class	PascalCase
+Struct	PascalCase
+Enum	PascalCase
+Namespace	lowercase
+Variable	camelCase
+Function	camelCase
+Constant	UPPER_SNAKE_CASE
+File	snake_case
+Folder	lowercase
+
+Examples:
+
+class InventoryService;
+
+class OrderController;
+
+class ReportGenerator;
+
+namespace coop;
+
+void generateInvoice();
+
+int stockQuantity;
+
+const int MAX_PRODUCTS = 50000;
+3.12 File Organization
+
+Example:
+
+inventory/
+
+├── inventory_controller.cpp
+
+├── inventory_controller.h
+
+├── inventory_service.cpp
+
+├── inventory_service.h
+
+├── inventory_repository.cpp
+
+├── inventory_repository.h
+
+├── inventory_model.cpp
+
+├── inventory_model.h
+
+└── tests/
+
+Files remain small and focused.
+
+3.13 Memory Management
+
+Modern C++ memory management rules:
+
+Prefer automatic storage.
+Use std::unique_ptr by default.
+Use std::shared_ptr only when ownership is shared.
+Avoid raw new and delete.
+Prevent memory leaks.
+Follow RAII principles.
+3.14 Error Handling
+
+Recoverable errors:
+
+Operation
+
+↓
+
+Validation
+
+↓
+
+Log Error
+
+↓
+
+Display Friendly Message
+
+↓
+
+Continue Running
+
+Fatal errors:
+
+Log details.
+Save diagnostics.
+Protect user data.
+Shut down gracefully if necessary.
+3.15 Logging Standards
+
+Logging levels:
+
+Debug
+
+↓
+
+Info
+
+↓
+
+Warning
+
+↓
+
+Error
+
+↓
+
+Critical
+
+Logs must never contain:
+
+Passwords
+Authentication tokens
+Credit card data
+Personal secrets
+3.16 Performance Standards
+
+Performance goals:
+
+Application launch under 3 seconds on recommended hardware.
+Dashboard load under 1 second after startup.
+Search results in under 200 ms for typical datasets.
+UI remains responsive during background tasks.
+Smooth animations at 60 FPS where hardware permits.
+
+Expensive operations must run asynchronously.
+
+3.17 Threading Model
+
+Separate threads should handle:
+
+AI requests
+Synchronization
+Report generation
+Backup operations
+File imports/exports
+Network communication
+
+The UI thread must never be blocked by long-running tasks.
+
+3.18 Code Quality Standards
+
+Every feature must satisfy:
+
+No compiler warnings.
+No memory leaks.
+No duplicated logic without justification.
+Clear documentation.
+Consistent formatting.
+Meaningful variable and function names.
+Unit tests for business logic.
+Integration tests for workflows.
+3.19 Accessibility Standards
+
+All UI components must support:
+
+Keyboard navigation.
+High-contrast themes.
+Screen reader compatibility where feasible.
+Dynamic scaling for high-DPI displays.
+Minimum touch target sizes for touch-enabled devices.
+Clear focus indicators.
+
+Accessibility is considered from the start, not added later.
+
+3.20 AI Development Standards
+
+Because Co-op is AI-assisted:
+
+AI-generated code must always be reviewed.
+Generated code must follow project standards.
+AI suggestions are treated as drafts, not final implementations.
+Developers remain responsible for correctness, security, and maintainability.
+AI-generated documentation must be verified before publication.
+3.21 Code Review Checklist
+
+Before merging, verify:
+
+Architecture follows project standards.
+Code is readable and maintainable.
+Business logic is correct.
+Performance impact is acceptable.
+Security best practices are followed.
+Tests pass successfully.
+Documentation is updated.
+No unnecessary complexity has been introduced.
+3.22 Acceptance Criteria
+
+The Architecture & Coding Standards are complete when:
+
+Layered architecture is implemented.
+Modules follow a consistent structure.
+SOLID principles are applied.
+Approved design patterns are used appropriately.
+Naming conventions are followed.
+Memory management adheres to modern C++ practices.
+Logging and error handling standards are implemented.
+Performance targets are defined.
+Code quality requirements are documented.
+AI-assisted development guidelines are established.
+3.23 Chapter Summary
+
+This chapter establishes the architectural and engineering standards that govern Co-op's implementation. By adopting a layered architecture, modular design, SOLID principles, modern C++ practices, and consistent coding conventions, the project remains maintainable, scalable, and resilient. These standards ensure that every feature integrates cleanly with the rest of the system, supports long-term evolution, and delivers a secure, high-performance experience for users.

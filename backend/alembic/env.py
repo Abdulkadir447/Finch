@@ -1,4 +1,4 @@
-"""Alembic environment for Finch (Supabase/Postgres, asyncpg).
+"""Alembic environment for Co-op (Supabase/Postgres, asyncpg).
 
 Supports both online (`alembic upgrade head`) and offline (`alembic upgrade
 head --sql`) modes. Offline mode works without a live database so CI can
@@ -38,7 +38,7 @@ def _database_url() -> str:
     except RuntimeError:
         if context.is_offline_mode():
             # SQL generation only: any structurally valid URL will do.
-            return "postgresql+asyncpg://finch:finch@localhost:5432/finch"
+            return "postgresql+asyncpg://coop:coop@localhost:5432/coop"
         raise RuntimeError(
             "DATABASE_URL must be set to run migrations (see backend/config.py)."
         ) from None

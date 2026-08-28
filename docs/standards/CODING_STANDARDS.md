@@ -1,6 +1,6 @@
 # Coding Standards
 
-This document defines the coding standards and conventions that must be followed for all code in the Finch project.
+This document defines the coding standards and conventions that must be followed for all code in the Co-op project.
 
 ## Table of Contents
 1. [General Principles](#general-principles)

@@ -6,7 +6,7 @@ repository root. Secrets (DB passwords, JWT secret, API keys) are NEVER stored
 in those files — they are resolved from environment variables at runtime.
 
 Selection order:
-    1. ``FINCH_ENV`` env var (development | testing | production)
+    1. ``COOP_ENV`` env var (development | testing | production)
     2. ``APP_ENV`` env var
     3. default: ``development``
 """
@@ -28,7 +28,8 @@ _CONFIG_DIR = _REPO_ROOT / "config"
 
 
 def _resolve_env() -> str:
-    env = os.getenv("FINCH_ENV") or os.getenv("APP_ENV") or DEFAULT_ENV
+    env = os.getenv("COOP_ENV") or os.getenv("FINCH_ENV") or os.getenv("APP_ENV") or DEFAULT_ENV
+    # COOP_ENV is the renamed variable; FINCH_ENV is kept as a compatibility fallback for existing .env files.
     return env if env in VALID_ENVS else DEFAULT_ENV
 
 
@@ -72,7 +73,7 @@ def get(key: str, default: Any = None) -> Any:
 def database_url() -> str:
     """Resolve the SQLAlchemy database URL.
 
-    Finch targets Supabase/Postgres. Production and development both require an
+    Co-op targets Supabase/Postgres. Production and development both require an
     explicit ``DATABASE_URL`` (or ``SUPABASE_DB_URL``); SQLite is available ONLY
     in the ``testing`` environment. There is no silent fallback that could mask
     a missing or misconfigured production database (Task 11 / audit H3).
@@ -87,10 +88,10 @@ def database_url() -> str:
         return explicit
 
     if get_env() == "testing":
-        return "sqlite+aiosqlite:///./finch_test.db"
+        return "sqlite+aiosqlite:///./coop_test.db"
 
     raise RuntimeError(
-        "DATABASE_URL is not set. Finch requires a Postgres/Supabase connection "
-        "string (e.g. postgresql://user:pass@host:5432/finch). SQLite is only "
+        "DATABASE_URL is not set. Co-op requires a Postgres/Supabase connection "
+        "string (e.g. postgresql://user:pass@host:5432/coop). SQLite is only "
         "available in the testing environment."
     )

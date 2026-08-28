@@ -1,94 +1,62 @@
 import React from 'react';
 import {
+  AppstoreOutlined,
   DollarOutlined,
   InboxOutlined,
-  LineChartOutlined,
-  RocketOutlined,
   ShoppingCartOutlined,
-  TeamOutlined,
 } from '@ant-design/icons';
-import { brand, semantic } from '../../theme';
 import { getCurrency } from '../../services/currency';
 
 /**
- * KPI definitions for the Dashboard first row (UXDS 9.7):
- * Profit • Revenue • Orders • Inventory • Customer Growth • Forecast.
+ * KPI definitions for the Dashboard first row (Stitch
+ * finch_business_dashboard_qa_polished): Total Revenue • Orders •
+ * Inventory Health • Products.
  *
- * These are static card definitions (title, icon, accent, route). Live values
- * are injected from /dashboard/summary at render time; the `value`/`sparkData`
- * fields below are the honest empty-state defaults shown while data loads or
- * when a backend value does not exist yet (UXDS 9.22).
+ * This file stays the single KPI CONFIGURATION layer (title, icon, accent,
+ * route) exactly as before — live values, trends and sub-lines are computed
+ * from /dashboard/summary at render time in Dashboard/index.tsx.
+ *
+ * `accent` is 'solid' (filled brand tile — the hero metric) or 'soft'
+ * (tinted tile), matching the design's icon treatment.
  */
+export type KpiAccent = 'solid' | 'soft';
+
 export interface KpiDefinition {
   key: string;
   title: string;
   icon: React.ReactNode;
-  accent: string;
-  /** UXDS 9.9 — KPI click navigates to the associated module (when it exists). */
+  accent: KpiAccent;
+  /** KPI click navigates to the associated module (UXDS 9.9). */
   route?: string;
-  /** Empty-state default; replaced by live data when available. */
-  value: string;
-  trend: null;
-  sparkData: number[];
 }
 
 export const KPI_DEFINITIONS: KpiDefinition[] = [
   {
-    key: 'profit',
-    title: 'Profit',
-    icon: <DollarOutlined />,
-    accent: semantic.success,
-    value: '—',
-    trend: null,
-    sparkData: [],
-  },
-  {
     key: 'revenue',
-    title: 'Revenue',
-    icon: <LineChartOutlined />,
-    accent: brand.primary,
-    value: '—',
-    trend: null,
-    sparkData: [],
+    title: 'Total Revenue',
+    icon: <DollarOutlined />,
+    accent: 'solid',
   },
   {
     key: 'orders',
     title: 'Orders',
     icon: <ShoppingCartOutlined />,
-    accent: semantic.info,
+    accent: 'soft',
     route: '/orders',
-    value: '—',
-    trend: null,
-    sparkData: [],
   },
   {
-    key: 'inventory',
-    title: 'Inventory',
+    key: 'inventory-health',
+    title: 'Inventory Health',
     icon: <InboxOutlined />,
-    accent: semantic.warning,
+    accent: 'soft',
+    route: '/inventory',
+  },
+  {
+    key: 'products',
+    title: 'Products',
+    icon: <AppstoreOutlined />,
+    accent: 'soft',
     route: '/products',
-    value: '—',
-    trend: null,
-    sparkData: [],
-  },
-  {
-    key: 'customer-growth',
-    title: 'Customer Growth',
-    icon: <TeamOutlined />,
-    accent: brand.primaryActive,
-    route: '/customers',
-    value: '—',
-    trend: null,
-    sparkData: [],
-  },
-  {
-    key: 'forecast',
-    title: 'Forecast',
-    icon: <RocketOutlined />,
-    accent: brand.primaryHover,
-    value: '—',
-    trend: null,
-    sparkData: [],
   },
 ];
 
@@ -99,3 +67,18 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
  */
 export const formatCurrency = (value: number, currency?: string): string =>
   value.toLocaleString(undefined, { style: 'currency', currency: currency ?? getCurrency() });
+
+/** Compact money for tight spaces (donut center label): $1.4k / $2.3M. */
+export const formatCompact = (value: number, currency?: string): string => {
+  const cur = currency ?? getCurrency();
+  const abs = Math.abs(value);
+  let num: string;
+  if (abs >= 1_000_000) num = (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  else if (abs >= 1_000) num = (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  else num = String(Math.round(value));
+  const symbol =
+    new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, currencyDisplay: 'symbol' })
+      .formatToParts(0)
+      .find((p) => p.type === 'currency')?.value ?? `${cur} `;
+  return `${symbol}${num}`;
+};

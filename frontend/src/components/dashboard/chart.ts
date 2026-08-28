@@ -1,5 +1,5 @@
 /**
- * Tree-shaken ApexCharts bootstrap for Finch (ApexCharts v6).
+ * Tree-shaken ApexCharts bootstrap for Co-op (ApexCharts v6).
  *
  * Per the ApexCharts tree-shaking reference, the full `apexcharts` bundle is
  * replaced by the core wrapper variant plus only the chart-type entries and

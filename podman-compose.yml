@@ -1,4 +1,4 @@
-# Finch local stack (podman-compose / docker-compose compatible).
+# Co-op local stack (podman-compose / docker-compose compatible).
 #
 # Production deploys against a hosted Supabase/Postgres database via the
 # DATABASE_URL environment variable. This file provides a local Postgres for
@@ -10,8 +10,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      - DATABASE_URL=postgresql://finch:finch_password@db:5432/finch
-      - FINCH_ENV=development
+      - DATABASE_URL=postgresql://coop:coop_password@db:5432/coop
+      - COOP_ENV=development
       - CLERK_FRONTEND_API=${CLERK_FRONTEND_API:-}
       - CLERK_ALLOWED_ORIGINS=${CLERK_ALLOWED_ORIGINS:-}
     ports:
@@ -23,9 +23,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=finch
-      - POSTGRES_PASSWORD=finch_password
-      - POSTGRES_DB=finch
+      - POSTGRES_USER=coop
+      - POSTGRES_PASSWORD=coop_password
+      - POSTGRES_DB=coop
     ports:
       - "5432:5432"
     volumes:

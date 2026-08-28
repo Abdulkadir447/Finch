@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to Finch! This document explains how to contribute to this project.
+Thank you for your interest in contributing to Co-op! This document explains how to contribute to this project.
 
 ## Prerequisites
 
@@ -16,8 +16,8 @@ Before contributing, please ensure you have:
 ### Clone the Repository
 
 ```bash
-gh repo clone finch-project/your-username/finch
-cd finch
+gh repo clone coop-project/your-username/coop
+cd coop
 ```
 
 ### Install Dependencies
@@ -52,7 +52,7 @@ pnpm prepare
 The project is organized as follows:
 
 ```
-Finch/
+Co-op/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -318,5 +318,5 @@ This project is licensed under the MIT License.
 
 ---
 
-_Generated based on Finch project architecture and IPD Chapter 2 requirements_
+_Generated based on Co-op project architecture and IPD Chapter 2 requirements_
 _Updated with comprehensive guidelines for new contributors_

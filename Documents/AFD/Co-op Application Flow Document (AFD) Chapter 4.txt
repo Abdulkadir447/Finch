@@ -1,0 +1,451 @@
+Co-op Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 4 — Company Setup & Initial Configuration Flow
+4.1 Purpose
+
+This chapter defines the complete workflow that occurs immediately after a user successfully creates an account and logs into Co-op for the first time.
+
+The Company Setup Wizard ensures that Co-op is personalized for the user's business before they begin managing orders, inventory, customers, or reports.
+
+The setup process should be:
+
+Simple
+Guided
+Intelligent
+Fast
+Skippable only where appropriate
+Required before accessing the Dashboard
+
+Once completed, Co-op creates the business profile, initializes the workspace, and prepares the application for daily use.
+
+4.2 Objectives
+
+The Company Setup Wizard must:
+
+Create the user's business profile.
+Configure regional settings.
+Initialize business preferences.
+Set up invoice branding.
+Configure AI business context.
+Create default application settings.
+Prepare the local SQLite database.
+Synchronize the company profile with Supabase.
+4.3 High-Level Setup Flow
+Account Created
+       │
+       ▼
+First Login
+       │
+       ▼
+Company Setup Wizard
+       │
+       ▼
+Business Information
+       │
+       ▼
+Branding
+       │
+       ▼
+Regional Settings
+       │
+       ▼
+AI Initialization
+       │
+       ▼
+Optional Data Import
+       │
+       ▼
+Save Configuration
+       │
+       ▼
+Dashboard
+
+The setup process only appears if no company profile exists.
+
+4.4 Setup Wizard Overview
+
+The wizard consists of six sequential steps:
+
+Step	Description
+1	Welcome
+2	Business Information
+3	Branding
+4	Regional Preferences
+5	AI Configuration
+6	Import Existing Data (Optional)
+
+Users cannot access the Dashboard until all required steps are completed.
+
+4.5 Step 1 — Welcome
+
+Purpose:
+
+Introduce Co-op and explain what will happen.
+
+Displayed information:
+
+Welcome message
+Estimated completion time (approximately 3–5 minutes)
+Progress indicator
+"Let's Get Started" button
+
+Example:
+
+Welcome to Co-op
+
+Let's set up your business.
+
+This takes about 3 minutes.
+
+[Get Started]
+4.6 Step 2 — Business Information
+
+The user enters the basic company information.
+
+Required fields:
+
+Company Name
+Business Email
+Phone Number
+Business Address
+
+Optional fields:
+
+Company Website
+Tax ID
+Business Description
+
+Validation rules:
+
+Company Name
+
+Cannot be empty
+Maximum 100 characters
+
+Email
+
+Valid email format
+
+Phone Number
+
+Valid international format
+
+Address
+
+Minimum 10 characters
+
+Tax ID
+
+Optional
+Stored if provided
+Used for invoices and tax reporting
+4.7 Step 3 — Branding
+
+This step customizes the appearance of Co-op documents.
+
+The user may upload:
+
+Company Logo
+
+The logo will appear on:
+
+Invoices
+Reports
+PDF exports
+Future email templates
+
+Recommended image formats:
+
+PNG
+SVG
+JPG
+
+Recommended size:
+
+512 × 512 pixels
+
+Maximum size:
+
+5 MB
+
+If no logo is uploaded, Co-op generates a temporary placeholder using the company initials.
+
+4.8 Step 4 — Regional Preferences
+
+The user selects localization options.
+
+Required:
+
+Currency
+Time Zone
+
+Optional:
+
+Date Format
+Number Format
+Language (future support)
+
+Example:
+
+Currency
+
+(Nigerian Naira)
+
+Time Zone
+
+(WAT)
+
+These settings determine:
+
+Invoice formatting
+Reports
+Forecast calculations
+Financial summaries
+Dashboard widgets
+4.9 Step 5 — AI Initialization
+
+The AI Assistant needs business context before providing useful recommendations.
+
+Co-op creates an AI profile using:
+
+Company Name
+Industry (optional in v1)
+Currency
+Business Location
+Regional Settings
+
+The AI profile is securely stored and synchronized.
+
+The AI uses this information to:
+
+Generate reports
+Explain charts
+Create invoices
+Answer business questions
+Produce forecasts
+
+No confidential data is sent until the user explicitly requests AI assistance.
+
+4.10 Step 6 — Import Existing Data (Optional)
+
+Users can immediately import business data.
+
+Supported formats:
+
+CSV
+Excel (.xlsx)
+
+Importable data:
+
+Customers
+Inventory
+Orders
+
+Flow:
+
+Choose File
+      │
+      ▼
+Preview
+      │
+      ▼
+Validate
+      │
+      ▼
+Import
+      │
+      ▼
+Finish
+
+Users may skip this step and import data later.
+
+4.11 Configuration Storage
+
+After completing the wizard, Co-op stores:
+
+SQLite
+Company Profile
+Preferences
+Theme
+Regional Settings
+Branding
+AI Configuration
+Supabase
+Company Profile
+Branding
+Preferences
+AI Configuration
+
+Synchronization begins automatically in the background.
+
+4.12 Default Configuration
+
+After setup, Co-op creates default values.
+
+Examples:
+
+Dashboard Widgets
+
+Revenue
+Orders
+Profit
+Inventory
+Customer Growth
+AI Insights
+
+Invoice Settings
+
+Default numbering sequence
+Payment terms
+Signature area
+QR code enabled
+
+Application Settings
+
+Dynamic Windows theme
+Automatic cloud sync
+Desktop notifications enabled
+4.13 Validation Flow
+
+Each step validates input before proceeding.
+
+User Input
+     │
+     ▼
+Validation
+     │
+ ┌───┴────┐
+ │        │
+Valid   Invalid
+ │        │
+ ▼        ▼
+Next   Show Errors
+
+Users cannot continue until required fields are valid.
+
+4.14 Save Flow
+
+After the final step:
+
+Save Configuration
+        │
+        ▼
+Create Company Profile
+        │
+        ▼
+Initialize Database
+        │
+        ▼
+Generate Defaults
+        │
+        ▼
+Cloud Sync
+        │
+        ▼
+Dashboard
+
+The Dashboard opens immediately after the local save completes, while cloud synchronization continues in the background.
+
+4.15 Error Handling
+
+Possible setup errors include:
+
+Error	Recovery
+Invalid email	Correct the email address
+Logo upload failed	Retry or skip
+Database initialization failed	Retry setup
+Cloud synchronization failed	Save locally and sync later
+Import validation errors	Display invalid rows and continue after correction
+
+The user should never lose entered information due to an error.
+
+4.16 Offline Behavior
+
+If internet connectivity is unavailable during setup:
+
+Local company profile is created.
+SQLite stores all configuration.
+Cloud synchronization is queued.
+AI initialization is deferred until internet access returns.
+
+A notification informs the user:
+
+"Your business has been set up successfully. Cloud synchronization will begin when an internet connection is available."
+
+4.17 Future Scalability
+
+The Company Setup Wizard is designed to support future enhancements without redesign.
+
+Future additions include:
+
+Multiple companies
+Multiple warehouses
+Industry templates
+Custom invoice themes
+Business categories
+Team invitations
+Role-based permissions
+AI onboarding assistant
+
+These features will integrate into the existing wizard as additional steps or optional sections.
+
+4.18 State Diagram
+Not Configured
+        │
+        ▼
+Setup Started
+        │
+        ▼
+Business Information
+        │
+        ▼
+Branding
+        │
+        ▼
+Regional Settings
+        │
+        ▼
+AI Initialization
+        │
+        ▼
+Import Data
+        │
+        ▼
+Configuration Saved
+        │
+        ▼
+Dashboard Ready
+4.19 Developer Implementation Notes
+
+Implementation guidelines:
+
+Build the setup wizard as a multi-step React component with progress tracking.
+Persist each completed step locally to prevent data loss if the application closes unexpectedly.
+Validate all required fields before advancing.
+Upload branding assets to Supabase Storage after local persistence.
+Generate default settings immediately after successful completion.
+Start background synchronization only after the local configuration is saved.
+Allow users to revisit and edit all configuration values later through Settings → Company Profile.
+4.20 Acceptance Criteria
+
+The Company Setup & Initial Configuration Flow is complete when:
+
+The setup wizard launches automatically for first-time users.
+All required business information is collected and validated.
+Company branding can be uploaded successfully.
+Regional settings are applied throughout the application.
+AI is initialized with the business profile.
+Optional data import functions correctly.
+Configuration is saved locally and synchronized with Supabase.
+Offline setup is fully supported.
+Users are taken directly to the Dashboard after successful completion.
+Future expansion for multi-company support can be added without redesigning the flow.
+4.21 Chapter Summary
+
+This chapter defines how Co-op transitions from a newly registered account to a fully configured business workspace. The Company Setup Wizard creates the business profile, applies branding and regional settings, initializes AI, and prepares the local and cloud databases. By guiding users through a structured yet efficient setup process, Co-op ensures every workspace is ready for productive use from the very first session.

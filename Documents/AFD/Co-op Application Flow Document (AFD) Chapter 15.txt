@@ -1,0 +1,402 @@
+Co-op Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 15 — Startup, Initialization & Application Lifecycle Flow
+15.1 Purpose
+
+This chapter defines how Co-op starts, initializes its core services, restores the previous user session, and shuts down safely. The goal is to provide a fast, reliable, and seamless startup experience while ensuring that all essential services are available before the user begins interacting with the application.
+
+The startup process is designed around the Offline-First Architecture, ensuring that the application remains usable even without an internet connection.
+
+15.2 Objectives
+
+The startup system must:
+
+Launch quickly.
+Display a professional splash screen.
+Initialize core services in the correct order.
+Restore the previous session automatically.
+Load the dashboard without unnecessary delays.
+Check for updates in the background.
+Detect crashes from previous sessions.
+Recover gracefully from failures.
+Shut down safely without data loss.
+Support future plugin and module loading.
+15.3 Application Lifecycle Overview
+Application Launch
+        │
+        ▼
+Splash Screen
+        │
+        ▼
+Initialize Core Services
+        │
+        ▼
+Restore Session
+        │
+        ▼
+Load Dashboard
+        │
+        ▼
+Running
+        │
+        ▼
+Shutdown
+
+The application lifecycle is managed by Electron's main process while the React frontend manages the user interface.
+
+15.4 Startup Sequence
+
+The startup sequence follows a fixed order.
+
+Launch Co-op
+      │
+      ▼
+Initialize Logger
+      │
+      ▼
+Load Configuration
+      │
+      ▼
+Initialize SQLite
+      │
+      ▼
+Load User Session
+      │
+      ▼
+Validate License
+      │
+      ▼
+Initialize Sync Engine
+      │
+      ▼
+Initialize AI Services
+      │
+      ▼
+Load Dashboard
+
+Each step must complete successfully before moving to the next.
+
+15.5 Splash Screen
+
+The splash screen appears immediately after launching Co-op.
+
+It displays:
+
+Co-op Logo
+Application Name
+Version Number
+Loading Progress
+Initialization Status
+
+Example progress messages:
+
+Initializing Database...
+Loading Preferences...
+Restoring Session...
+Starting Synchronization...
+Preparing Dashboard...
+
+The splash screen automatically closes once initialization completes.
+
+15.6 Initialization Order
+
+Core services initialize in the following order:
+
+Order	Service
+1	Logging (Pino)
+2	Configuration Manager
+3	SQLite Database
+4	Local Cache
+5	User Preferences
+6	Authentication
+7	License Validation
+8	Synchronization Engine
+9	Notification Service
+10	AI Service
+11	Dashboard
+12	Background Services
+
+This order minimizes startup delays and dependency issues.
+
+15.7 Configuration Loading
+
+During startup Co-op loads:
+
+Application settings
+Theme
+Dashboard layout
+Company profile
+Keyboard shortcuts
+Window preferences
+Notification preferences
+AI settings
+
+Configuration loading occurs locally before cloud synchronization.
+
+15.8 Session Restoration
+
+Following the Application Flow Document requirements:
+
+Application Start
+        │
+        ▼
+Previous Session?
+        │
+   ┌────┴────┐
+   │         │
+ Yes        No
+   │         │
+   ▼         ▼
+Restore    Login
+
+The restored session includes:
+
+Logged-in user
+Last opened page
+Window size
+Theme
+Sidebar state
+Open panels
+Recent searches
+
+Users return to exactly where they left off.
+
+15.9 Database Initialization
+
+The SQLite database initializes before any module loads.
+
+Startup checks include:
+
+Database existence
+Database version
+Schema compatibility
+Corruption detection
+Migration requirements
+
+If migrations are required:
+
+Database Check
+       │
+       ▼
+Migration Needed?
+       │
+ ┌─────┴──────┐
+ │            │
+No          Yes
+ │            │
+ ▼            ▼
+Continue   Run Migration
+15.10 Authentication Check
+
+After the database is ready:
+
+Load Session
+      │
+      ▼
+Authenticated?
+      │
+ ┌────┴─────┐
+ │          │
+Yes        No
+ │          │
+ ▼          ▼
+Continue   Login Screen
+
+Offline authentication is supported using the cached session when appropriate.
+
+15.11 License Validation
+
+After authentication:
+
+License Check
+      │
+      ▼
+Valid?
+      │
+ ┌────┴────┐
+ │         │
+Yes       No
+ │         │
+ ▼         ▼
+Continue Activation
+
+When offline, the cached license is used if still valid.
+
+15.12 Background Service Initialization
+
+Once the dashboard is displayed, Co-op starts background services without blocking the user.
+
+Services include:
+
+Cloud synchronization
+Notification listener
+Auto-save
+Update checker
+AI initialization
+Cache cleanup
+Log maintenance
+
+These services run independently of the main user interface.
+
+15.13 Update Check Flow
+
+Update checks occur after the application becomes usable.
+
+Dashboard Loaded
+        │
+        ▼
+Check GitHub Releases
+        │
+        ▼
+Update Available?
+        │
+ ┌──────┴──────┐
+ │             │
+No           Yes
+ │             │
+ ▼             ▼
+Continue    Notify User
+
+Updates are downloaded only if the user has enabled automatic downloads.
+
+15.14 Crash Recovery
+
+If Co-op did not shut down correctly:
+
+Application Start
+        │
+        ▼
+Previous Crash?
+        │
+ ┌──────┴──────┐
+ │             │
+No           Yes
+ │             │
+ ▼             ▼
+Continue   Recovery Mode
+
+Recovery Mode:
+
+Restores unsaved local data.
+Checks database integrity.
+Displays a recovery notification.
+Sends logs (with user permission in future versions).
+15.15 Graceful Shutdown
+
+When closing the application:
+
+Close Request
+      │
+      ▼
+Unsaved Changes?
+      │
+ ┌────┴─────┐
+ │          │
+No         Yes
+ │          │
+ ▼          ▼
+Shutdown  Ask User
+
+Before exiting, Co-op:
+
+Saves settings.
+Flushes logs.
+Saves session state.
+Completes pending local writes.
+Stops background services.
+Closes the SQLite connection.
+15.16 Auto-Save Before Exit
+
+Before shutdown:
+
+Save Session
+      │
+      ▼
+Save Settings
+      │
+      ▼
+Save Window State
+      │
+      ▼
+Exit
+
+This ensures the next startup restores the previous workspace accurately.
+
+15.17 Error Handling
+Error	Recovery
+Database unavailable	Attempt repair or restore backup
+Migration failed	Roll back and notify user
+License validation failed	Enter activation flow
+Session corrupted	Start new session
+Configuration corrupted	Restore defaults while preserving user data
+Startup timeout	Display recovery options
+
+The application should never enter an unusable state because of a recoverable startup error.
+
+15.18 Lifecycle State Machine
+Not Running
+      │
+      ▼
+Launching
+      │
+      ▼
+Initializing
+      │
+      ▼
+Ready
+      │
+      ▼
+Running
+      │
+ ┌────┴────┐
+ │         │
+Close    Crash
+ │         │
+ ▼         ▼
+Shutdown Recovery
+
+This state machine governs the application's lifecycle and recovery behavior.
+
+15.19 Performance Targets
+Operation	Target
+Splash Screen Display	<100 ms
+Configuration Load	<300 ms
+Database Initialization	<500 ms
+Session Restore	<500 ms
+Dashboard Display	<2 seconds
+Background Services Start	<1 second after dashboard
+Graceful Shutdown	<2 seconds
+15.20 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use Electron's main process for application lifecycle management.
+Initialize only critical services before displaying the dashboard; defer non-essential tasks to the background.
+Store session and window state before shutdown for fast restoration.
+Implement database schema migrations using version-controlled migration scripts.
+Perform update checks asynchronously using Electron Updater and GitHub Releases.
+Log startup and shutdown events with Pino to aid diagnostics.
+Design the startup pipeline to allow future modules or plugins to register their own initialization steps.
+15.21 Acceptance Criteria
+
+The Startup, Initialization & Application Lifecycle Flow is complete when:
+
+The splash screen appears immediately after launch.
+Core services initialize in the correct order.
+Previous sessions are restored automatically.
+The dashboard loads within performance targets.
+Background services start without blocking the UI.
+Update checks occur after startup.
+Crash recovery restores the application safely.
+Graceful shutdown preserves user data and settings.
+All performance targets are met.
+The lifecycle supports future extensibility.
+15.22 Chapter Summary
+
+The Startup, Initialization & Application Lifecycle Flow provides Co-op with a dependable foundation for launching, running, and closing the application. By prioritizing fast startup, automatic session restoration, background initialization, graceful shutdown, and robust crash recovery, Co-op delivers a smooth and resilient desktop experience while maintaining the integrity of business data.

@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-Finch requires a maintainable, testable architecture that can scale from a single business owner to enterprise deployments. We need clear separation of concerns to enable modular development and future expansion.
+Co-op requires a maintainable, testable architecture that can scale from a single business owner to enterprise deployments. We need clear separation of concerns to enable modular development and future expansion.
 
 ## Decision
 We will use a **Clean Architecture / Layered Architecture** pattern with the following layers (from outer to inner):

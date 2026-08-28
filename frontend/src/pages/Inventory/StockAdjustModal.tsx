@@ -1,21 +1,26 @@
 /**
- * Adjust Stock dialog (UXDS 11.11): Increase/Decrease + quantity + reason +
- * optional note, with a live current -> projected stock preview. The server
- * re-validates everything (409 when the result would go negative).
+ * Adjust Stock dialog (Stitch finch_adjust_stock_workflow).
+ *
+ * UI refactor only — same endpoint (POST /products/{id}/adjust), same
+ * server-side validation (409 when the result would go negative).
+ *
+ * Layout per the design:
+ *   PRODUCT   read-only tile (name + SKU of the row's product)
+ *   TYPE      [ + In | − Out ] segmented
+ *   QUANTITY  stepper
+ *   REASON    select (purchase / sale / damaged / returned / correction)
+ *   NOTE      optional free text
+ *   footer    Cancel · Confirm Adjustment
+ * The live "current → projected" preview is kept — it is real data.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Input,
-  InputNumber,
-  Modal,
-  Radio,
-  Select,
-  Space,
-  Typography,
-  theme as antdTheme,
-} from 'antd';
+import { Alert, Input, InputNumber, Segmented } from 'antd';
+import { MinusOutlined, PlusOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { radius, type } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
 import { ADJUST_REASONS, AdjustInput, InventoryProduct } from './useInventory';
+import CoopModal from '../../components/ui/CoopModal';
+import CoopSelect from '../../components/ui/CoopSelect';
 
 export interface StockAdjustModalProps {
   open: boolean;
@@ -25,6 +30,16 @@ export interface StockAdjustModalProps {
   onSubmit: (input: AdjustInput) => Promise<void>;
 }
 
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: 7,
+  fontSize: 12,
+  lineHeight: '16px',
+  fontWeight: 600,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
+};
+
 const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
   open,
   product,
@@ -32,8 +47,8 @@ const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
   onCancel,
   onSubmit,
 }) => {
-  const { token } = antdTheme.useToken();
-  const [mode, setMode] = useState<'increase' | 'decrease'>('increase');
+  const { colors } = useCoopTheme();
+  const [mode, setMode] = useState<'in' | 'out'>('in');
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState<AdjustInput['reason']>('purchase');
   const [note, setNote] = useState('');
@@ -41,14 +56,14 @@ const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
 
   useEffect(() => {
     if (!open) return;
-    setMode('increase');
+    setMode('in');
     setQuantity(1);
     setReason('purchase');
     setNote('');
     setProblem(null);
   }, [open, product?.id]);
 
-  const change = mode === 'increase' ? quantity : -quantity;
+  const change = mode === 'in' ? quantity : -quantity;
   const projected = useMemo(
     () => (product ? product.current_stock + change : 0),
     [product, change],
@@ -62,9 +77,7 @@ const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
       return;
     }
     if (wouldGoNegative) {
-      setProblem(
-        `Cannot remove ${quantity}: only ${product.current_stock} in stock.`,
-      );
+      setProblem(`Cannot remove ${quantity}: only ${product.current_stock} in stock.`);
       return;
     }
     setProblem(null);
@@ -72,76 +85,116 @@ const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
   };
 
   return (
-    <Modal
-      title={product ? `Adjust Stock — ${product.name}` : 'Adjust Stock'}
+    <CoopModal
+      title="Adjust Stock"
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
-      okText="Apply adjustment"
-      cancelText="Discard"
+      okText="Confirm Adjustment"
+      cancelText="Cancel"
       confirmLoading={submitting}
       okButtonProps={{ disabled: !product || wouldGoNegative }}
       destroyOnClose
       width={520}
     >
       {product && (
-        <Space direction="vertical" size={16} style={{ width: '100%', marginTop: token.marginMD }}>
-          {/* Current level */}
-          <Typography.Text type="secondary">
-            SKU <strong>{product.sku}</strong> · current stock:{' '}
-            <strong style={{ color: token.colorText }}>{product.current_stock}</strong> · reorder at{' '}
-            {product.reorder_level}
-          </Typography.Text>
-
-          <Radio.Group
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-            optionType="button"
-            buttonStyle="solid"
-            options={[
-              { value: 'increase', label: 'Increase Stock' },
-              { value: 'decrease', label: 'Decrease Stock' },
-            ]}
-          />
-
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
+          {/* PRODUCT — read-only identity of the row's product */}
           <div>
-            <Typography.Text strong style={{ display: 'block', marginBottom: 6 }}>
-              Quantity <Typography.Text type="danger">*</Typography.Text>
-            </Typography.Text>
-            <InputNumber
-              min={1}
-              precision={0}
-              value={quantity}
-              onChange={(v) => setQuantity(v ?? 1)}
-              style={{ width: '100%' }}
-            />
+            <span style={labelStyle}>Product</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                height: 46,
+                padding: '0 14px',
+                borderRadius: radius.lg,
+                border: `1px solid ${colors.outlineVariant}`,
+                background: colors.surfaceContainerLow,
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: radius.md,
+                  background: colors.surfaceContainer,
+                  color: colors.outline,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  flexShrink: 0,
+                }}
+              >
+                <ShoppingOutlined />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5, color: colors.onSurface, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {product.name}
+                </span>
+                <span style={{ ...type.bodyCompact, fontSize: 12, color: colors.outline }}>
+                  SKU: {product.sku} · {product.current_stock} in stock · reorder at {product.reorder_level}
+                </span>
+              </span>
+            </div>
           </div>
 
+          {/* TYPE + QUANTITY */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ flex: '0 1 170px' }}>
+              <span style={labelStyle}>Type</span>
+              <Segmented
+                block
+                value={mode}
+                onChange={(v) => setMode(v as 'in' | 'out')}
+                options={[
+                  { label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><PlusOutlined /> In</span>, value: 'in' },
+                  { label: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><MinusOutlined /> Out</span>, value: 'out' },
+                ]}
+              />
+            </div>
+            <div style={{ flex: '1 1 150px' }}>
+              <span style={labelStyle}>Quantity</span>
+              <InputNumber
+                min={1}
+                precision={0}
+                value={quantity}
+                onChange={(v) => setQuantity(v ?? 1)}
+                style={{ width: '100%' }}
+                aria-label="Quantity"
+              />
+            </div>
+          </div>
+
+          {/* REASON */}
           <div>
-            <Typography.Text strong style={{ display: 'block', marginBottom: 6 }}>
-              Reason <Typography.Text type="danger">*</Typography.Text>
-            </Typography.Text>
-            <Select
+            <span style={labelStyle}>Reason</span>
+            <CoopSelect
               value={reason}
               onChange={setReason}
               style={{ width: '100%' }}
               options={ADJUST_REASONS}
+              aria-label="Adjustment reason"
             />
           </div>
 
+          {/* NOTE */}
           <div>
-            <Typography.Text strong style={{ display: 'block', marginBottom: 6 }}>
-              Note
-            </Typography.Text>
-            <Input
+            <span style={labelStyle}>Note (optional)</span>
+            <Input.TextArea
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              rows={3}
               maxLength={500}
-              placeholder="Optional — e.g. supplier delivery, damaged in storage"
+              placeholder="Add any relevant details…"
+              aria-label="Note (optional)"
             />
           </div>
 
-          {/* Projected result */}
+          {/* Live projected result (real data) */}
           <Alert
             type={wouldGoNegative ? 'error' : 'info'}
             showIcon
@@ -153,9 +206,9 @@ const StockAdjustModal: React.FC<StockAdjustModalProps> = ({
           />
 
           {problem && <Alert type="warning" showIcon message={problem} />}
-        </Space>
+        </div>
       )}
-    </Modal>
+    </CoopModal>
   );
 };
 

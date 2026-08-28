@@ -1,8 +1,8 @@
 {
-  "name": "finch",
+  "name": "coop",
   "version": "1.0.0",
   "private": true,
-  "description": "Finch - AI-powered Business Management Platform",
+  "description": "Co-op - AI-powered Business Management Platform",
   "scripts": {
     "prepare": "husky install",
     "commitlint": "commitlint --edit $1",

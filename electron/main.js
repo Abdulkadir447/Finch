@@ -2,13 +2,13 @@ const { app, BrowserWindow, session } = require('electron');
 const path = require('path');
 
 // ---------------------------------------------------------------------------
-// Content Security Policy for the Finch desktop app.
+// Content Security Policy for the Co-op desktop app.
 //
 // Applied to navigation responses via session.webRequest.onHeadersReceived.
 // Sources follow Clerk's official manual CSP configuration
 // (https://clerk.com/docs/security/clerk-csp), adapted for Electron:
 //
-//   * script-src  — Finch's Clerk DEVELOPMENT Frontend API host serves
+//   * script-src  — Co-op's Clerk DEVELOPMENT Frontend API host serves
 //                   clerk.browser.js; challenges.cloudflare.com (Clerk bot
 //                   protection) and *.protect.clerk.com (Clerk abuse/fraud
 //                   protection) are required by Clerk docs. 'unsafe-eval' is
@@ -23,9 +23,9 @@ const path = require('path');
 //   * frame-src   — development hosted pages and Clerk challenge frames.
 //   * form-action / base-uri / object-src — hardening, per CSP best practice.
 //
-// When Finch moves to a production Clerk instance, replace the
+// When Co-op moves to a production Clerk instance, replace the
 // bursting-swan-43.clerk.accounts.dev host with the production Frontend API
-// hostname (e.g. https://clerk.finch.example).
+// hostname (e.g. https://clerk.coop.example).
 // ---------------------------------------------------------------------------
 // The Clerk Frontend API host is parameterised (Task 11 / audit H5): production
 // builds set CLERK_FRONTEND_API in the environment; otherwise the development
@@ -59,15 +59,26 @@ function createWindow () {
   });
 
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    // Sane default for a dashboard app (Stage 2.4 QA).
+    width: 1280,
+    height: 800,
+    minWidth: 1024,
+    minHeight: 640,
+    // Match the design canvas to avoid a white flash before React paints.
+    backgroundColor: '#fcf8ff',
+    title: 'Co-op',
+    icon: path.join(__dirname, 'coop-icon.png'),
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     }
   });
-  
+
+  // Show only once the first paint is ready (no blank-frame flicker).
+  win.once('ready-to-show', () => win.show());
+
   // Use an absolute path relative to this script (frontend/dist/index.html).
   const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
   win.loadFile(indexPath);

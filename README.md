@@ -1,6 +1,6 @@
-# Finch — AI-powered Business Management Platform
+# Co-op — AI-powered Business Management Platform
 
-Finch is a multi-tenant ERP (products, inventory, customers, orders, dashboard
+Co-op is a multi-tenant ERP (products, inventory, customers, orders, dashboard
 analytics) with a React + Ant Design frontend, a FastAPI backend, Clerk
 authentication, and a Supabase/Postgres data store.
 
@@ -35,10 +35,10 @@ Copy `.env.example` to `.env` and fill in real values. The important ones:
 | `CLERK_FRONTEND_API` | backend (prod) | Clerk Frontend API host used to verify session tokens |
 | `CLERK_ALLOWED_ORIGINS` | optional | Comma-separated `azp` allow-list |
 | `CORS_ORIGINS` | optional | Comma-separated CORS allow-list (defaults to `*`) |
-| `FINCH_ENV` | optional | `development` (default) \| `testing` \| `production` |
+| `COOP_ENV` | optional | `development` (default) \| `testing` \| `production` |
 | `TEST_DATABASE_URL` | tests | Postgres URL to enable true-concurrency tests |
 
-> SQLite is used **only** when `FINCH_ENV=testing` (or by the test suite).
+> SQLite is used **only** when `COOP_ENV=testing` (or by the test suite).
 > There is no silent fallback in production/development.
 
 ## Running locally
@@ -58,6 +58,29 @@ cd frontend
 npm install
 npm run dev
 ```
+
+## Intelligent Import & Day 1 Briefing (v1 onboarding)
+
+Bring your business history from your old system:
+
+1. **Import** (sidebar → *Import*, or `/import`): drag & drop a CSV or Excel
+   (.xlsx, first worksheet, clean tables) export — products, customers or
+   sales history. The file is parsed and the columns are **suggested**
+   against the Co-op schema with confidence scores (e.g. `Buyer_Name` →
+   customer name, `Sale_Date` → order date).
+2. **Review & confirm**: you approve/adjust every mapping; nothing is
+   written before you confirm. The import runs in one transaction with a
+   never-overwrite duplicate policy (existing SKU/email rows are skipped,
+   row errors are reported per row).
+3. **Day 1 Briefing** (`/briefing`): verified, deterministic analyses over
+   your imported history — revenue trend, top products & concentration,
+   quiet customers, stock risk and margin (from product cost prices) — each
+   with its evidence and a link to the relevant module. A "Draft
+   Follow-up" action on a quiet-customer insight opens the existing order
+   flow pre-filled for your review; it never creates anything on its own.
+
+Backend endpoints: `GET /import/schemas`, `POST /import/preview`,
+`POST /import/execute`, `GET /dashboard/briefing`.
 
 ## Database migrations (Supabase/Postgres)
 

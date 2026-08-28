@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Finch",
+    "name": "Co-op",
     "tagline": "Your Business, Smarter.",
     "environment": "testing",
     "version": "1.0.0",
@@ -12,7 +12,7 @@
   },
   "database": {
     "driver": "sqlite+aiosqlite",
-    "name": "finch_test.db"
+    "name": "coop_test.db"
   },
   "sync": {
     "enabled": false,

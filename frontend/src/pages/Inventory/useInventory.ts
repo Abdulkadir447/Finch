@@ -4,8 +4,8 @@
  * server-side movements); the ledger is read via fetchMovements().
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { semantic } from '../../theme';
 
 export type StockStatus = 'in' | 'low' | 'out';
 
@@ -91,10 +91,11 @@ export const MOVEMENT_LABELS: Record<MovementReason, string> = {
   order_deleted: 'Order deleted',
 };
 
-export const STOCK_STATUS_META: Record<StockStatus, { label: string; color: string; bg: string }> = {
-  in: { label: 'In Stock', color: semantic.success, bg: semantic.successBg },
-  low: { label: 'Low Stock', color: semantic.warning, bg: semantic.warningBg },
-  out: { label: 'Out of Stock', color: semantic.error, bg: semantic.errorBg },
+/** Stock status labels (display chrome lives in the page's CoopBadge variants). */
+export const STOCK_STATUS_META: Record<StockStatus, { label: string }> = {
+  in: { label: 'In Stock' },
+  low: { label: 'Low Stock' },
+  out: { label: 'Out of Stock' },
 };
 
 /** UXDS 11.6 mutually exclusive stock status. */
@@ -115,6 +116,18 @@ export function useInventory() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  // Command-palette deep links (Stage 2): apply ?q= when the palette
+  // navigates to this module — including while it is already mounted.
+  const location = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q');
+    if (q != null) setSearch(q);
+  }, [location.search]);
+  useEffect(() => {
+    const stock = new URLSearchParams(location.search).get('stock');
+    if (stock === 'in' || stock === 'low' || stock === 'out') setStockFilter(stock);
+  }, [location.search]);
+
   const [stockFilter, setStockFilter] = useState<StockStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
@@ -141,7 +154,7 @@ export function useInventory() {
         setSummary(sum.data);
       } catch (e) {
         setError(
-          e instanceof ApiError ? e : new ApiError('Unable to reach the Finch API.'),
+          e instanceof ApiError ? e : new ApiError('Unable to reach the Co-op API.'),
         );
       } finally {
         setLoading(false);

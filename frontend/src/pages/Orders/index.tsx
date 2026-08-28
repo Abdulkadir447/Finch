@@ -1,52 +1,46 @@
 /**
- * Orders module screen (Task 7) — same architecture as Products/Customers:
- * header (count + New order CTA), status filter + debounced search, table
- * with expandable line items, per-row status control limited to legal
- * transitions, delete with the shared confirmation pattern, pagination
- * footer, and honest loading/error/empty states. Templates = structural
- * reference only; all interaction is native antd.
+ * Orders module screen (Stitch finch_orders_catalog_refactored +
+ * finch_orders_mobile_refactored). UI refactor only — same endpoints, same
+ * transition rules (published by the backend), same stock handling.
+ *
+ *   desktop : underline status tabs + catalog table; rows open the
+ *             Order Details page (status workflow + invoice live there)
+ *   mobile  : pill tabs + order cards + FAB
+ *   export  : real CSV of the current page (client-side, no new endpoint)
+ *   create  : /orders/new (Create Order workflow page)
  */
-import React, { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  message,
-  theme as antdTheme,
-} from 'antd';
+import React from 'react';
+import { message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import {
-  DeleteOutlined,
-  ExclamationCircleFilled,
-  PlusOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
+import { CalendarOutlined, DownloadOutlined, PlusOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { radius, type } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
+import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, orderNumber } from '../../lib/orderStatus';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { formatCurrency } from '../Dashboard/kpiConfig';
-import OrderFormModal from './OrderFormModal';
+import { Order, OrderStatus, useOrders } from './useOrders';
 import {
-  Order,
-  OrderCreateInput,
-  OrderStatus,
-  STATUS_META,
-  useOrders,
-} from './useOrders';
+  CustomerAvatar,
+  CoopBadge,
+  CoopButton,
+  CoopCard,
+  CoopErrorState,
+  CoopInput,
+  CoopTable,
+} from '../../components/ui';
+import PageHeader from '../../components/layout/PageHeader';
 
-const orderNumber = (id: number) => `#ORD-${String(id).padStart(4, '0')}`;
+type TabValue = OrderStatus | 'all';
+
+const TABS: TabValue[] = ['all', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
 
 const OrdersPage: React.FC = () => {
-  const { token } = antdTheme.useToken();
+  const { colors } = useCoopTheme();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const navigate = useNavigate();
   const [messageApi, messageCtx] = message.useMessage();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   const {
     items,
@@ -61,106 +55,101 @@ const OrdersPage: React.FC = () => {
     error,
     reload,
     goToPage,
-    createOrder,
-    updateStatus,
-    deleteOrder,
   } = useOrders();
 
-  const handleCreate = async (input: OrderCreateInput) => {
-    setSubmitting(true);
-    try {
-      await createOrder(input);
-      messageApi.success('Order created');
-      setCreateOpen(false);
-      reload();
-    } catch (e) {
-      messageApi.error(e instanceof Error ? e.message : 'Order creation failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const openOrder = (id: number) => navigate(`/orders/${id}`);
 
-  const handleStatusChange = async (order: Order, next: OrderStatus) => {
-    try {
-      await updateStatus(order.id, next);
-      messageApi.success(
-        next === 'cancelled' ? 'Order cancelled — stock restored' : `Order marked ${next}`,
-      );
-      reload();
-    } catch (e) {
-      messageApi.error(e instanceof Error ? e.message : 'Status update failed');
+  // Real CSV export of the current page (client-side; no server change).
+  const exportCsv = () => {
+    if (items.length === 0) {
+      messageApi.info('Nothing to export on this page.');
+      return;
     }
-  };
-
-  // Delete confirmation — shared pattern (centered Modal.confirm, danger
-  // "Yes, I'm sure" / "No, cancel"). Deletion is PERMANENT from the user's
-  // perspective (Task 12 / M11).
-  const confirmDelete = (order: Order) => {
-    Modal.confirm({
-      title: 'Delete order',
-      icon: <ExclamationCircleFilled />,
-      content: `Are you sure you want to delete ${orderNumber(order.id)}? This is permanent and cannot be undone.${
-        order.status !== 'cancelled' ? ' Its stock will be restored.' : ''
-      }`,
-      centered: true,
-      okText: "Yes, I'm sure",
-      okButtonProps: { danger: true },
-      cancelText: 'No, cancel',
-      onOk: async () => {
-        try {
-          await deleteOrder(order.id);
-          messageApi.success('Order deleted');
-          reload();
-        } catch (e) {
-          messageApi.error(e instanceof Error ? e.message : 'Delete failed');
-        }
-      },
-    });
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const rows = [
+      ['Order ID', 'Customer', 'Date', 'Items', 'Total', 'Status'],
+      ...items.map((o) => [
+        orderNumber(o.id),
+        o.customer?.full_name ?? '',
+        dayjs(o.order_date).format('YYYY-MM-DD'),
+        String(o.items.length),
+        o.total_amount.toFixed(2),
+        ORDER_STATUS_LABEL[o.status],
+      ]),
+    ];
+    const csv = rows.map((r) => r.map(esc).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `coop-orders-page-${page}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    messageApi.success('Orders exported (current page).');
   };
 
   const columns: ColumnsType<Order> = [
     {
-      title: 'Order',
+      title: 'Order ID',
       dataIndex: 'id',
-      key: 'order',
-      render: (_: number, o) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong style={{ color: token.colorText }}>
-            {orderNumber(o.id)}
-          </Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-            {dayjs(o.order_date).format('MMM D, YYYY')}
-          </Typography.Text>
-        </Space>
+      key: 'id',
+      width: 140,
+      render: (v: number) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openOrder(v);
+          }}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            color: colors.primary,
+            fontWeight: 600,
+            fontSize: 13.5,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          {orderNumber(v)}
+        </button>
       ),
     },
     {
       title: 'Customer',
       key: 'customer',
-      render: (_: unknown, o) =>
-        o.customer ? (
-          <Typography.Text style={{ color: token.colorText }}>{o.customer.full_name}</Typography.Text>
-        ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
-        ),
+      render: (_: unknown, o) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <CustomerAvatar name={o.customer?.full_name ?? '?'} size={32} />
+          <span style={{ color: colors.onSurfaceVariant }}>{o.customer?.full_name ?? '—'}</span>
+        </div>
+      ),
+    },
+    {
+      title: 'Date',
+      dataIndex: 'order_date',
+      key: 'order_date',
+      width: 140,
+      render: (v: string) => <span style={{ color: colors.onSurfaceVariant }}>{dayjs(v).format('MMM D, YYYY')}</span>,
     },
     {
       title: 'Items',
       key: 'items',
-      width: 90,
-      align: 'center',
-      render: (_: unknown, o) => o.items.length,
+      width: 100,
+      render: (_: unknown, o) => (
+        <span style={{ color: colors.onSurfaceVariant }}>{o.items.length} {o.items.length === 1 ? 'item' : 'items'}</span>
+      ),
     },
     {
       title: 'Total',
       dataIndex: 'total_amount',
       key: 'total',
-      width: 130,
+      width: 140,
       align: 'right',
       render: (v: number) => (
-        <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: colors.onSurface }}>
           {formatCurrency(v)}
-        </Typography.Text>
+        </span>
       ),
     },
     {
@@ -168,197 +157,293 @@ const OrdersPage: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       width: 130,
-      render: (status: OrderStatus) => {
-        const meta = STATUS_META[status];
-        return (
-          <Tag style={{ color: meta.color, background: meta.bg, border: 'none', borderRadius: 6, fontWeight: 500 }}>
-            {meta.label}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 220,
-      align: 'right',
-      render: (_: unknown, o) => {
-        const nexts = o.allowed_transitions ?? [];
-        return (
-          <Space size={4}>
-            <Select
-              size="small"
-              value={o.status}
-              disabled={nexts.length === 0}
-              onChange={(next) => handleStatusChange(o, next)}
-              style={{ width: 130 }}
-              aria-label={`Change status of ${orderNumber(o.id)}`}
-              options={[
-                { value: o.status, label: STATUS_META[o.status].label },
-                ...nexts.map((n) => ({ value: n, label: `→ ${STATUS_META[n].label}` })),
-              ]}
-            />
-            <Button
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => confirmDelete(o)}
-              aria-label={`Delete ${orderNumber(o.id)}`}
-            />
-          </Space>
-        );
-      },
+      render: (s: OrderStatus) => <CoopBadge variant={ORDER_STATUS_VARIANT[s]}>{ORDER_STATUS_LABEL[s]}</CoopBadge>,
     },
   ];
 
   const showEmptyCta = !loading && !error && total === 0 && !search && statusFilter === 'all';
 
+  const tabsBar = (
+    <div
+      style={{
+        display: 'flex',
+        gap: 22,
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        borderBottom: `1px solid ${colors.borderSubtle}`,
+      }}
+    >
+      {TABS.map((t) => {
+        const active = statusFilter === t;
+        return (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setStatusFilter(t as TabValue)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              padding: '10px 2px',
+              marginBottom: -1,
+              cursor: 'pointer',
+              fontWeight: active ? 600 : 500,
+              fontSize: 14,
+              color: active ? colors.primary : colors.onSurfaceVariant,
+              borderBottom: `2px solid ${active ? colors.primary : 'transparent'}`,
+              whiteSpace: 'nowrap',
+              transition: 'color 150ms',
+            }}
+          >
+            {t === 'all' ? 'All Orders' : ORDER_STATUS_LABEL[t]}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div>
       {messageCtx}
 
-      {/* Page header */}
-      <Space direction="vertical" size={2}>
-        <Typography.Title level={2} style={{ margin: 0, color: token.colorText, fontWeight: 600 }}>
-          Orders
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          Manage customer orders, fulfillment status and stock.
-        </Typography.Text>
-      </Space>
+      <PageHeader
+        title="Orders"
+        subtitle="Manage and track all customer orders."
+        actions={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <CoopButton variant="secondary" icon={<DownloadOutlined />} onClick={exportCsv}>
+              Export
+            </CoopButton>
+            {!isMobile && (
+              <CoopButton icon={<PlusOutlined />} onClick={() => navigate('/orders/new')}>
+                Create Order
+              </CoopButton>
+            )}
+          </div>
+        }
+      />
 
-      {/* Error banner (widgets stay visible underneath) */}
       {error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error.isAuthError ? 'Authentication required' : 'Unable to load orders'}
-          description={error.message}
-          action={
-            <Button size="small" danger onClick={reload}>
-              Retry
-            </Button>
-          }
-        />
+        <div style={{ marginBottom: 16 }}>
+          <CoopErrorState
+            title={error.isAuthError ? 'Authentication required' : 'Unable to load orders'}
+            detail={error.message}
+            onRetry={reload}
+          />
+        </div>
       )}
 
-      {/* Table card */}
-      <Card styles={{ body: { padding: 0 } }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: 16,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          }}
-        >
-          <Typography.Text>
-            <span style={{ color: token.colorTextSecondary }}>All Orders: </span>
-            <strong style={{ color: token.colorText }}>{loading ? '…' : total}</strong>
-          </Typography.Text>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-            New order
-          </Button>
-        </div>
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ maxWidth: 420 }}>
+            <CoopInput
+              search
+              placeholder="Search orders…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search orders"
+              style={{ width: '100%' }}
+            />
+          </div>
 
-        {/* Toolbar: status filter + search */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            padding: 16,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          }}
-        >
-          <Select
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v)}
-            style={{ width: 170 }}
-            aria-label="Filter by status"
-            options={[
-              { value: 'all', label: 'All statuses' },
-              ...(Object.keys(STATUS_META) as OrderStatus[]).map((s) => ({
-                value: s,
-                label: STATUS_META[s].label,
-              })),
-            ]}
-          />
-          <Input
-            allowClear
-            prefix={<SearchOutlined style={{ color: token.colorTextTertiary }} />}
-            placeholder="Search by customer name or order number"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ maxWidth: 360 }}
-            aria-label="Search orders"
-          />
-        </div>
+          {/* Mobile pill tabs (finch_orders_mobile) */}
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            {TABS.map((t) => {
+              const active = statusFilter === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setStatusFilter(t as TabValue)}
+                  style={{
+                    border: 'none',
+                    borderRadius: radius.full,
+                    padding: '8px 16px',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    background: active ? colors.primary : colors.surfaceContainer,
+                    color: active ? colors.onPrimary : colors.onSurfaceVariant,
+                    transition: 'background-color 150ms',
+                  }}
+                >
+                  {t === 'all' ? 'All Orders' : ORDER_STATUS_LABEL[t]}
+                </button>
+              );
+            })}
+          </div>
 
-        <Table<Order>
-          rowKey="id"
-          size="middle"
-          columns={columns}
-          dataSource={items}
-          loading={loading}
-          scroll={{ x: 760 }}
-          expandable={{
-            expandedRowRender: (o) => (
-              <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                {o.items.map((item) => (
-                  <Typography.Text key={item.id} type="secondary">
-                    {item.product_name ?? `Product #${item.product_id}`} — {item.quantity} ×{' '}
-                    {formatCurrency(item.unit_price)} ={' '}
-                    <strong>{formatCurrency(item.total_price)}</strong>
-                  </Typography.Text>
-                ))}
-              </Space>
-            ),
-          }}
-          locale={{
-            emptyText: showEmptyCta ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Space direction="vertical" size={2}>
-                    <Typography.Text>No orders yet</Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      Create your first order to start tracking sales.
-                    </Typography.Text>
-                  </Space>
-                }
-              >
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
-                  New order
-                </Button>
-              </Empty>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<Typography.Text>No orders match your filters.</Typography.Text>}
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ height: 150, borderRadius: radius.lg, background: colors.surfaceContainer }} />
+              ))}
+            </div>
+          ) : items.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {items.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => openOrder(o.id)}
+                  style={{
+                    textAlign: 'left',
+                    background: colors.surfaceContainerLowest,
+                    border: `1px solid ${colors.borderSubtle}`,
+                    borderRadius: radius.lg,
+                    padding: 16,
+                    cursor: 'pointer',
+                    transition: 'border-color 150ms',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = colors.outlineVariant)}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = colors.borderSubtle)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ ...type.labelCaps, color: colors.outline, fontSize: 11 }}>{orderNumber(o.id)}</span>
+                    <CoopBadge variant={ORDER_STATUS_VARIANT[o.status]}>{ORDER_STATUS_LABEL[o.status]}</CoopBadge>
+                  </div>
+                  <div style={{ ...type.titleMd, fontSize: 17, color: colors.onSurface, marginTop: 8 }}>
+                    {o.customer?.full_name ?? '—'}
+                  </div>
+                  <div
+                    style={{
+                      ...type.bodyCompact,
+                      fontSize: 13,
+                      color: colors.onSurfaceVariant,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 4,
+                    }}
+                  >
+                    <CalendarOutlined style={{ color: colors.outline, fontSize: 12 }} />
+                    {dayjs(o.order_date).format('MMM D, YYYY')}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderTop: `1px solid ${colors.borderSubtle}`,
+                      marginTop: 12,
+                      paddingTop: 12,
+                    }}
+                  >
+                    <CustomerAvatar name={o.customer?.full_name ?? '?'} size={30} />
+                    <span style={{ ...type.titleMd, color: colors.onSurface, fontVariantNumeric: 'tabular-nums' }}>
+                      {formatCurrency(o.total_amount)}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                border: `1px solid ${colors.borderSubtle}`,
+                borderRadius: radius.lg,
+                padding: '36px 16px',
+                textAlign: 'center',
+                background: colors.surfaceContainerLowest,
+              }}
+            >
+              <div style={{ ...type.titleMd, color: colors.onSurface, marginBottom: 6 }}>
+                {showEmptyCta ? 'No orders yet' : 'No results found'}
+              </div>
+              <div style={{ ...type.bodyCompact, color: colors.onSurfaceVariant }}>
+                {showEmptyCta
+                  ? 'Create your first order to start tracking sales.'
+                  : 'No orders match your filters.'}
+              </div>
+            </div>
+          )}
+
+          {/* Mobile FAB */}
+          <button
+            type="button"
+            onClick={() => navigate('/orders/new')}
+            aria-label="Create order"
+            style={{
+              position: 'fixed',
+              right: 20,
+              bottom: 24,
+              width: 54,
+              height: 54,
+              borderRadius: radius.xl,
+              border: 'none',
+              background: `linear-gradient(135deg, ${colors.primaryContainer} 0%, ${colors.secondaryContainer} 100%)`,
+              color: colors.onPrimary,
+              fontSize: 22,
+              cursor: 'pointer',
+              zIndex: 60,
+              boxShadow: '0 8px 24px rgba(91, 95, 239, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <PlusOutlined />
+          </button>
+        </div>
+      ) : (
+        <CoopCard flush bodyPadding={0}>
+          {/* Toolbar: status tabs + search */}
+          <div style={{ padding: '0 16px' }}>{tabsBar}</div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '12px 16px',
+              borderBottom: `1px solid ${colors.borderSubtle}`,
+            }}
+          >
+            <div style={{ width: '100%', maxWidth: 340 }}>
+              <CoopInput
+                search
+                placeholder="Search by customer name or order number"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search orders"
+                style={{ width: '100%' }}
               />
-            ),
-          }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: false,
-            showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
-            onChange: goToPage,
-          }}
-        />
-      </Card>
+            </div>
+          </div>
 
-      <OrderFormModal
-        open={createOpen}
-        submitting={submitting}
-        onCancel={() => setCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
+          <CoopTable<Order>
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            loading={loading}
+            onRow={(o) => ({
+              onClick: () => openOrder(o.id),
+              style: { cursor: 'pointer' },
+            })}
+            scroll={{ x: 820 }}
+            empty={
+              showEmptyCta
+                ? {
+                    title: 'No orders yet',
+                    description: 'Create your first order to start tracking sales.',
+                    action: (
+                      <CoopButton size="sm" icon={<PlusOutlined />} onClick={() => navigate('/orders/new')}>
+                        New order
+                      </CoopButton>
+                    ),
+                    compact: true,
+                  }
+                : { title: 'No results found', description: 'No orders match your filters.', compact: true }
+            }
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: false,
+              showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
+              onChange: goToPage,
+            }}
+          />
+        </CoopCard>
+      )}
     </div>
   );
 };

@@ -1,40 +1,56 @@
 /**
- * Customers module screen — same architecture as Products (Task 6),
- * adapted from the Flowbite CRUD table/modal/footer templates onto
- * Ant Design + Finch tokens. Delete uses the exact confirmation pattern
- * already implemented for Products. No sample/invented data.
+ * Customers module screen (Stitch finch_customer_catalog_refactored +
+ * finch_customers_mobile). UI refactor only — same endpoints, same data
+ * rules (tenant-scoped email uniqueness, soft delete, order history
+ * retained).
+ *
+ *   desktop : catalog table — Name (avatar + ID) · Company · Contact ·
+ *             Status (derived) · Orders · Total Spent (derived, lazy)
+ *   mobile  : search + AI insight card + customer cards + FAB
+ *   rows    → Customer Profile (/customers/:id)
+ *   create  : "Create New Customer" modal
+ *   delete  : destructive workflow confirmation (profile + shared modal)
  */
 import React, { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  Modal,
-  Space,
-  Table,
-  Typography,
-  message,
-  theme as antdTheme,
-} from 'antd';
+import { Pagination, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  ExclamationCircleFilled,
-  PlusOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { PlusOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { radius, type } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { formatCurrency } from '../Dashboard/kpiConfig';
 import CustomerFormModal from './CustomerFormModal';
+import CustomerCardList from './CustomerCardList';
 import { Customer, CustomerFormValues, useCustomers } from './useCustomers';
+import {
+  customerActivity,
+  useCustomerStats,
+  CustomerActivity,
+} from './useCustomerStats';
+import {
+  AiNoticeBox,
+  CustomerAvatar,
+  CoopButton,
+  CoopCard,
+  CoopErrorState,
+  CoopInput,
+  CoopTable,
+} from '../../components/ui';
+import PageHeader from '../../components/layout/PageHeader';
+
+const ACTIVITY_META: Record<CustomerActivity, { label: string; variant: 'primary' | 'neutral'; solid?: boolean }> = {
+  new: { label: 'New', variant: 'primary', solid: true },
+  active: { label: 'Active', variant: 'primary' },
+  inactive: { label: 'Inactive', variant: 'neutral' },
+};
 
 const CustomersPage: React.FC = () => {
-  const { token } = antdTheme.useToken();
+  const { colors } = useCoopTheme();
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const navigate = useNavigate();
   const [messageApi, messageCtx] = message.useMessage();
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Customer | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const {
@@ -49,30 +65,17 @@ const CustomersPage: React.FC = () => {
     reload,
     goToPage,
     createCustomer,
-    updateCustomer,
-    deleteCustomer,
   } = useCustomers();
 
-  const openCreate = () => {
-    setEditing(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = (customer: Customer) => {
-    setEditing(customer);
-    setModalOpen(true);
-  };
+  // Derived purchase stats (Orders / Total Spent) from the existing orders
+  // endpoint — lazy per page, never blocks the list itself.
+  const { stats, statsLoading } = useCustomerStats(items);
 
   const handleSubmit = async (values: CustomerFormValues) => {
     setSubmitting(true);
     try {
-      if (editing) {
-        await updateCustomer(editing.id, values);
-        messageApi.success('Customer updated');
-      } else {
-        await createCustomer(values);
-        messageApi.success('Customer created');
-      }
+      await createCustomer(values);
+      messageApi.success('Customer created');
       setModalOpen(false);
       reload();
     } catch (e) {
@@ -82,89 +85,100 @@ const CustomersPage: React.FC = () => {
     }
   };
 
-  // Delete confirmation — same pattern as Products (centered Modal.confirm,
-  // danger "Yes, I'm sure" / "No, cancel"). Deletion is PERMANENT from the
-  // user's perspective (Task 12 / M11); their order history is kept for
-  // reporting (customers are soft-deleted and orders keep their reference).
-  const confirmDelete = (customer: Customer) => {
-    Modal.confirm({
-      title: 'Delete customer',
-      icon: <ExclamationCircleFilled />,
-      content: `Are you sure you want to delete "${customer.full_name}" (${customer.email})? This is permanent and cannot be undone. Their order history is kept for reporting.`,
-      centered: true,
-      okText: "Yes, I'm sure",
-      okButtonProps: { danger: true },
-      cancelText: 'No, cancel',
-      onOk: async () => {
-        try {
-          await deleteCustomer(customer.id);
-          messageApi.success('Customer deleted');
-          reload();
-        } catch (e) {
-          messageApi.error(e instanceof Error ? e.message : 'Delete failed');
-        }
-      },
-    });
-  };
-
   const columns: ColumnsType<Customer> = [
     {
-      title: 'Customer',
+      title: 'Name',
       dataIndex: 'full_name',
       key: 'full_name',
       render: (_: string, c) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong style={{ color: token.colorText }}>
-            {c.full_name}
-          </Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-            {c.email}
-          </Typography.Text>
-        </Space>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <CustomerAvatar name={c.full_name} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, color: colors.onSurface }}>{c.full_name}</div>
+            <div style={{ ...type.bodyCompact, fontSize: 12, color: colors.outline, marginTop: 2 }}>
+              ID: #C-{String(c.id).padStart(4, '0')}
+            </div>
+          </div>
+        </div>
       ),
     },
     {
       title: 'Company',
       dataIndex: 'company',
       key: 'company',
-      width: 180,
+      width: 170,
       render: (company: string | null) =>
         company ? (
-          <Typography.Text style={{ color: token.colorText }}>{company}</Typography.Text>
+          <span style={{ color: colors.onSurfaceVariant }}>{company}</span>
         ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
+          <span style={{ color: colors.outline }}>—</span>
         ),
     },
     {
-      title: 'Phone',
-      dataIndex: 'phone',
-      key: 'phone',
-      width: 160,
-      render: (phone: string | null) =>
-        phone ? (
-          <Typography.Text style={{ fontVariantNumeric: 'tabular-nums' }}>{phone}</Typography.Text>
-        ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
-        ),
+      title: 'Contact',
+      key: 'contact',
+      width: 240,
+      render: (_: unknown, c) => (
+        <div>
+          <div style={{ color: colors.onSurfaceVariant }}>{c.email}</div>
+          <div style={{ ...type.bodyCompact, fontSize: 12, color: colors.outline, marginTop: 2 }}>
+            {c.phone ?? ''}
+          </div>
+        </div>
+      ),
     },
     {
-      title: '',
-      key: 'actions',
+      title: 'Status',
+      key: 'status',
+      width: 120,
+      render: (_: unknown, c) => {
+        if (statsLoading && !stats[c.id]) return <span style={{ color: colors.outline }}>…</span>;
+        const meta = ACTIVITY_META[customerActivity(c, stats[c.id])];
+        return (
+          <span
+            style={
+              meta.solid
+                ? {
+                    display: 'inline-block',
+                    padding: '3px 12px',
+                    borderRadius: radius.md,
+                    background: colors.primary,
+                    color: colors.onPrimary,
+                    ...type.labelCaps,
+                    textTransform: 'uppercase',
+                  }
+                : undefined
+            }
+          >
+            {meta.solid ? (
+              meta.label
+            ) : (
+              <ActivityPill activity={customerActivity(c, stats[c.id])} />
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Orders',
+      key: 'orders',
+      width: 100,
+      align: 'right',
+      render: (_: unknown, c) => (
+        <span style={{ color: colors.onSurface, fontVariantNumeric: 'tabular-nums' }}>
+          {statsLoading && !stats[c.id] ? '…' : (stats[c.id]?.orders ?? 0)}
+        </span>
+      ),
+    },
+    {
+      title: 'Total Spent',
+      key: 'total',
       width: 150,
       align: 'right',
       render: (_: unknown, c) => (
-        <Space size={4}>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(c)}>
-            Edit
-          </Button>
-          <Button
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => confirmDelete(c)}
-            aria-label={`Delete ${c.full_name}`}
-          />
-        </Space>
+        <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: colors.onSurface }}>
+          {statsLoading && !stats[c.id] ? '…' : formatCurrency(stats[c.id]?.total ?? 0)}
+        </span>
       ),
     },
   ];
@@ -172,132 +186,220 @@ const CustomersPage: React.FC = () => {
   const showEmptyCta = !loading && !error && total === 0 && !search;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div>
       {messageCtx}
 
-      {/* Page header */}
-      <Space direction="vertical" size={2}>
-        <Typography.Title level={2} style={{ margin: 0, color: token.colorText, fontWeight: 600 }}>
-          Customers
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          Manage your customer database and contact details.
-        </Typography.Text>
-      </Space>
+      <PageHeader
+        title="Customers"
+        subtitle="Manage and view your customer database."
+        actions={
+          isMobile ? undefined : (
+            <CoopButton icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+              Add Customer
+            </CoopButton>
+          )
+        }
+      />
 
-      {/* Error banner (widgets stay visible underneath) */}
       {error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error.isAuthError ? 'Authentication required' : 'Unable to load customers'}
-          description={error.message}
-          action={
-            <Button size="small" danger onClick={reload}>
-              Retry
-            </Button>
-          }
-        />
-      )}
-
-      {/* Table card: header row (count + CTA), search toolbar, table, footer */}
-      <Card styles={{ body: { padding: 0 } }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: 16,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          }}
-        >
-          <Typography.Text>
-            <span style={{ color: token.colorTextSecondary }}>All Customers: </span>
-            <strong style={{ color: token.colorText }}>{loading ? '…' : total}</strong>
-          </Typography.Text>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Add customer
-          </Button>
-        </div>
-
-        {/* Search toolbar */}
-        <div style={{ padding: 16, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
-          <Input
-            allowClear
-            prefix={<SearchOutlined style={{ color: token.colorTextTertiary }} />}
-            placeholder="Search for customers by name, email or company"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ maxWidth: 420 }}
-            aria-label="Search customers"
+        <div style={{ marginBottom: 16 }}>
+          <CoopErrorState
+            title={error.isAuthError ? 'Authentication required' : 'Unable to load customers'}
+            detail={error.message}
+            onRetry={reload}
           />
         </div>
+      )}
 
-        <Table<Customer>
-          rowKey="id"
-          size="middle"
-          columns={columns}
-          dataSource={items}
-          loading={loading}
-          scroll={{ x: 640 }}
-          expandable={{
-            expandedRowRender: (c) => (
-              <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                <Typography.Text type="secondary">
-                  {c.address || 'No address provided.'}
-                </Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                  Created {dayjs(c.created_at).format('MMM D, YYYY HH:mm')}
-                  {c.updated_at ? ` · Updated ${dayjs(c.updated_at).format('MMM D, YYYY HH:mm')}` : ''}
-                </Typography.Text>
-              </Space>
-            ),
-          }}
-          locale={{
-            emptyText: showEmptyCta ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Space direction="vertical" size={2}>
-                    <Typography.Text>No customers yet</Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      Add your first customer to start building your customer base.
-                    </Typography.Text>
-                  </Space>
-                }
-              >
-                <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-                  Add customer
-                </Button>
-              </Empty>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<Typography.Text>No customers match your search.</Typography.Text>}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ maxWidth: 420 }}>
+            <CoopInput
+              search
+              placeholder="Search customers…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search customers"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <AiNoticeBox
+            compact
+            title="AI Insight: Engagement"
+            description="Co-op AI will flag customers with changing order cadence and suggest check-ins once the AI module is available."
+          />
+
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    height: 110,
+                    borderRadius: radius.lg,
+                    background: colors.surfaceContainer,
+                  }}
+                />
+              ))}
+            </div>
+          ) : items.length > 0 ? (
+            <CustomerCardList customers={items} stats={stats} statsLoading={statsLoading} />
+          ) : (
+            <div
+              style={{
+                border: `1px solid ${colors.borderSubtle}`,
+                borderRadius: radius.lg,
+                padding: '36px 16px',
+                textAlign: 'center',
+                background: colors.surfaceContainerLowest,
+              }}
+            >
+              <div style={{ ...type.titleMd, color: colors.onSurface, marginBottom: 6 }}>
+                {showEmptyCta ? 'No customers yet' : 'No results found'}
+              </div>
+              <div style={{ ...type.bodyCompact, color: colors.onSurfaceVariant }}>
+                {showEmptyCta
+                  ? 'Add your first customer to start building your customer base.'
+                  : 'No customers match your search.'}
+              </div>
+            </div>
+          )}
+
+          {items.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Pagination
+                current={page}
+                pageSize={pageSize}
+                total={total}
+                size="small"
+                showSizeChanger={false}
+                onChange={goToPage}
               />
-            ),
-          }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: false,
-            showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
-            onChange: goToPage,
-          }}
-        />
-      </Card>
+            </div>
+          )}
+
+          {/* Mobile FAB (finch_customers_mobile) */}
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            aria-label="Add customer"
+            style={{
+              position: 'fixed',
+              right: 20,
+              bottom: 24,
+              width: 54,
+              height: 54,
+              borderRadius: radius.xl,
+              border: 'none',
+              background: `linear-gradient(135deg, ${colors.primaryContainer} 0%, ${colors.secondaryContainer} 100%)`,
+              color: colors.onPrimary,
+              fontSize: 22,
+              cursor: 'pointer',
+              zIndex: 60,
+              boxShadow: '0 8px 24px rgba(91, 95, 239, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <PlusOutlined />
+          </button>
+        </div>
+      ) : (
+        <CoopCard flush bodyPadding={0}>
+          {/* Toolbar: count + search */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '12px 16px',
+              borderBottom: `1px solid ${colors.borderSubtle}`,
+            }}
+          >
+            <span style={{ ...type.bodyCompact, color: colors.onSurfaceVariant }}>
+              All Customers: <strong style={{ color: colors.onSurface }}>{loading ? '…' : total}</strong>
+            </span>
+            <div style={{ width: '100%', maxWidth: 380, flex: 1 }}>
+              <CoopInput
+                search
+                placeholder="Search for customers by name, email or company"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search customers"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+
+          <CoopTable<Customer>
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            loading={loading}
+            onRow={(c) => ({
+              onClick: () => navigate(`/customers/${c.id}`),
+              style: { cursor: 'pointer' },
+            })}
+            scroll={{ x: 860 }}
+            empty={
+              showEmptyCta
+                ? {
+                    title: 'No customers yet',
+                    description: 'Add your first customer to start building your customer base.',
+                    action: (
+                      <CoopButton size="sm" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+                        Add customer
+                      </CoopButton>
+                    ),
+                    compact: true,
+                  }
+                : { title: 'No results found', description: 'No customers match your search.', compact: true }
+            }
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: false,
+              showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
+              onChange: goToPage,
+            }}
+          />
+        </CoopCard>
+      )}
 
       <CustomerFormModal
         open={modalOpen}
-        customer={editing}
+        customer={null}
         submitting={submitting}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleSubmit}
       />
     </div>
+  );
+};
+
+/** Activity pill (Active / Inactive) — New is rendered solid by the column. */
+const ActivityPill: React.FC<{ activity: CustomerActivity }> = ({ activity }) => {
+  const meta = ACTIVITY_META[activity];
+  const { colors } = useCoopTheme();
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '3px 12px',
+        borderRadius: radius.md,
+        background: meta.variant === 'primary' ? colors.primaryFixed : colors.surfaceVariant,
+        color: meta.variant === 'primary' ? colors.onPrimaryFixedVariant : colors.onSurfaceVariant,
+        ...type.labelCaps,
+        textTransform: 'uppercase',
+      }}
+    >
+      {meta.label}
+    </span>
   );
 };
 

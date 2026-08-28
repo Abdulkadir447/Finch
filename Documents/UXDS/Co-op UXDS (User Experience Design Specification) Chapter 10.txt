@@ -1,0 +1,509 @@
+Co-op UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 10 — Orders Module Screen Specification
+10.1 Purpose
+
+The Orders module is one of the core operational areas of Co-op. It is responsible for managing the complete sales lifecycle—from creating an order to generating invoices, updating inventory, notifying customers, and synchronizing business data.
+
+The module is designed around three principles:
+
+Speed — Create and manage orders in under 60 seconds.
+Clarity — Present all relevant order information in one place.
+Automation — Minimize manual work through AI and system integrations.
+10.2 Objectives
+
+The Orders module should allow users to:
+
+Create new orders.
+View all existing orders.
+Edit and update orders.
+Cancel orders.
+Generate invoices.
+Print invoices.
+Export order data.
+Search and filter orders.
+Perform bulk actions.
+Ask AI questions about orders.
+Work offline with automatic cloud synchronization.
+10.3 Screen Layout
+
+The Orders page uses a split-view layout to maximize productivity.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Page Header                                                                 │
+├───────────────────────┬─────────────────────────────────────────────────────┤
+│                       │                                                     │
+│ Orders List           │ Order Details                                       │
+│                       │                                                     │
+│ Search                │ Customer                                            │
+│ Filters               │ Products                                            │
+│                       │ Invoice                                             │
+│                       │ Timeline                                            │
+│                       │ AI Insights                                         │
+│                       │                                                     │
+└───────────────────────┴─────────────────────────────────────────────────────┘
+10.4 Page Header
+
+The header includes:
+
+Left:
+
+Orders title
+Total order count
+
+Center:
+
+Search bar
+
+Right:
+
+New Order
+Export
+Print
+AI Assistant
+
+Example:
+
+Orders
+
+245 Orders
+
+[ Search ]
+
++ New Order
+
+Export
+
+Print
+
+🤖
+10.5 Orders List Panel
+
+The left panel contains the searchable order list.
+
+Each row displays:
+
+Order Number
+Customer Name
+Date
+Total Amount
+Payment Status
+Order Status
+
+Example:
+
+#1045
+
+John Smith
+
+₦25,000
+
+Paid
+
+Completed
+10.6 List Features
+
+Supported functionality:
+
+Instant search
+Multi-column sorting
+Filters
+Keyboard navigation
+Multi-selection
+Infinite scrolling
+Context menu
+
+Rows should update without refreshing the page.
+
+10.7 Filters
+
+Supported filters include:
+
+Status
+
+Pending
+Processing
+Completed
+Cancelled
+
+Payment
+
+Paid
+Unpaid
+Partial
+
+Date
+
+Today
+This Week
+This Month
+Custom Range
+
+Customer
+
+Existing customers
+New customers
+
+Amount
+
+Minimum
+Maximum
+
+Multiple filters may be combined.
+
+10.8 Order Details Panel
+
+Selecting an order opens the details panel.
+
+Sections include:
+
+Customer Information
+Order Information
+Products
+Totals
+Invoice
+Notes
+Timeline
+AI Insights
+
+The panel updates instantly when another order is selected.
+
+10.9 Customer Information Card
+
+Displays:
+
+Avatar
+Name
+Email
+Phone
+Address
+Purchase history summary
+
+Quick actions:
+
+Call
+Email
+Open Customer Profile
+10.10 Product Table
+
+Displays:
+
+Column	Description
+Product	Product name
+SKU	Stock Keeping Unit
+Quantity	Purchased quantity
+Unit Price	Price per item
+Discount	Applied discount
+Total	Final line total
+
+Supports inline editing before the order is finalized.
+
+10.11 Order Summary
+
+Displays:
+
+Subtotal
+Discount
+Tax
+Shipping
+Grand Total
+
+Values update instantly as products are added or edited.
+
+10.12 Timeline
+
+Displays the complete order history.
+
+Example:
+
+10:15
+
+Order Created
+
+↓
+
+10:20
+
+Invoice Generated
+
+↓
+
+10:24
+
+Payment Received
+
+↓
+
+10:30
+
+Completed
+
+Timeline entries are timestamped and ordered chronologically.
+
+10.13 AI Insights Panel
+
+The AI analyzes the selected order.
+
+Examples:
+
+Highlight unusual discounts.
+Suggest related products.
+Estimate customer lifetime value.
+Detect potential payment risks.
+Recommend follow-up actions.
+
+Users can ask follow-up questions without leaving the Orders module.
+
+10.14 Create Order Flow
+
+Selecting New Order opens the order creation interface.
+
+Steps:
+
+Select customer.
+Add products.
+Adjust quantities.
+Review pricing.
+Apply discounts.
+Review totals.
+Save order.
+Generate invoice.
+
+Estimated completion time:
+
+Under 60 seconds
+
+10.15 Customer Selection
+
+Users may:
+
+Search existing customers.
+Create a new customer.
+Select from recent customers.
+
+AI may suggest customers based on recent activity.
+
+10.16 Product Selection
+
+Products are searchable.
+
+Search fields include:
+
+Name
+SKU
+Barcode (future)
+
+Product cards display:
+
+Image
+Stock availability
+Price
+Low stock indicator
+
+Low-stock products display a warning.
+
+10.17 Invoice Generation
+
+Once an order is saved, Co-op automatically generates an invoice preview.
+
+Invoice includes:
+
+Company logo
+Invoice number
+QR code
+Customer details
+Product list
+Tax information
+Payment terms
+Signature area
+
+Users can:
+
+Print
+Export PDF
+Email via Gmail
+10.18 Bulk Actions
+
+When multiple orders are selected, users can:
+
+Export
+Print
+Mark as Completed
+Cancel
+Delete (if permitted)
+
+Bulk actions require confirmation when data changes cannot be undone.
+
+10.19 Search Experience
+
+Search updates in real time.
+
+Supported search terms:
+
+Order Number
+Customer Name
+Product Name
+Invoice Number
+
+Results should appear within 150 ms.
+
+10.20 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + N	New Order
+Ctrl + F	Search Orders
+Ctrl + S	Save Order
+Ctrl + P	Print Invoice
+Ctrl + E	Export
+Delete	Cancel Selected Order (after confirmation)
+Esc	Close Dialog
+Ctrl + Shift + A	Ask AI
+10.21 Empty State
+
+When no orders exist:
+
+Display:
+
+Illustration
+Welcome message
+"Create Your First Order" button
+AI suggestion
+
+Example:
+
+No orders yet.
+
+Start by creating your first customer order.
+
+10.22 Loading State
+
+Skeleton placeholders appear for:
+
+Order list
+Details panel
+Product table
+Timeline
+
+Loading should be progressive.
+
+10.23 Error State
+
+Example:
+
+Unable to load orders.
+
+[Retry]
+
+Continue Offline
+
+Previously loaded data remains available whenever possible.
+
+10.24 Offline Behavior
+
+While offline, users can:
+
+Create orders
+Edit orders
+Cancel orders
+Print invoices
+Search local data
+
+Unavailable features:
+
+AI Assistant
+Gmail
+Cloud synchronization
+
+Changes are queued automatically and synced when the internet returns.
+
+10.25 Notifications
+
+Users receive notifications when:
+
+Order created
+Order updated
+Invoice generated
+Payment received
+Sync completed
+Export finished
+
+Notifications include direct links to the affected order.
+
+10.26 Animations
+
+Animations should be subtle and purposeful.
+
+Examples:
+
+Row selection highlight
+Drawer slide-in
+Invoice preview fade
+Success toast slide-down
+AI panel slide-up
+
+Duration:
+
+180–220 ms
+
+10.27 Accessibility
+
+The Orders module must support:
+
+Full keyboard navigation.
+Screen readers.
+High-contrast mode.
+Logical tab order.
+Large clickable targets.
+Accessible table headers.
+Descriptive status indicators beyond color alone.
+10.28 Performance Targets
+Metric	Target
+Orders Page Load	<2 seconds
+Search Results	<150 ms
+Save Order	<500 ms
+Invoice Preview	<1 second
+List Scroll	60 FPS
+Order Selection	<100 ms
+10.29 Developer Component Structure
+OrdersPage
+├── OrdersHeader
+├── SearchBar
+├── FilterBar
+├── OrdersTable
+├── OrderDetailsPanel
+│   ├── CustomerCard
+│   ├── ProductsTable
+│   ├── OrderSummary
+│   ├── Timeline
+│   └── AIInsightsCard
+├── InvoicePreview
+├── BulkActionToolbar
+└── FloatingAI
+
+Each component should:
+
+Be independently testable.
+Support loading, empty, and error states.
+Use shared Co-op design tokens.
+Respect Light and Dark themes.
+Integrate with the global command palette and notification system.
+10.30 Acceptance Criteria
+
+The Orders module is considered complete when:
+
+Users can create, edit, cancel, and view orders efficiently.
+Split-view navigation is responsive and intuitive.
+Invoice generation is integrated into the workflow.
+Search, filtering, and bulk actions are fully functional.
+AI provides contextual insights for selected orders.
+Offline operation with queued synchronization works reliably.
+Accessibility standards are met.
+Performance targets are achieved across supported desktop environments.
+Chapter Summary
+
+The Orders module is the operational backbone of Co-op, enabling business owners to manage customer transactions quickly and accurately. Its split-view layout, integrated invoice generation, AI insights, and offline-first architecture ensure a seamless workflow from order creation to completion. By combining powerful data management with intuitive interactions, the Orders module supports efficient day-to-day business operations while remaining scalable for future enhancements.

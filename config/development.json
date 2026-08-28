@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Finch",
+    "name": "Co-op",
     "tagline": "Your Business, Smarter.",
     "environment": "development",
     "version": "1.0.0",
@@ -14,7 +14,7 @@
     "driver": "postgresql+asyncpg",
     "host": "localhost",
     "port": 5432,
-    "name": "finch"
+    "name": "coop"
   },
   "sync": {
     "enabled": false,

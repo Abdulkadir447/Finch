@@ -1,0 +1,412 @@
+Co-op Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 18 — Deployment, Updates & Release Management Flow
+18.1 Purpose
+
+This chapter defines how Co-op is packaged, distributed, installed, updated, and maintained throughout its lifecycle. The deployment strategy prioritizes simplicity for end users, reliability during updates, and scalability for future releases.
+
+Version 1.0 targets Windows as the primary platform, using Electron, Electron Builder, Electron Updater, and GitHub Releases for packaging and update distribution.
+
+The deployment architecture is designed to support future releases for macOS and Linux with minimal changes.
+
+18.2 Objectives
+
+The Deployment & Update system must:
+
+Package the application into a professional Windows installer.
+Support first-time installation.
+Automatically detect updates.
+Download updates securely.
+Allow users to control update installation.
+Recover from failed updates.
+Support rollback mechanisms.
+Maintain version compatibility.
+Prepare for multiple release channels.
+Ensure safe deployments.
+18.3 Deployment Architecture
+Developer
+      │
+      ▼
+Git Repository
+      │
+      ▼
+CI/CD Pipeline
+      │
+      ▼
+Build Electron App
+      │
+      ▼
+Electron Builder
+      │
+      ▼
+Windows Installer
+      │
+      ▼
+GitHub Releases
+      │
+      ▼
+Electron Updater
+      │
+      ▼
+User Desktop
+18.4 Release Workflow
+Developer Push
+        │
+        ▼
+Run Tests
+        │
+        ▼
+Build Application
+        │
+        ▼
+Package Installer
+        │
+        ▼
+Create GitHub Release
+        │
+        ▼
+Users Receive Update
+
+Only successful builds should be published.
+
+18.5 Packaging
+
+The production build generates:
+
+Windows Installer (.exe)
+Portable Version (optional)
+Release Notes
+Update Metadata
+Source Maps (internal only)
+
+Electron Builder manages packaging.
+
+18.6 Installation Flow
+Download Installer
+        │
+        ▼
+Launch Installer
+        │
+        ▼
+Accept License
+        │
+        ▼
+Choose Installation Folder
+        │
+        ▼
+Install Application
+        │
+        ▼
+Launch Co-op
+
+The installer creates:
+
+Desktop Shortcut
+Start Menu Entry
+File Associations (future)
+18.7 First Launch Flow
+
+Following installation:
+
+First Launch
+      │
+      ▼
+Initialize Application
+      │
+      ▼
+Create Local Database
+      │
+      ▼
+Sign In / Sign Up
+      │
+      ▼
+Activate License
+      │
+      ▼
+Company Setup
+      │
+      ▼
+Dashboard
+
+This matches the application flow defined in earlier chapters.
+
+18.8 Version Management
+
+Each release includes:
+
+Major Version
+Minor Version
+Patch Version
+Build Number
+
+Example:
+
+1.4.2
+
+Major = 1
+
+Minor = 4
+
+Patch = 2
+
+Version numbers are displayed in:
+
+About Page
+Splash Screen
+Installer
+Update Dialog
+18.9 Update Detection
+
+After startup:
+
+Dashboard Loaded
+       │
+       ▼
+Check GitHub Releases
+       │
+       ▼
+Update Available?
+
+If no update exists:
+
+Continue normally.
+
+If an update exists:
+
+Notify the user.
+
+18.10 Update Flow
+New Version Found
+        │
+        ▼
+Show Release Notes
+        │
+        ▼
+User Chooses
+
+Update?
+
+        │
+ ┌──────┴──────┐
+ │             │
+Yes           Later
+ │
+ ▼
+Download Update
+ │
+ ▼
+Install on Restart
+
+Users remain in control of installation timing.
+
+18.11 Background Download
+
+Downloads occur without interrupting work.
+
+Download Update
+       │
+       ▼
+Background Download
+       │
+       ▼
+Notify Ready
+
+Users can continue using Co-op while updates download.
+
+18.12 Installation of Updates
+
+After download:
+
+Restart Application
+        │
+        ▼
+Install Update
+        │
+        ▼
+Launch New Version
+
+Updates install during restart to prevent data corruption.
+
+18.13 Failed Update Recovery
+
+If installation fails:
+
+Install Failed
+      │
+      ▼
+Restore Previous Version
+      │
+      ▼
+Notify User
+
+Users should never be left with a partially installed application.
+
+18.14 Rollback Strategy
+
+Rollback occurs automatically when:
+
+Installation fails.
+Startup verification fails.
+Required files are missing.
+Database migration fails.
+
+The application restores the previous working version whenever possible.
+
+18.15 Database Compatibility
+
+When a new version requires a database migration:
+
+Application Updated
+       │
+       ▼
+Check Database Version
+       │
+       ▼
+Migration Needed?
+
+If required:
+
+Run migration.
+Verify success.
+Continue startup.
+
+If migration fails:
+
+Roll back.
+Restore backup.
+Notify the user.
+18.16 Release Channels
+
+Version 1.0 supports:
+
+Stable
+
+Future releases may add:
+
+Beta
+Preview
+Nightly
+Enterprise
+
+Users can choose their preferred release channel in Settings when additional channels become available.
+
+18.17 Code Signing
+
+Production releases should be digitally signed.
+
+Benefits:
+
+Windows SmartScreen trust.
+Integrity verification.
+Protection against tampering.
+Improved user confidence.
+
+Unsigned builds should be limited to development environments.
+
+18.18 Build Pipeline
+
+CI/CD pipeline stages:
+
+Source Code
+      │
+      ▼
+Install Dependencies
+      │
+      ▼
+Run Tests
+      │
+      ▼
+Lint
+      │
+      ▼
+Build
+      │
+      ▼
+Package
+      │
+      ▼
+Publish Release
+
+Every release must pass automated quality checks before publication.
+
+18.19 Release Notes
+
+Each release includes:
+
+New Features
+Improvements
+Bug Fixes
+Performance Changes
+Security Updates
+Known Issues
+
+Release notes are displayed before users install updates.
+
+18.20 Diagnostics After Update
+
+After installing an update:
+
+Co-op verifies:
+
+Application files
+Database compatibility
+License validity
+Configuration
+Synchronization engine
+
+Any issues are reported immediately.
+
+18.21 Error Handling
+Error	Recovery
+Download failed	Retry download
+Installation failed	Restore previous version
+Database migration failed	Restore backup
+Invalid package	Reject installation
+Update server unavailable	Retry later
+Code signature invalid	Cancel installation
+
+Errors should never compromise user data.
+
+18.22 Performance Targets
+Operation	Target
+Check for Updates	<2 seconds
+Background Download	Non-blocking
+Install Update	<60 seconds
+Restart After Update	<10 seconds
+Version Verification	<2 seconds
+18.23 Developer Implementation Notes
+
+Implementation guidelines:
+
+Package the application using Electron Builder.
+Distribute updates through GitHub Releases using Electron Updater.
+Automate builds with a CI/CD pipeline that includes linting, testing, packaging, and publishing.
+Digitally sign production installers to improve security and user trust.
+Version database migrations alongside application releases to maintain compatibility.
+Verify application integrity after updates before allowing normal operation.
+Keep update logic separate from core application logic to simplify maintenance and testing.
+Design the deployment pipeline to support future platforms such as macOS and Linux.
+18.24 Acceptance Criteria
+
+The Deployment, Updates & Release Management Flow is complete when:
+
+Windows installers are generated successfully.
+First-time installation completes without errors.
+Users can sign in, activate, and complete company setup after installation.
+The application checks for updates automatically.
+Updates download in the background without interrupting work.
+Users can choose when to install updates.
+Failed updates roll back safely.
+Database migrations run successfully during upgrades.
+Production releases are digitally signed.
+CI/CD produces verified, repeatable builds.
+Performance targets are consistently achieved.
+18.25 Chapter Summary
+
+The Deployment, Updates & Release Management Flow provides Co-op with a professional, secure, and maintainable release process. By combining Electron Builder, Electron Updater, GitHub Releases, automated CI/CD, and robust rollback mechanisms, Co-op ensures users receive reliable updates with minimal disruption. The deployment architecture also establishes a strong foundation for future cross-platform support, multiple release channels, and enterprise distribution.

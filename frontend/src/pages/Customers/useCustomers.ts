@@ -4,6 +4,7 @@
  * Clerk-authenticated API client. No data is ever invented.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
 
 export interface Customer {
@@ -40,6 +41,14 @@ export function useCustomers() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  // Command-palette deep links (Stage 2): apply ?q= when the palette
+  // navigates to this module — including while it is already mounted.
+  const location = useLocation();
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get('q');
+    if (q != null) setSearch(q);
+  }, [location.search]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -60,7 +69,7 @@ export function useCustomers() {
         setPage(data.page);
       } catch (e) {
         setError(
-          e instanceof ApiError ? e : new ApiError('Unable to reach the Finch API.'),
+          e instanceof ApiError ? e : new ApiError('Unable to reach the Co-op API.'),
         );
       } finally {
         setLoading(false);

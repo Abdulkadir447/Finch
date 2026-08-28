@@ -6,7 +6,7 @@ database and prints exactly what is there — tables, columns, indexes and
 unique constraints — so the Alembic baseline can be reviewed against reality.
 
 Usage:
-    DATABASE_URL=postgresql://user:pass@host:5432/finch \
+    DATABASE_URL=postgresql://user:pass@host:5432/coop \
         python tools/inspect_db_schema.py
 
 It reads DATABASE_URL (or SUPABASE_DB_URL). No credentials are written here or
