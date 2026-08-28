@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
+import { makeProductRepo } from '../../repositories';
 
 export interface Product {
   id: number;
@@ -45,6 +46,9 @@ export type ProductStockFilter = 'all' | 'low' | 'out';
 
 export function useProducts() {
   const api = useApiClient();
+  // OFFLINE 2: mutations go through the repository (local-first on desktop,
+  // unchanged HTTP in a browser). Reads stay server-backed until pull exists.
+  const productsRepo = makeProductRepo(api);
   const [items, setItems] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -97,13 +101,14 @@ export function useProducts() {
     return () => clearTimeout(timer);
   }, [search, stockFilter, load]);
 
-  const createProduct = (values: ProductFormValues) =>
-    api.post<Product>('/products', values);
+  // Local-first mutations (ADR-002): write to SQLite + sync queue on desktop,
+  // otherwise the existing HTTP call. Components await these and reload.
+  const createProduct = (values: ProductFormValues) => productsRepo.create(values);
 
   const updateProduct = (id: number, values: Partial<ProductFormValues>) =>
-    api.put<Product>(`/products/${id}`, values);
+    productsRepo.update(id, values);
 
-  const deleteProduct = (id: number) => api.delete(`/products/${id}`);
+  const deleteProduct = (id: number) => productsRepo.remove(id);
 
   return {
     items,

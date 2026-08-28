@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
+import { makeInventoryRepo } from '../../repositories';
 
 export type StockStatus = 'in' | 'low' | 'out';
 
@@ -111,6 +112,9 @@ export const unitValueOf = (p: InventoryProduct): number =>
 
 export function useInventory() {
   const api = useApiClient();
+  // OFFLINE 2: stock is operation-based (ADR-002 rule 5) — the adjustment is a
+  // signed movement applied locally + queued on desktop, else the HTTP call.
+  const inventoryRepo = makeInventoryRepo(api);
   const [summary, setSummary] = useState<InventorySummary | null>(null);
   const [items, setItems] = useState<InventoryProduct[]>([]);
   const [total, setTotal] = useState(0);
@@ -172,8 +176,10 @@ export function useInventory() {
     return () => clearTimeout(timer);
   }, [search, stockFilter, load]);
 
+  // Local-first stock adjustment (ADR-002 rule 5): a signed movement applied
+  // to the local ledger + queued on desktop, otherwise the existing HTTP call.
   const adjustStock = (productId: number, input: AdjustInput) =>
-    api.post<InventoryProduct>(`/products/${productId}/adjust`, input);
+    inventoryRepo.adjust(productId, input);
 
   const fetchMovements = (productId: number, limit = 20) =>
     api.get<MovementListResponse>(`/products/${productId}/movements`, {

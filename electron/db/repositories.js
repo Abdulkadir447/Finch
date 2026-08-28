@@ -69,6 +69,8 @@ class CustomerRepository {
   }
 
   update(id, { full_name, email, phone, company, address }) {
+    const existing = this.db.prepare(`SELECT * FROM customers WHERE id=?`).get(id);
+    if (!existing) throw new Error(`customer ${id} is not in the local database`);
     this.db
       .prepare(
         `UPDATE customers SET
@@ -83,6 +85,8 @@ class CustomerRepository {
   }
 
   softDelete(id) {
+    const existing = this.db.prepare(`SELECT * FROM customers WHERE id=?`).get(id);
+    if (!existing) throw new Error(`customer ${id} is not in the local database`);
     this.db.prepare(`UPDATE customers SET deleted_at=?, updated_at=? WHERE id=?`).run(now(), now(), id);
     const row = this.db.prepare(`SELECT * FROM customers WHERE id=?`).get(id);
     this.queue.enqueue({ business_id: row.business_id, entity: 'customer', entity_id: id, client_id: row.client_id, operation: 'delete', payload: { client_id: row.client_id } });
@@ -129,6 +133,8 @@ class ProductRepository {
   }
 
   update(id, fields) {
+    const existing = this.db.prepare(`SELECT * FROM products WHERE id=?`).get(id);
+    if (!existing) throw new Error(`product ${id} is not in the local database`);
     this.db
       .prepare(
         `UPDATE products SET
@@ -145,6 +151,8 @@ class ProductRepository {
   }
 
   softDelete(id) {
+    const existing = this.db.prepare(`SELECT * FROM products WHERE id=?`).get(id);
+    if (!existing) throw new Error(`product ${id} is not in the local database`);
     this.db.prepare(`UPDATE products SET deleted_at=?, updated_at=? WHERE id=?`).run(now(), now(), id);
     const row = this.db.prepare(`SELECT * FROM products WHERE id=?`).get(id);
     this.queue.enqueue({ business_id: row.business_id, entity: 'product', entity_id: id, client_id: row.client_id, operation: 'delete', payload: { client_id: row.client_id } });

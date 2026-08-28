@@ -16,6 +16,7 @@ import { useCoopTheme } from '../../theme-provider';
 import { orderNumber } from '../../lib/orderStatus';
 import { formatCurrency } from '../Dashboard/kpiConfig';
 import { ApiError, useApiClient } from '../../services/api/client';
+import { makeCustomerRepo, makeOrderRepo } from '../../repositories';
 import {
   useCustomerCatalog,
   useProductCatalog,
@@ -89,6 +90,10 @@ const CreateOrderPage: React.FC = () => {
   const navigate = useNavigate();
   const [messageApi, messageCtx] = message.useMessage();
   const api = useApiClient();
+  // OFFLINE 2: inline customer + order creation go through the repositories
+  // (local-first on desktop, unchanged HTTP in a browser).
+  const customersRepo = makeCustomerRepo(api);
+  const ordersRepo = makeOrderRepo(api);
 
   const customers = useCustomerCatalog();
   const products = useProductCatalog();
@@ -174,15 +179,13 @@ const CreateOrderPage: React.FC = () => {
     }
     setNewCustomerBusy(true);
     try {
-      const { data } = await api.post(
-        '/customers',
-        {
-          full_name: customerDraft.full_name.trim(),
-          email: customerDraft.email.trim(),
-          ...(customerDraft.phone.trim() ? { phone: customerDraft.phone.trim() } : {}),
-        },
-        // response shape: CustomerOut
-      );
+      // Local-first (ADR-002): the repository returns the created customer
+      // (server CustomerOut, or a local row with the same id/full_name/email).
+      const data = (await customersRepo.create({
+        full_name: customerDraft.full_name.trim(),
+        email: customerDraft.email.trim(),
+        ...(customerDraft.phone.trim() ? { phone: customerDraft.phone.trim() } : {}),
+      })) as { id: number; full_name: string; email: string };
       pickCustomer({ id: data.id, full_name: data.full_name, email: data.email });
       setCustomerDraft({ full_name: '', email: '', phone: '' });
       messageApi.success('Customer created.');
@@ -277,9 +280,14 @@ const CreateOrderPage: React.FC = () => {
       })),
     };
     try {
-      const { data } = await api.post<{ id: number; total_amount: number }>('/orders', input);
+      // Local-first (ADR-002): the repository returns the created order
+      // (server OrderOut, or a local row with the same id + total_amount).
+      const data = (await ordersRepo.create(input)) as {
+        id: number;
+        total_amount: number;
+      };
       setCreatedOrderId(data.id);
-      setCreatedTotal(data.total_amount);
+      setCreatedTotal(data.total_amount ?? grandTotal);
       setStep('success');
     } catch (e) {
       setFailureMessage(e instanceof ApiError ? e.message : 'The order could not be created.');

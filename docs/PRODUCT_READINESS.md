@@ -61,12 +61,33 @@ ids; idempotent writes; operation-based inventory; visible sync state).
   DB seam) + a visible TopBar **SyncIndicator** (Synced / Offline — saved
   on this device / Syncing / N to sync).
 
-**Remaining (scheduled sub-phases):** OFFLINE 2 (route the UI's core
-operations through the local repositories instead of FastAPI), OFFLINE 3
-(the push engine: drain the queue on reconnect, retry, pull/refresh),
-OFFLINE 4 (conflict rules: customers merge, products SKU-conflict flag,
-inventory operation-based), OFFLINE 5 (sync UX: manual sync, conflict
-resolution), OFFLINE 6 (E2E offline / restart / duplicate-sync testing).
+**OFFLINE 2 — local-first UI wiring (plumbing delivered; activation gated):**
+- `frontend/src/repositories/` — the UI's data-access layer (ADR-002 rule):
+  `identity` (tenant + local-business bootstrap), `customers`, `products`,
+  `inventory`, `orders`. Each operation branches: local (SQLite + sync
+  queue) on desktop, or the unchanged HTTP call in a browser.
+- The four write-module hooks (`useCustomers`, `useProducts`,
+  `useInventory`, `useOrders`) and `CreateOrderPage` now route their
+  mutations through the repositories — the UI no longer calls FastAPI
+  directly for core mutations.
+- **Safety gate (important finding):** local mode is gated behind
+  `isLocalModeActive()` (local DB present **and** mirror ready). It is
+  **inactive** until OFFLINE 3, because activating local *writes* before
+  local *reads* would (a) make locally-created records invisible to
+  server-backed reads, and (b) drive local update/delete against rows that
+  aren't mirrored yet (a null-row crash — now a clear error). So OFFLINE 2
+  delivers the plumbing + a correct, hardened local branch; OFFLINE 3
+  activates it. Until then the app's behaviour is unchanged (all HTTP).
+- Local data layer hardened: update/delete on a non-local row now throws a
+  clear "not in the local database" error instead of crashing on null.
+
+**Remaining (scheduled sub-phases):** OFFLINE 3 (the push engine: drain the
+queue on reconnect, retry, pull/refresh to populate the local mirror +
+switch reads to local, then `setLocalMirrorReady(true)` to activate
+local-first), OFFLINE 4 (conflict rules: customers merge, products
+SKU-conflict flag, inventory operation-based), OFFLINE 5 (sync UX: manual
+sync, conflict resolution, per-order "pending sync" badges), OFFLINE 6
+(E2E offline / restart / duplicate-sync testing).
 
 ### 2.3 Notifications — **partially live; daily summary is the gap**
 Live: low-stock / out-of-stock alerts in the TopBar popover (real data,

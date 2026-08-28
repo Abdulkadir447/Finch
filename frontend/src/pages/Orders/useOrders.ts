@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
+import { makeOrderRepo } from '../../repositories';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -62,6 +63,9 @@ export const STATUS_META: Record<OrderStatus, { label: string }> = {
 
 export function useOrders() {
   const api = useApiClient();
+  // OFFLINE 2: order writes go through the repository (local-first on desktop,
+  // unchanged HTTP in a browser). Reads stay server-backed until pull exists.
+  const ordersRepo = makeOrderRepo(api);
   const [items, setItems] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -114,11 +118,15 @@ export function useOrders() {
     return () => clearTimeout(timer);
   }, [search, statusFilter, load]);
 
-  const createOrder = (input: OrderCreateInput) => api.post<Order>('/orders', input);
+  // Local-first order writes (ADR-002): create + status go to the local layer
+  // (ULID + stock operation + queue) on desktop, else the existing HTTP call.
+  const createOrder = (input: OrderCreateInput) => ordersRepo.create(input);
 
   const updateStatus = (id: number, status: OrderStatus) =>
-    api.put<Order>(`/orders/${id}/status`, { status });
+    ordersRepo.setStatus(id, status);
 
+  // Deletion restores server-side stock, so it stays on the HTTP path for now
+  // (local delete + stock restore is a later OFFLINE sub-phase).
   const deleteOrder = (id: number) => api.delete(`/orders/${id}`);
 
   return {

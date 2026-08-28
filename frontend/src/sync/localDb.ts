@@ -17,17 +17,17 @@ export interface LocalRow {
 
 export interface LocalDb {
   businessEnsure(b: { client_id: string; name: string; currency?: string }): Promise<LocalRow>;
-  customerCreate(a: { business_id: number; data: Record<string, unknown> }): Promise<LocalRow>;
-  customerUpdate(a: { id: number; data: Record<string, unknown> }): Promise<LocalRow>;
+  customerCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
+  customerUpdate(a: { id: number; data: object }): Promise<LocalRow>;
   customerDelete(id: number): Promise<LocalRow>;
   customerGet(id: number): Promise<LocalRow | null>;
   customerList(bizId: number): Promise<LocalRow[]>;
-  productCreate(a: { business_id: number; data: Record<string, unknown> }): Promise<LocalRow>;
-  productUpdate(a: { id: number; data: Record<string, unknown> }): Promise<LocalRow>;
+  productCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
+  productUpdate(a: { id: number; data: object }): Promise<LocalRow>;
   productDelete(id: number): Promise<LocalRow>;
   productGet(id: number): Promise<LocalRow | null>;
   productList(bizId: number): Promise<LocalRow[]>;
-  orderCreate(a: { business_id: number; data: Record<string, unknown> }): Promise<LocalRow>;
+  orderCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
   orderSetStatus(a: { business_id: number; order_id: number; status: string }): Promise<LocalRow>;
   orderGet(id: number): Promise<LocalRow | null>;
   orderList(bizId: number): Promise<LocalRow[]>;

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
+import { makeCustomerRepo } from '../../repositories';
 
 export interface Customer {
   id: number;
@@ -37,6 +38,9 @@ export const CUSTOMERS_PAGE_SIZE = 10;
 
 export function useCustomers() {
   const api = useApiClient();
+  // OFFLINE 2: mutations go through the repository (local-first on desktop,
+  // unchanged HTTP in a browser). Reads stay server-backed until pull exists.
+  const customersRepo = makeCustomerRepo(api);
   const [items, setItems] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -84,13 +88,14 @@ export function useCustomers() {
     return () => clearTimeout(timer);
   }, [search, load]);
 
-  const createCustomer = (values: CustomerFormValues) =>
-    api.post<Customer>('/customers', values);
+  // Local-first mutations (ADR-002): write to SQLite + sync queue on desktop,
+  // otherwise the existing HTTP call. Components await these and reload.
+  const createCustomer = (values: CustomerFormValues) => customersRepo.create(values);
 
   const updateCustomer = (id: number, values: Partial<CustomerFormValues>) =>
-    api.put<Customer>(`/customers/${id}`, values);
+    customersRepo.update(id, values);
 
-  const deleteCustomer = (id: number) => api.delete(`/customers/${id}`);
+  const deleteCustomer = (id: number) => customersRepo.remove(id);
 
   return {
     items,
