@@ -322,6 +322,33 @@ class StockMovement(Base):
 # Supabase is the storage layer for Co-op; identity comes from Clerk, so the
 # profile is keyed by the Clerk user id and lives in Supabase Postgres.
 # ---------------------------------------------------------------------------
+class AiUsage(Base):
+    """One metered AI request (AI Platform phase, Pass 4).
+
+    Every successful /ai/chat request writes exactly one row: model, tokens
+    and the credits charged under the current credit policy. Billing reads
+    this ledger — it never re-derives usage from anywhere else, and the
+    policy (credits per request / per 1k output tokens) lives in config,
+    not in the AI engine, so pricing can change without touching AI code.
+    """
+
+    __tablename__ = "ai_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(String(255))  # Clerk user id
+    request_id = Column(String(64), index=True)  # idempotency key (client-generated or server-assigned)
+    model = Column(String(64))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    credits_used = Column(Integer, default=0)
+    answer_kind = Column(String(20))  # fact | calculation | forecast | suggestion | draft | clarify
+    created_at = Column(DateTime, server_default=func.now())
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<AiUsage business={self.business_id} model={self.model!r} credits={self.credits_used}>"
+
+
 class Profile(Base):
     """Local user profile, linked to the Clerk identity.
 

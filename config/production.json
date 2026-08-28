@@ -22,9 +22,11 @@
     "intervalSeconds": 60
   },
   "ai": {
-    "provider": "openai",
-    "model": "gpt-5.5",
-    "assistEnabled": true
+    "enabled": true,
+    "model": "gpt-4o-mini",
+    "credits_per_request": 1,
+    "free_output_tokens": 500,
+    "credits_per_1k_output_tokens": 1
   },
   "features": {
     "dashboard": true,

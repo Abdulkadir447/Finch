@@ -17,6 +17,8 @@
  * succeed or fail, so both result screens exist and are wired.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useApiClient } from '../services/api/client';
+import { fetchAiUsage } from '../ai/client';
 import { PLAN_CATALOG, PlanId, getPlan, type Plan } from './plans';
 
 // ---------------------------------------------------------------------------
@@ -25,10 +27,16 @@ import { PLAN_CATALOG, PlanId, getPlan, type Plan } from './plans';
 export interface BillingUsage {
   /** Calendar month label, e.g. "Aug 2026". */
   month: string;
-  /** REAL: Ask Co-op questions answered this month. */
+  /** REAL: Ask Co-op questions asked this month (local conversation store). */
   aiQueries: number;
   /** REAL: Ask Co-op conversations started this month. */
   conversations: number;
+  /** REAL + metered: AI requests served by the AI backend this month. */
+  aiRequests: number;
+  /** REAL + metered: AI credits used this month (config-driven policy). */
+  creditsUsed: number;
+  /** True once the metered ledger has been read from the backend. */
+  metered: boolean;
 }
 
 export type BillingResult = { ok: true } | { ok: false; reason: string };
@@ -67,7 +75,7 @@ function readAiUsage(): BillingUsage {
   } catch {
     /* corrupted store → zero usage, not a crash */
   }
-  return { month, aiQueries, conversations };
+  return { month, aiQueries, conversations, aiRequests: 0, creditsUsed: 0, metered: false };
 }
 
 function readStoredPlan(): PlanId {
@@ -133,14 +141,24 @@ export type PlanActionState =
   | { status: 'failure'; target: PlanId | 'free'; reason: string };
 
 export function useBilling() {
+  const api = useApiClient();
   const [currentPlan, setCurrentPlan] = useState<PlanId>(provider.getCurrentPlan());
-  const [usage, setUsage] = useState<BillingUsage>(provider.getUsage());
+  const [usage, setUsage] = useState<BillingUsage>({
+    ...provider.getUsage(),
+    aiRequests: 0,
+    creditsUsed: 0,
+    metered: false,
+  });
   const [action, setAction] = useState<PlanActionState>({ status: 'idle' });
 
   const refresh = useCallback(() => {
     setCurrentPlan(provider.getCurrentPlan());
-    setUsage(provider.getUsage());
-  }, []);
+    setUsage((u) => ({ ...provider.getUsage(), aiRequests: u.aiRequests, creditsUsed: u.creditsUsed, metered: u.metered }));
+    // Metered AI usage comes from the real ledger (billing's source of truth).
+    fetchAiUsage(api)
+      .then((m) => setUsage((u) => ({ ...u, month: m.month, aiRequests: m.requests, creditsUsed: m.credits_used, metered: true })))
+      .catch(() => undefined); // ledger unreachable → keep local-only usage
+  }, [api]);
 
   useEffect(() => {
     refresh();

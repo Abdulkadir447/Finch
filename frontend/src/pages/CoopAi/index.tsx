@@ -5,6 +5,7 @@ import { radius, type } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 import { useAiData } from '../../ai/data';
 import { useConversation } from '../../ai/useConversation';
+import { useApiClient } from '../../services/api/client';
 import { SparkleIcon } from '../../components/ui/icons';
 import { CoopMark } from '../../components/brand/CoopLogo';
 import AnswerCard from '../../components/ai/AnswerCard';
@@ -29,8 +30,9 @@ const SUGGESTIONS = [
  */
 const CoopAiPage: React.FC = () => {
   const { colors } = useCoopTheme();
+  const api = useApiClient();
   const { bundle, loading, error, retry } = useAiData();
-  const { conversations, active, startNew, select, remove, clearAll, ask } = useConversation(bundle);
+  const { conversations, active, startNew, select, remove, clearAll, ask } = useConversation(bundle, api);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -44,11 +46,9 @@ const CoopAiPage: React.FC = () => {
     if (!q || thinking) return;
     setInput('');
     setThinking(true);
-    // Small beat so the "thinking" state is perceptible (engine is fast).
-    setTimeout(() => {
-      ask(q);
-      setThinking(false);
-    }, 350);
+    // The engine answers instantly; the assistant path may take a moment.
+    // A short floor keeps the "Thinking…" state perceptible either way.
+    void ask(q).finally(() => setThinking(false));
   };
 
   return (

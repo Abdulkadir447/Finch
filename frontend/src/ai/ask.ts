@@ -334,3 +334,87 @@ export function askCoop(question: string, b: AiDataBundle): Answer {
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// AI Platform orchestration (Pass 2) — deterministic engine + real assistant
+//
+//   question
+//     ↓ deterministic engine first (instant, free, fully grounded)
+//     ↓ curated intent matched? → answer directly (no model call, no cost)
+//     ↓ otherwise → /ai/chat (verified context → model → structured answer)
+//     ↓ model unavailable? → honest deterministic fallback (AI never blocks)
+//
+// The model is the reasoning/language layer; it is never the database layer.
+// ---------------------------------------------------------------------------
+import type { AxiosInstance } from 'axios';
+import { aiChat, type AiChatResult } from './client';
+
+const PERIOD_LABELS: Record<string, string> = {
+  this_month: 'this month',
+  last_month: 'last month',
+  last_30_days: 'last 30 days',
+  previous_30_days: 'previous 30 days',
+  all_history: 'all history',
+};
+
+// Session-level memo: if the backend said the assistant is unavailable,
+// don't pay a round-trip for it on every question (re-check after 5 min).
+let aiUnavailableUntil = 0;
+export function aiBackendCurrentlyUnavailable(): boolean {
+  return Date.now() < aiUnavailableUntil;
+}
+
+/** Map a verified assistant result onto the existing Answer contract. */
+export function toAssistantAnswer(res: AiChatResult): Answer {
+  const orderAction = res.actions.find((a) => a.type === 'DRAFT_ORDER');
+  const basis = res.basis
+    ? `verified ${res.basis.period ? PERIOD_LABELS[res.basis.period] ?? res.basis.period : 'data'} · ${
+        res.basis.sources.length ? res.basis.sources.join(', ') : 'business data'
+      } · ${res.model ?? 'assistant'}`
+    : undefined;
+  return {
+    kind: res.kind === 'error' ? 'clarify' : res.kind,
+    title: res.title || 'Co-op answer',
+    body: res.message,
+    basis,
+    links: res.links && res.links.length ? res.links : undefined,
+    followUps: res.follow_ups.length ? res.follow_ups : undefined,
+    orderDraft: orderAction ? orderAction.parameters : null,
+  };
+}
+
+/**
+ * Ask Co-op, smart: deterministic engine first; the real assistant (grounded
+ * in the verified business context on the server) answers what the curated
+ * engine can't. Never fails the user — degrades to the honest engine answer.
+ */
+export async function askCoopSmart(
+  question: string,
+  b: AiDataBundle,
+  api: AxiosInstance,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<Answer> {
+  const det = askCoop(question, b);
+
+  // Curated intent matched (or a help question) → answer directly: instant,
+  // free and fully grounded. The model earns its keep on everything else.
+  if (det.kind !== 'clarify' || /(help|what can you do|how do you work)/.test(question.toLowerCase())) {
+    return det;
+  }
+
+  if (aiBackendCurrentlyUnavailable()) {
+    return det;
+  }
+
+  try {
+    const res = await aiChat(api, question, history);
+    return toAssistantAnswer(res);
+  } catch {
+    aiUnavailableUntil = Date.now() + 5 * 60 * 1000;
+    // Honest degradation: the engine's capabilities answer, with a note.
+    return {
+      ...det,
+      body: `${det.body}\n\n(The AI assistant is unavailable right now — answers above come from Co-op's verified data engine.)`,
+    };
+  }
+}

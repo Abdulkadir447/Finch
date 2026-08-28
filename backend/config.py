@@ -27,6 +27,41 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CONFIG_DIR = _REPO_ROOT / "config"
 
 
+def _load_dotenv_once() -> None:
+    """Load ``.env`` from the repository root, IF PRESENT (dependency-free).
+
+    Standard 12-factor semantics: values already in the real environment
+    ALWAYS win — ``.env`` only fills gaps, so it can never override a
+    deployment's settings. The file is gitignored; only non-secret
+    placeholders (``.env.example``) are committed. This is what makes a
+    local ``OPENAI_API_KEY`` in ``.env`` work without extra tooling.
+    """
+    if getattr(_load_dotenv_once, "_done", False):
+        return
+    _load_dotenv_once._done = True  # type: ignore[attr-defined]
+    env_file = _REPO_ROOT / ".env"
+    if not env_file.exists():
+        return
+    try:
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):]
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("'\"")
+            if key:
+                os.environ.setdefault(key, value)
+    except OSError:
+        # A broken .env must never prevent the API from starting.
+        pass
+
+
+_load_dotenv_once()
+
+
 def _resolve_env() -> str:
     env = os.getenv("COOP_ENV") or os.getenv("FINCH_ENV") or os.getenv("APP_ENV") or DEFAULT_ENV
     # COOP_ENV is the renamed variable; FINCH_ENV is kept as a compatibility fallback for existing .env files.

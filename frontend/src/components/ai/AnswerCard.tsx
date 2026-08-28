@@ -1,11 +1,13 @@
 import React from 'react';
 import {
+  ArrowRightOutlined,
   CalculatorOutlined,
   FileTextOutlined,
   LineChartOutlined,
   SafetyCertificateOutlined,
   StarOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { radius, type } from '../../theme';
 import { tint } from '../../theme/colors';
 import { useCoopTheme } from '../../theme-provider';
@@ -54,6 +56,7 @@ const AnswerCard: React.FC<{
   onFollowUp: (q: string) => void;
 }> = ({ answer, onFollowUp }) => {
   const { colors, isDark } = useCoopTheme();
+  const navigate = useNavigate();
   const meta = KIND_META[answer.kind];
   const tone = TONE_STYLE[meta.tone];
 
@@ -91,7 +94,43 @@ const AnswerCard: React.FC<{
       </div>
 
       <div style={{ ...type.titleMd, fontSize: 16, color: colors.onSurface, marginBottom: 6 }}>{answer.title}</div>
-      <div style={{ ...type.bodyCompact, color: colors.onSurfaceVariant, lineHeight: '21px' }}>{answer.body}</div>
+      <div
+        style={{ ...type.bodyCompact, color: colors.onSurfaceVariant, lineHeight: '21px', whiteSpace: 'pre-line' }}
+      >
+        {answer.body}
+      </div>
+
+      {/* Where the evidence lives in Co-op (verified, allow-listed targets) */}
+      {answer.links && answer.links.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+          {answer.links.map((l) => (
+            <button
+              key={l.to}
+              type="button"
+              onClick={() => navigate(l.to)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                border: `1px solid ${colors.outlineVariant}`,
+                background: colors.surfaceContainerLow,
+                color: colors.primary,
+                fontWeight: 600,
+                fontSize: 12.5,
+                borderRadius: radius.full,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                transition: 'background-color 150ms',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = colors.surfaceContainer)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = colors.surfaceContainerLow)}
+            >
+              {l.label}
+              <ArrowRightOutlined style={{ fontSize: 11 }} />
+            </button>
+          ))}
+        </div>
+      )}
 
       {answer.chart && answer.chart.data.length > 0 && (
         <div style={{ marginTop: 12 }}>

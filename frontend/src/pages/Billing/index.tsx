@@ -183,6 +183,7 @@ const BillingPage: React.FC = () => {
             >
               {stat('AI queries', usage.aiQueries, usage.month)}
               {stat('Conversations', usage.conversations, 'this month')}
+              {stat('AI credits used', usage.metered ? usage.creditsUsed : 0, 'metered this month')}
               {stat('Plan', plan.name, preview ? 'preview — not charged' : 'billed')}
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -222,7 +223,10 @@ const BillingPage: React.FC = () => {
               {[
                 { label: 'Ask Co-op questions', value: usage.aiQueries, max: 0 },
                 { label: 'Conversations started', value: usage.conversations, max: 0 },
-              ].map((row) => (
+                { label: 'AI requests served (metered)', value: usage.metered ? usage.aiRequests : null, max: 0 },
+                { label: 'AI credits used (metered)', value: usage.metered ? usage.creditsUsed : null, max: 0 },
+              ].map((row) =>
+                row.value === null ? null : (
                 <div key={row.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', ...type.bodyCompact, color: colors.onSurfaceVariant, marginBottom: 6 }}>
                     <span>{row.label}</span>
@@ -249,9 +253,9 @@ const BillingPage: React.FC = () => {
                 </div>
               ))}
               <div style={{ ...type.bodyCompact, fontSize: 12, color: colors.outline }}>
-                Usage is real activity from Ask Co-op, counted this month ({usage.month}). Credit
-                quotas and the credit economy (e.g. per-credit pricing) apply with the finalized
-                pricing model — nothing here is metered against a limit yet.
+                Questions & conversations come from this device's conversation history ({usage.month}).
+                AI requests and credits are metered by the Co-op backend — this ledger is what plan
+                limits will enforce against.
               </div>
             </div>
           </CoopCard>

@@ -28,6 +28,7 @@ from sqlalchemy.orm import selectinload
 
 from . import briefing as briefing_mod
 from . import importer
+from .ai import service as ai_service
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
@@ -1368,3 +1369,83 @@ async def onboarding_state(
         "customers": cust,
         "orders": orders,
     }
+
+
+# ---------------------------------------------------------------------------
+# AI Platform (Pass 1) — grounded, verified, metered assistant
+#
+# Trust model: the model NEVER queries the database. /ai/chat builds a
+# verified context from the business's real data, asks the model to explain
+# it under a strict answer contract, validates any proposed actions against
+# the fixed registry, and records the metered usage in the ai_usage ledger.
+# AI is an enhancement and never blocks core operations (TRD Ch1.8): when the
+# model layer is unavailable, the client falls back to the deterministic
+# engine with an honest notice.
+# ---------------------------------------------------------------------------
+
+class AiChatRequest(BaseModel):
+    question: str
+    history: Optional[List[Dict[str, str]]] = None
+    request_id: Optional[str] = None
+
+
+@app.post("/ai/chat", tags=["AI"])
+async def ai_chat(
+    req: AiChatRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """One grounded AI turn: verified context -> model -> structured answer.
+
+    Returns the answer contract {type, kind, title, message, basis,
+    follow_ups, links, actions, actions_rejected, source, model,
+    credits_used}. Proposed actions are resolved + business-validated; the
+    UI still requires explicit user confirmation before anything executes.
+    """
+    if not ai_service.ai_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="The AI assistant is not configured on this server (OPENAI_API_KEY).",
+        )
+    try:
+        result = await ai_service.handle_chat(
+            db,
+            business,
+            user_id=business.owner_id,
+            question=req.question,
+            history=req.history,
+            request_id=req.request_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except ai_service.AiUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return result
+
+
+class AiUsageResponse(BaseModel):
+    month: str
+    requests: int
+    input_tokens: int
+    output_tokens: int
+    credits_used: int
+
+
+@app.get("/ai/usage", response_model=AiUsageResponse, tags=["AI"])
+async def ai_usage(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> AiUsageResponse:
+    """Real metered AI usage for the current calendar month (billing reads this)."""
+    today = date.today()
+    first = datetime.combine(today.replace(day=1), time.min)
+    nxt_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+    last = datetime.combine(nxt_month, time.min)
+    u = await ai_service.month_usage(db, business.id, first, last)
+    return AiUsageResponse(
+        month=today.strftime("%b %Y"),
+        requests=u["requests"],
+        input_tokens=u["input_tokens"],
+        output_tokens=u["output_tokens"],
+        credits_used=u["credits_used"],
+    )

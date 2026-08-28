@@ -67,6 +67,8 @@ export interface Answer {
   body: string;
   /** Data window / source note, shown under the kind badge. */
   basis?: string;
+  /** Where the evidence lives in Co-op (verified, allow-listed targets). */
+  links?: Array<{ label: string; to: string }>;
   /** Suggested follow-up prompts. */
   followUps?: string[];
   /** Mini chart points (revenue trend answers). */

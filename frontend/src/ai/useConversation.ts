@@ -1,13 +1,17 @@
 /**
- * Co-op AI — conversation state + history (Stage 2.2, Layer 2).
+ * Co-op AI — conversation state + history (Stage 2.2, AI Platform phase).
  *
  * Conversations persist locally (localStorage) so history survives reloads
- * — the assistant itself stays stateless and data-driven.
+ * — the assistant itself stays stateless and data-driven. `ask` runs the
+ * smart orchestration: deterministic engine first (instant, free, grounded),
+ * then the real assistant (verified context on the server) for what the
+ * engine can't ground. It never fails — worst case the honest engine answer.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { askCoop } from './ask';
+import type { AxiosInstance } from 'axios';
+import { askCoopSmart } from './ask';
 import type { AiDataBundle } from './data';
-import type { AiMessage, Conversation } from './types';
+import type { Answer, AiMessage, Conversation } from './types';
 
 const STORAGE_KEY = 'coop:ai-conversations';
 const MAX_CONVERSATIONS = 20;
@@ -27,9 +31,10 @@ function loadStored(): Conversation[] {
   }
 }
 
-export function useConversation(bundle: AiDataBundle) {
+export function useConversation(bundle: AiDataBundle, api: AxiosInstance) {
   const [conversations, setConversations] = useState<Conversation[]>(loadStored);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
@@ -69,11 +74,16 @@ export function useConversation(bundle: AiDataBundle) {
     setActiveId(null);
   }, []);
 
-  /** Ask a question: appends the user message + the grounded answer. */
+  /**
+   * Ask a question: appends the user message immediately, then the grounded
+   * answer (engine or assistant — the caller keeps its "thinking" state up
+   * until this resolves).
+   */
   const ask = useCallback(
-    (question: string) => {
+    async (question: string): Promise<Answer | null> => {
       const text = question.trim();
-      if (!text) return;
+      if (!text || busy) return null;
+
       let convId = activeId;
       if (!convId) {
         const c: Conversation = {
@@ -89,30 +99,53 @@ export function useConversation(bundle: AiDataBundle) {
       }
 
       const userMsg: AiMessage = { id: uid(), role: 'user', text, ts: Date.now() };
-      const answer = askCoop(text, bundle);
-      const coopMsg: AiMessage = { id: uid(), role: 'coop', answer, ts: Date.now() };
 
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === convId
-            ? {
-                ...c,
-                updated: Date.now(),
-                // Title a fresh conversation with its first question.
-                title:
-                  c.messages.length === 0 && c.title === 'New conversation'
-                    ? text.length > 42
-                      ? `${text.slice(0, 42)}…`
-                      : text
-                    : c.title,
-                messages: [...c.messages, userMsg, coopMsg].slice(-MAX_MESSAGES),
-              }
-            : c,
-        ),
-      );
+      // Hand the assistant recent conversation context (verified answers are
+      // summarised as "title — body" so follow-ups make sense).
+      const history = (active?.messages ?? [])
+        .slice(-8)
+        .map((m) =>
+          m.role === 'user'
+            ? { role: 'user' as const, content: m.text ?? '' }
+            : m.answer
+              ? { role: 'assistant' as const, content: `${m.answer.title} — ${m.answer.body}` }
+              : null,
+        )
+        .filter(Boolean) as Array<{ role: 'user' | 'assistant'; content: string }>;
+
+      setBusy(true);
+      const append = (answer: Answer) => {
+        const coopMsg: AiMessage = { id: uid(), role: 'coop', answer, ts: Date.now() };
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === convId
+              ? {
+                  ...c,
+                  updated: Date.now(),
+                  // Title a fresh conversation with its first question.
+                  title:
+                    c.messages.length === 0 && c.title === 'New conversation'
+                      ? text.length > 42
+                        ? `${text.slice(0, 42)}…`
+                        : text
+                      : c.title,
+                  messages: [...c.messages, userMsg, coopMsg].slice(-MAX_MESSAGES),
+                }
+              : c,
+          ),
+        );
+      };
+
+      try {
+        const answer = await askCoopSmart(text, bundle, api, history);
+        append(answer);
+        return answer;
+      } finally {
+        setBusy(false);
+      }
     },
-    [activeId, bundle],
+    [activeId, active, bundle, api, busy],
   );
 
-  return { conversations, active, startNew, select, remove, clearAll, ask };
+  return { conversations, active, busy, startNew, select, remove, clearAll, ask };
 }
