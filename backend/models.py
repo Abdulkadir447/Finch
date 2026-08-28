@@ -349,6 +349,36 @@ class AiUsage(Base):
         return f"<AiUsage business={self.business_id} model={self.model!r} credits={self.credits_used}>"
 
 
+class Subscription(Base):
+    """The business's active plan (Real Billing phase).
+
+    One row per business. Credits are NOT stored here — they are computed
+    from the plan's monthly allowance (config) minus the SUM of the
+    ``ai_usage`` ledger for the current calendar month, so the ledger stays
+    the single source of truth and there is no balance to drift.
+
+    Payments are deliberately out of scope for this phase: plan changes are
+    real server-side state (enforcement + remaining are real), but nothing
+    is charged until a payment provider is connected.
+    """
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index("uq_subscriptions_business", "business_id", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    plan = Column(String(20), nullable=False, default="free")  # free | starter | professional | enterprise
+    status = Column(String(20), nullable=False, default="active")
+    updated_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Subscription business={self.business_id} plan={self.plan!r}>"
+
+
 class Profile(Base):
     """Local user profile, linked to the Clerk identity.
 

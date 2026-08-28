@@ -1435,6 +1435,8 @@ async def ai_chat(
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except ai_service.InsufficientCredits as e:
+        raise HTTPException(status_code=402, detail=e.to_dict())
     except ai_service.AiUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e))
     return result
@@ -1466,6 +1468,49 @@ async def ai_usage(
         output_tokens=u["output_tokens"],
         credits_used=u["credits_used"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Billing + Credits (Real Billing phase) — plans and credit enforcement are
+# REAL server-side state; payment collection is a later phase (nothing is
+# charged yet, and the UI says so honestly).
+# ---------------------------------------------------------------------------
+
+class BillingPlanRequest(BaseModel):
+    plan: str
+
+
+@app.get("/billing/summary", tags=["Billing"])
+async def billing_summary_route(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Plan + real credit position + the month's metered AI usage.
+
+    Credits are computed (allowance − ledger), never stored — so this is
+    always the source of truth for "you have N credits remaining".
+    """
+    from . import billing as billing_mod
+
+    return await billing_mod.billing_summary(db, business)
+
+
+@app.post("/billing/plan", tags=["Billing"])
+async def billing_change_plan(
+    req: BillingPlanRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Switch plans. Real state (enforcement updates immediately); payment
+    is deliberately NOT taken in this phase."""
+    from . import billing as billing_mod
+    from .billing import InvalidPlan
+
+    try:
+        await billing_mod.change_plan(db, business, req.plan, actor=business.owner_id)
+    except InvalidPlan as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return await billing_mod.billing_summary(db, business)
 
 
 # ---------------------------------------------------------------------------

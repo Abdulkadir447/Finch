@@ -1,63 +1,58 @@
 /**
- * Co-op Billing — state/service layer (Stage 2.3).
+ * Co-op Billing — state/service layer (Real Billing phase).
  *
- * Architecture (per product direction):
+ * What is REAL now (server-side state, shared across devices):
+ *   - the active plan (subscriptions)
+ *   - credits granted (plan allowance, config-driven)
+ *   - credits used (the ai_usage ledger — single source of truth)
+ *   - remaining balance (computed: allowance − ledger)
+ *   - plan changes (enforcement updates immediately)
  *
- *   Billing UI
- *     ↓
- *   Billing state/service  ← this file
- *     ↓
- *   BillingProvider        ← the seam. Today: LocalPreviewBillingProvider
- *                             (plan preference in localStorage, usage from
- *                             REAL Ask Co-op data). Tomorrow: a real billing
- *                             provider + finalized pricing/credit model.
+ * What is still preview (by design, until a payment provider connects):
+ *   - collecting payment — nothing is charged; the UI says so honestly.
  *
- * The UI never knows where plans or usage come from — it renders whatever
- * the provider reports. Selecting a plan is an async action that can
- * succeed or fail, so both result screens exist and are wired.
+ * The UI never knows where plans or credits come from — it renders what
+ * the backend reports. Selecting a plan is async and can succeed/fail, so
+ * both result screens exist and are wired.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useApiClient } from '../services/api/client';
-import { fetchAiUsage } from '../ai/client';
 import { PLAN_CATALOG, PlanId, getPlan, type Plan } from './plans';
 
 // ---------------------------------------------------------------------------
-// Provider contract — the future billing model implements this
+// Backend contract
 // ---------------------------------------------------------------------------
-export interface BillingUsage {
-  /** Calendar month label, e.g. "Aug 2026". */
+
+export interface BillingSummary {
+  plan: PlanId;
+  label: string;
+  unlimited: boolean;
+  granted: number | null;
+  used: number;
+  remaining: number | null;
+  period: { start: string; end: string };
+  plans: Array<{ key: PlanId; label: string; credits_per_month: number | null }>;
+  usage_month: {
+    requests: number;
+    input_tokens: number;
+    output_tokens: number;
+    credits_used: number;
+  };
+  payment_connected: boolean;
+}
+
+// Local (this device) conversation activity — real, but not metered billing.
+export interface LocalAiUsage {
   month: string;
-  /** REAL: Ask Co-op questions asked this month (local conversation store). */
   aiQueries: number;
-  /** REAL: Ask Co-op conversations started this month. */
   conversations: number;
-  /** REAL + metered: AI requests served by the AI backend this month. */
-  aiRequests: number;
-  /** REAL + metered: AI credits used this month (config-driven policy). */
-  creditsUsed: number;
-  /** True once the metered ledger has been read from the backend. */
-  metered: boolean;
 }
 
 export type BillingResult = { ok: true } | { ok: false; reason: string };
 
-export interface BillingProvider {
-  /** 'preview' = no real charges; the UI shows the honest banner. */
-  readonly mode: 'preview' | 'live';
-  getCurrentPlan(): PlanId;
-  selectPlan(plan: PlanId): Promise<BillingResult>;
-  cancelToFree(): Promise<BillingResult>;
-  getUsage(): BillingUsage;
-}
-
-// ---------------------------------------------------------------------------
-// Local preview provider (the only implementation for now)
-// ---------------------------------------------------------------------------
-const PLAN_KEY = 'coop:billing-preview-plan';
 const AI_CONVERSATIONS_KEY = 'coop:ai-conversations';
 
-/** Read REAL Ask Co-op usage from the conversation store (no invented data). */
-function readAiUsage(): BillingUsage {
+function readLocalAiUsage(): LocalAiUsage {
   const now = new Date();
   const month = now.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -75,65 +70,13 @@ function readAiUsage(): BillingUsage {
   } catch {
     /* corrupted store → zero usage, not a crash */
   }
-  return { month, aiQueries, conversations, aiRequests: 0, creditsUsed: 0, metered: false };
+  return { month, aiQueries, conversations };
 }
-
-function readStoredPlan(): PlanId {
-  try {
-    const p = localStorage.getItem(PLAN_KEY) as PlanId | null;
-    if (p && (p === 'starter' || p === 'professional' || p === 'enterprise')) return p;
-  } catch {
-    /* fall through */
-  }
-  return 'free';
-}
-
-function storePlan(plan: PlanId) {
-  try {
-    if (plan === 'free') localStorage.removeItem(PLAN_KEY);
-    else localStorage.setItem(PLAN_KEY, plan);
-  } catch {
-    /* storage blocked — in-memory only */
-  }
-}
-
-/**
- * Preview provider: plan selection is a persisted local preference (no
- * charges, no backend). The async delay makes the processing → success
- * flow honest and testable; a real provider will do real work here.
- */
-class LocalPreviewBillingProvider implements BillingProvider {
-  readonly mode = 'preview' as const;
-  private plan: PlanId = readStoredPlan();
-
-  getCurrentPlan(): PlanId {
-    return this.plan;
-  }
-
-  async selectPlan(plan: PlanId): Promise<BillingResult> {
-    await new Promise((r) => setTimeout(r, 600)); // simulated processing
-    storePlan(plan);
-    this.plan = plan;
-    return { ok: true };
-  }
-
-  async cancelToFree(): Promise<BillingResult> {
-    await new Promise((r) => setTimeout(r, 600));
-    storePlan('free');
-    this.plan = 'free';
-    return { ok: true };
-  }
-
-  getUsage(): BillingUsage {
-    return readAiUsage();
-  }
-}
-
-const provider: BillingProvider = new LocalPreviewBillingProvider();
 
 // ---------------------------------------------------------------------------
 // Hook — the only surface the billing UI consumes
 // ---------------------------------------------------------------------------
+
 export type PlanActionState =
   | { status: 'idle' }
   | { status: 'processing'; target: PlanId | 'free' }
@@ -142,70 +85,63 @@ export type PlanActionState =
 
 export function useBilling() {
   const api = useApiClient();
-  const [currentPlan, setCurrentPlan] = useState<PlanId>(provider.getCurrentPlan());
-  const [usage, setUsage] = useState<BillingUsage>({
-    ...provider.getUsage(),
-    aiRequests: 0,
-    creditsUsed: 0,
-    metered: false,
-  });
+  const [summary, setSummary] = useState<BillingSummary | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [localUsage, setLocalUsage] = useState<LocalAiUsage>(readLocalAiUsage);
   const [action, setAction] = useState<PlanActionState>({ status: 'idle' });
 
-  const refresh = useCallback(() => {
-    setCurrentPlan(provider.getCurrentPlan());
-    setUsage((u) => ({ ...provider.getUsage(), aiRequests: u.aiRequests, creditsUsed: u.creditsUsed, metered: u.metered }));
-    // Metered AI usage comes from the real ledger (billing's source of truth).
-    fetchAiUsage(api)
-      .then((m) => setUsage((u) => ({ ...u, month: m.month, aiRequests: m.requests, creditsUsed: m.credits_used, metered: true })))
-      .catch(() => undefined); // ledger unreachable → keep local-only usage
+  const refresh = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const { data } = await api.get<BillingSummary>('/billing/summary');
+      setSummary(data);
+      setLocalUsage(readLocalAiUsage());
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : 'Could not load billing.');
+    }
   }, [api]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
-  const selectPlan = useCallback(
-    async (plan: PlanId) => {
-      setAction({ status: 'processing', target: plan });
-      const result = await provider.selectPlan(plan);
-      if (result.ok) {
-        refresh();
-        setAction({ status: 'success', target: plan });
-      } else {
-        setAction({ status: 'failure', target: plan, reason: result.reason });
-      }
-    },
-    [refresh],
-  );
-
-  const cancelToFree = useCallback(async () => {
-    setAction({ status: 'processing', target: 'free' });
-    const result = await provider.cancelToFree();
-    if (result.ok) {
-      refresh();
-      setAction({ status: 'success', target: 'free' });
-    } else {
-      setAction({ status: 'failure', target: 'free', reason: result.reason });
+  const applyPlan = useCallback(async (plan: PlanId | 'free') => {
+    setAction({ status: 'processing', target: plan });
+    try {
+      const { data } = await api.post<BillingSummary>('/billing/plan', { plan });
+      setSummary(data);
+      setAction({ status: 'success', target: plan });
+    } catch (e) {
+      setAction({
+        status: 'failure',
+        target: plan,
+        reason: e instanceof Error ? e.message : 'Plan change failed.',
+      });
     }
-  }, [refresh]);
+  }, [api]);
+
+  const selectPlan = useCallback((plan: PlanId) => applyPlan(plan), [applyPlan]);
+  const cancelToFree = useCallback(() => applyPlan('free'), [applyPlan]);
 
   const dismissResult = useCallback(() => setAction({ status: 'idle' }), []);
   const retry = useCallback(async () => {
     if (action.status !== 'failure') return;
-    const target = action.target;
-    if (target === 'free') await cancelToFree();
-    else await selectPlan(target);
-  }, [action, cancelToFree, selectPlan]);
+    await applyPlan(action.target);
+  }, [action, applyPlan]);
 
+  const currentPlan: PlanId = summary?.plan ?? 'free';
   const plan: Plan = getPlan(currentPlan);
-  const preview = provider.mode === 'preview';
+  // Payment collection is the only preview concern left; plans/credits are real.
+  const paymentConnected = summary?.payment_connected ?? false;
 
   return {
     plans: PLAN_CATALOG,
     plan,
     currentPlan,
-    usage,
-    preview,
+    summary,
+    localUsage,
+    loadError,
+    paymentConnected,
     action,
     selectPlan,
     cancelToFree,

@@ -347,6 +347,7 @@ export function askCoop(question: string, b: AiDataBundle): Answer {
 // The model is the reasoning/language layer; it is never the database layer.
 // ---------------------------------------------------------------------------
 import type { AxiosInstance } from 'axios';
+import { ApiError } from '../services/api/client';
 import { aiChat, type AiChatResult, type AiReportRef } from './client';
 
 const PERIOD_LABELS: Record<string, string> = {
@@ -419,7 +420,18 @@ export async function askCoopSmart(
   try {
     const res = await aiChat(api, question, history, report);
     return toAssistantAnswer(res);
-  } catch {
+  } catch (e) {
+    // Out of credits is NOT "assistant unavailable" — it's a plan limit.
+    // Show the honest billing state with a path to upgrade, don't memoise.
+    if (e instanceof ApiError && e.status === 402) {
+      return {
+        kind: 'clarify',
+        title: 'You\u2019re out of AI credits this month',
+        body: e.message ||
+          'You\u2019ve used the AI credits on your current plan this month. Upgrade for a bigger allowance \u2014 credits refresh at the start of each month.',
+        links: [{ label: 'View billing & upgrade', to: '/billing' }],
+      };
+    }
     aiUnavailableUntil = Date.now() + 5 * 60 * 1000;
     if (report) {
       return {

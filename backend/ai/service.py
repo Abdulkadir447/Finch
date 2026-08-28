@@ -28,7 +28,9 @@ from .prompts import REPAIR_PROMPT, build_system_prompt, user_prompt
 from .schemas import AiChatResponse
 from .usage import month_usage, record_usage
 
-__all__ = ["handle_chat", "ai_enabled", "AiUnavailable", "month_usage"]
+__all__ = ["handle_chat", "ai_enabled", "AiUnavailable", "month_usage", "InsufficientCredits"]
+
+from ..billing import InsufficientCredits, check_credits  # noqa: E402  (re-exported)
 
 
 class AiUnavailable(Exception):
@@ -135,6 +137,12 @@ async def handle_chat(
                 }
             except (FilterError, KeyError, TypeError, ValueError):
                 pass  # bad report ref -> answer from the general context only
+
+    # --- Credit gate (Real Billing phase) ------------------------------------
+    # Admit the request only if its minimum possible cost is affordable. The
+    # ACTUAL cost is recorded after the model runs (ledger stays exact); the
+    # gate stays simple and deterministic.
+    await check_credits(db, business)
 
     # --- Model call (JSON mode, one repair retry) ----------------------------
     model = _default_model()

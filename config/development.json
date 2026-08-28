@@ -44,5 +44,25 @@
   },
   "logging": {
     "level": "debug"
+  },
+  "billing": {
+    "plans": {
+      "free": {
+        "label": "Free",
+        "credits_per_month": 25
+      },
+      "starter": {
+        "label": "Starter",
+        "credits_per_month": 200
+      },
+      "professional": {
+        "label": "Professional",
+        "credits_per_month": 1000
+      },
+      "enterprise": {
+        "label": "Enterprise",
+        "credits_per_month": null
+      }
+    }
   }
 }

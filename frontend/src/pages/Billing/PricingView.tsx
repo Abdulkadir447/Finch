@@ -150,10 +150,10 @@ const ResultPanel: React.FC<{
   target: PlanId | 'free';
   ok: boolean;
   reason?: string;
-  preview: boolean;
+  paymentConnected: boolean;
   onRetry?: () => void;
   onClose: () => void;
-}> = ({ target, ok, reason, preview, onRetry, onClose }) => {
+}> = ({ target, ok, reason, paymentConnected, onRetry, onClose }) => {
   const { colors } = useCoopTheme();
   const planName = target === 'free' ? 'Free' : target.charAt(0).toUpperCase() + target.slice(1);
 
@@ -191,9 +191,7 @@ const ResultPanel: React.FC<{
       </div>
       <p style={{ margin: '8px auto 0', maxWidth: 420, ...type.bodyCompact, color: colors.onSurfaceVariant }}>
         {ok
-          ? preview
-            ? `Your plan preference is saved locally${target === 'free' ? ' and billing is off' : ''}. No payment was taken — charges begin when billing connects with the finalized pricing model.`
-            : 'Your plan has been updated.'
+          ? `Your plan has been updated on Co-op${target === 'free' ? ' — you\u2019re on the Free plan' : ''}. Your credit allowance changed immediately.${!paymentConnected ? ' No payment was taken — charges begin when a payment provider connects.' : ''}`
           : reason ?? 'We could not complete the plan change.'}
       </p>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
@@ -214,7 +212,7 @@ export interface PricingViewProps {
 
 const PricingView: React.FC<PricingViewProps> = ({ onBack }) => {
   const { colors } = useCoopTheme();
-  const { plans, currentPlan, action, selectPlan, dismissResult, retry, preview } = useBilling();
+  const { plans, currentPlan, action, selectPlan, dismissResult, retry, paymentConnected } = useBilling();
   const [annual, setAnnual] = useState(true);
 
   const result =
@@ -312,7 +310,7 @@ const PricingView: React.FC<PricingViewProps> = ({ onBack }) => {
             target={result.target}
             ok={result.ok}
             reason={result.reason}
-            preview={preview}
+            paymentConnected={paymentConnected}
             onRetry={retry}
             onClose={dismissResult}
           />
