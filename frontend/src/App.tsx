@@ -19,6 +19,7 @@ import { CoopMark } from './components/brand/CoopLogo';
 // Route-level code splitting (Stage 2.4 performance QA): each module loads
 // on demand instead of shipping everything in one initial bundle.
 const DashboardPage = lazy(() => import('./pages/Dashboard'));
+const ReportsPage = lazy(() => import('./pages/Reports'));
 const ProductsPage = lazy(() => import('./pages/Products'));
 const InventoryPage = lazy(() => import('./pages/Inventory'));
 const CustomersPage = lazy(() => import('./pages/Customers'));
@@ -364,6 +365,7 @@ const App: React.FC = () => {
                       <Routes>
                         <Route path="/" element={<RootGate />} />
                         <Route path="/welcome" element={<WelcomePage />} />
+                        <Route path="/reports" element={<ReportsPage />} />
                         <Route path="/products" element={<ProductsPage />} />
                         <Route path="/inventory" element={<InventoryPage />} />
                         <Route path="/customers" element={<CustomersPage />} />

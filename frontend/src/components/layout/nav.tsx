@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import {
+  BarChartOutlined,
   CreditCardOutlined,
   DashboardOutlined,
   InboxOutlined,
@@ -24,6 +25,7 @@ export interface NavItem {
 /** Primary module navigation (order = sidebar order). */
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Overview', path: '/', icon: <DashboardOutlined /> },
+  { key: 'reports', label: 'Reports', path: '/reports', icon: <BarChartOutlined /> },
   { key: 'products', label: 'Products', path: '/products', icon: <ShoppingCartOutlined /> },
   { key: 'inventory', label: 'Inventory', path: '/inventory', icon: <InboxOutlined /> },
   { key: 'orders', label: 'Orders', path: '/orders', icon: <TeamOutlined /> },

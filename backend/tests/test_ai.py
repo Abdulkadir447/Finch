@@ -206,6 +206,44 @@ async def test_chat_empty_business_gets_honest_clarify(api, fake_provider):
     assert u["requests"] == 0
 
 
+async def test_chat_report_context_is_verified_and_attached(api):
+    """'Ask Co-op about this report': the server rebuilds the verified report
+    from the FILTERS and attaches it to the model's context — the client
+    never supplies the numbers themselves."""
+    captured = {}
+
+    class Cap(FakeProvider):
+        def complete(self, system, messages):
+            captured["system"] = system
+            captured["messages"] = messages
+            return super().complete(system, messages)
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(ai_service, "build_provider", lambda model, key: Cap())
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        p, c, o = await _seed(api)  # 1 order: 4 x $5 = $20 revenue today
+
+        today = dt.date.today()
+        from_ = (today - dt.timedelta(days=30)).isoformat()
+        r = await api.client.post("/ai/chat", json={
+            "question": "Explain this report: what changed?",
+            "report": {"key": "sales", "from": from_, "to": today.isoformat()},
+        })
+        assert r.status_code == 200, r.text
+
+        user_msg = captured["messages"][-1]["content"]
+        # The verified report block is present, with the report's own title
+        # and its real (server-computed) KPI value.
+        assert '"report"' in user_msg
+        assert "Sales Report" in user_msg
+        assert "20.0" in user_msg
+        # The prompt tells the model the attached report is its primary subject.
+        assert "report" in captured["system"]
+    finally:
+        monkeypatch.undo()
+
+
 # ---------------------------------------------------------------------------
 # Credit policy (pure) + context builder (read-only, verified numbers)
 # ---------------------------------------------------------------------------

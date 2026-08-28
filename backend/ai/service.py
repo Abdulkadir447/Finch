@@ -73,8 +73,13 @@ async def handle_chat(
     question: str,
     history: Optional[list[dict[str, str]]] = None,
     request_id: Optional[str] = None,
+    report: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Run one grounded AI chat turn. Returns the structured response dict.
+
+    ``report`` (optional) carries the FILTERS of a report the owner is
+    looking at; the report data itself is rebuilt server-side by the
+    reporting engine and added to the verified context.
 
     Raises AiUnavailable when the model layer cannot serve the request —
     the route turns that into an honest 503 and the frontend falls back to
@@ -97,6 +102,39 @@ async def handle_chat(
         or context["inventory"]["products"]
         or context["customers"]["total"]
     )
+
+    # --- Attached report (Reports phase) -------------------------------------
+    # The frontend passes only the FILTERS; the report data is rebuilt here,
+    # server-side, by the reporting engine — the model sees verified numbers
+    # it cannot tamper with, and the same numbers the screen shows.
+    if report:
+        from ..reports import FilterError, ReportFilters, REPORT_TITLES, build_report
+
+        rkey = str(report.get("key") or "")
+        if rkey in REPORT_TITLES:
+            try:
+                rf = ReportFilters.from_query(
+                    from_str=report.get("from"), to_str=report.get("to"),
+                    compare=report.get("compare"), category=report.get("category"),
+                    product_id=report.get("product_id"), customer_id=report.get("customer_id"),
+                )
+                rd = await build_report(db, business.id, rkey, rf)
+                d = rd.to_dict()
+                context["report"] = {
+                    "key": rkey,
+                    "title": rd.title,
+                    "period": rd.period_label,
+                    "compare": rf.compare,
+                    "filters": rf.to_query_dict(),
+                    "kpis": d["kpis"],
+                    "top_rows": [
+                        {"title": t["title"], "columns": t["columns"], "rows": t["rows"][:8]}
+                        for t in d["tables"][:4]
+                    ],
+                    "notes": rd.notes,
+                }
+            except (FilterError, KeyError, TypeError, ValueError):
+                pass  # bad report ref -> answer from the general context only
 
     # --- Model call (JSON mode, one repair retry) ----------------------------
     model = _default_model()

@@ -3,8 +3,10 @@ import { DeleteOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { radius, type } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAiData } from '../../ai/data';
 import { useConversation } from '../../ai/useConversation';
+import type { AiReportRef } from '../../ai/client';
 import { useApiClient } from '../../services/api/client';
 import { SparkleIcon } from '../../components/ui/icons';
 import { CoopMark } from '../../components/brand/CoopLogo';
@@ -50,6 +52,24 @@ const CoopAiPage: React.FC = () => {
     // A short floor keeps the "Thinking…" state perceptible either way.
     void ask(q).finally(() => setThinking(false));
   };
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // "Ask Co-op about this report" (from the Reports page): when this page is
+  // opened carrying a report context, fire that question once the data
+  // bundle is ready, then clear the navigation state so it fires exactly once.
+  useEffect(() => {
+    const st = (location.state as { report?: AiReportRef } | null)?.report;
+    if (st && !loading && !error) {
+      setThinking(true);
+      void ask(
+        `Explain the ${st.title}: what changed, what matters most, and what should I investigate?`,
+        st,
+      ).finally(() => setThinking(false));
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, loading, error, ask, navigate, location.pathname]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', minHeight: 480 }}>

@@ -347,7 +347,7 @@ export function askCoop(question: string, b: AiDataBundle): Answer {
 // The model is the reasoning/language layer; it is never the database layer.
 // ---------------------------------------------------------------------------
 import type { AxiosInstance } from 'axios';
-import { aiChat, type AiChatResult } from './client';
+import { aiChat, type AiChatResult, type AiReportRef } from './client';
 
 const PERIOD_LABELS: Record<string, string> = {
   this_month: 'this month',
@@ -393,24 +393,41 @@ export async function askCoopSmart(
   b: AiDataBundle,
   api: AxiosInstance,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  report?: AiReportRef,
 ): Promise<Answer> {
   const det = askCoop(question, b);
 
-  // Curated intent matched (or a help question) → answer directly: instant,
-  // free and fully grounded. The model earns its keep on everything else.
-  if (det.kind !== 'clarify' || /(help|what can you do|how do you work)/.test(question.toLowerCase())) {
+  // No attached report: curated intent matched (or a help question) → answer
+  // directly: instant, free and fully grounded. The model earns its keep on
+  // everything else. With an attached report the engine is skipped — it can't
+  // explain report-level changes — so the assistant takes over with the
+  // verified report data the server rebuilt from those exact filters.
+  if (!report && (det.kind !== 'clarify' || /(help|what can you do|how do you work)/.test(question.toLowerCase()))) {
     return det;
   }
 
   if (aiBackendCurrentlyUnavailable()) {
-    return det;
+    return report
+      ? {
+          kind: 'clarify',
+          title: 'The assistant is unavailable',
+          body: "Co-op can't narrate this report right now — the AI assistant is unreachable. Every number on the report is still verified by Co-op.",
+        }
+      : det;
   }
 
   try {
-    const res = await aiChat(api, question, history);
+    const res = await aiChat(api, question, history, report);
     return toAssistantAnswer(res);
   } catch {
     aiUnavailableUntil = Date.now() + 5 * 60 * 1000;
+    if (report) {
+      return {
+        kind: 'clarify',
+        title: 'The assistant is unavailable',
+        body: `Co-op couldn't reach the AI assistant, so it can't narrate the ${report.title} just now. Every number on it is still verified by Co-op — try again in a moment.`,
+      };
+    }
     // Honest degradation: the engine's capabilities answer, with a note.
     return {
       ...det,

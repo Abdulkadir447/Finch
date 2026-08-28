@@ -47,13 +47,39 @@ export interface AiUsageMonth {
   credits_used: number;
 }
 
+/** The report the owner is looking at — FILTERS only; the backend rebuilds
+ *  the verified data server-side and never trusts client numbers. */
+export interface AiReportRef {
+  key: string;
+  title: string;
+  from: string;
+  to: string;
+  compare: string;
+  category: string | null;
+  product_id: number | null;
+  customer_id: number | null;
+}
+
 /** One grounded AI turn. Throws on 503 (assistant unavailable). */
 export async function aiChat(
   api: AxiosInstance,
   question: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+  report?: AiReportRef,
 ): Promise<AiChatResult> {
-  const { data } = await api.post<AiChatResult>('/ai/chat', { question, history });
+  const body: Record<string, unknown> = { question, history };
+  if (report) {
+    body.report = {
+      key: report.key,
+      from: report.from,
+      to: report.to,
+      compare: report.compare,
+      category: report.category,
+      product_id: report.product_id,
+      customer_id: report.customer_id,
+    };
+  }
+  const { data } = await api.post<AiChatResult>('/ai/chat', body);
   return data;
 }
 

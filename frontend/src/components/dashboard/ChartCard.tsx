@@ -13,7 +13,7 @@ export interface ChartCardProps {
   subtitle?: string;
   /** Optional header-extra node (e.g. range switch). */
   extra?: React.ReactNode;
-  type: 'line' | 'area' | 'bar' | 'donut' | 'pie';
+  type: 'line' | 'area' | 'bar' | 'column' | 'donut' | 'pie';
   options: ApexOptions;
   series: ApexAxisChartSeries | ApexNonAxisChartSeries;
   height?: number;
@@ -113,7 +113,9 @@ const ChartCard: React.FC<ChartCardProps> = ({
         {extra}
       </div>
       <div style={{ flex: 1 }}>
-        <Chart options={merged} series={series} type={type} height={height} />
+        {/* 'column' is supported by ApexCharts at runtime (vertical bars);
+            the react wrapper's type union just doesn't list it. */}
+        <Chart options={merged} series={series} type={type as Exclude<typeof type, 'column'>} height={height} />
       </div>
     </div>
   );

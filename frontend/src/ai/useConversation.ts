@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AxiosInstance } from 'axios';
 import { askCoopSmart } from './ask';
 import type { AiDataBundle } from './data';
+import type { AiReportRef } from './client';
 import type { Answer, AiMessage, Conversation } from './types';
 
 const STORAGE_KEY = 'coop:ai-conversations';
@@ -80,7 +81,7 @@ export function useConversation(bundle: AiDataBundle, api: AxiosInstance) {
    * until this resolves).
    */
   const ask = useCallback(
-    async (question: string): Promise<Answer | null> => {
+    async (question: string, report?: AiReportRef): Promise<Answer | null> => {
       const text = question.trim();
       if (!text || busy) return null;
 
@@ -137,7 +138,7 @@ export function useConversation(bundle: AiDataBundle, api: AxiosInstance) {
       };
 
       try {
-        const answer = await askCoopSmart(text, bundle, api, history);
+        const answer = await askCoopSmart(text, bundle, api, history, report);
         append(answer);
         return answer;
       } finally {

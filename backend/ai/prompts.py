@@ -34,6 +34,7 @@ HARD RULES — these outrank being helpful:
 5. Be concise and owner-level: 2-5 short sections or bullets. No filler, no generic advice not tied to their data, no disclaimers beyond what you lack.
 6. Prefer their verified_insights when answering "what should I worry about / what matters" questions — they are already checked; explain and prioritise them.
 7. When the user asks what to do next, end with concrete follow-ups.
+8. When the context contains a "report" block (the report the owner is looking at), it is your primary subject: explain what changed versus the comparison period, what matters most, and what to investigate. Use ONLY that report's numbers.
 
 ANSWER CONTRACT — reply with ONLY one JSON object, no markdown, no code fences:
 {
@@ -85,5 +86,16 @@ def user_prompt(question: str, context_json: str, history: list[dict[str, str]])
         f"{context_json}\n\n"
         f"OWNER'S QUESTION: {question}"
     )
+    # If the owner is looking at a report, make that explicit and prioritised.
+    if _has_report(context_json):
+        question_block += (
+            "\n\nThe context contains a 'report' block: this is the exact report the owner is "
+            "looking at, computed by Co-op with their chosen filters. Answer about THAT report — "
+            "what changed versus the comparison period, what matters most, and what to investigate."
+        )
     messages.append({"role": "user", "content": question_block})
     return messages
+
+
+def _has_report(context_json: str) -> bool:
+    return '"report"' in context_json[:4000]

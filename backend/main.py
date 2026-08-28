@@ -16,9 +16,9 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import case, func, or_, select, text
 from sqlalchemy import update as sa_update
@@ -29,6 +29,8 @@ from sqlalchemy.orm import selectinload
 from . import briefing as briefing_mod
 from . import importer
 from .ai import service as ai_service
+from .exports import export_report, ExportError
+from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
@@ -1383,10 +1385,24 @@ async def onboarding_state(
 # engine with an honest notice.
 # ---------------------------------------------------------------------------
 
+class AiReportRef(BaseModel):
+    """Which report the owner is looking at (filters only — the data is
+    rebuilt server-side by the reporting engine and never trusted from the
+    client)."""
+    key: str
+    from_date: Optional[str] = Field(None, alias="from")
+    to: Optional[str] = None
+    compare: Optional[str] = None
+    category: Optional[str] = None
+    product_id: Optional[int] = None
+    customer_id: Optional[int] = None
+
+
 class AiChatRequest(BaseModel):
     question: str
     history: Optional[List[Dict[str, str]]] = None
     request_id: Optional[str] = None
+    report: Optional[AiReportRef] = None
 
 
 @app.post("/ai/chat", tags=["AI"])
@@ -1415,6 +1431,7 @@ async def ai_chat(
             question=req.question,
             history=req.history,
             request_id=req.request_id,
+            report=req.report.model_dump(by_alias=True, exclude_none=True) if req.report else None,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -1448,4 +1465,98 @@ async def ai_usage(
         input_tokens=u["input_tokens"],
         output_tokens=u["output_tokens"],
         credits_used=u["credits_used"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Reports (Reports phase) — one verified engine, many consumers
+#
+# The reporting engine (backend/reports) is the SINGLE source of truth: the
+# Reports UI, CSV/XLSX/PDF exports and the AI context all read the same
+# ReportData for the same filters, so the screen, the file and the
+# explanation can never disagree about a number.
+# ---------------------------------------------------------------------------
+
+def _report_filters(
+    from_: Optional[str],
+    to: Optional[str],
+    compare: Optional[str],
+    category: Optional[str],
+    product_id: Optional[int],
+    customer_id: Optional[int],
+) -> ReportFilters:
+    try:
+        return ReportFilters.from_query(
+            from_str=from_, to_str=to, compare=compare,
+            category=category, product_id=product_id, customer_id=customer_id,
+        )
+    except FilterError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/reports/meta", tags=["Reports"])
+async def reports_meta(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Available reports + the tenant's product categories (for the filter UI)."""
+    cats = (await db.execute(
+        select(func.distinct(Product.category)).where(
+            Product.business_id == business.id,
+            Product.deleted_at.is_(None),
+            Product.category.is_not(None),
+        )
+    )).scalars().all()
+    return {
+        "reports": [{"key": k, "title": v} for k, v in REPORT_TITLES.items()],
+        "categories": sorted(c for c in cats if c),
+        "compare_options": ["none", "previous_period", "previous_month", "previous_year"],
+    }
+
+
+@app.get("/reports/{key}", tags=["Reports"])
+async def get_report(
+    key: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    compare: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    product_id: Optional[int] = Query(None),
+    customer_id: Optional[int] = Query(None),
+) -> dict:
+    """One verified report dataset for the given filters (deterministic)."""
+    if key not in REPORT_TITLES:
+        raise HTTPException(status_code=404, detail=f"Unknown report '{key}'.")
+    f = _report_filters(from_, to, compare, category, product_id, customer_id)
+    return await build_report(db, business.id, key, f).to_dict()
+
+
+@app.get("/reports/{key}/export", tags=["Reports"])
+async def export_report_route(
+    key: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    format: str = Query("csv", alias="format"),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    compare: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    product_id: Optional[int] = Query(None),
+    customer_id: Optional[int] = Query(None),
+) -> Response:
+    """Export EXACTLY what the screen shows: same engine, same filters."""
+    if key not in REPORT_TITLES:
+        raise HTTPException(status_code=404, detail=f"Unknown report '{key}'.")
+    f = _report_filters(from_, to, compare, category, product_id, customer_id)
+    data = await build_report(db, business.id, key, f)
+    try:
+        content, filename, media_type = export_report(data, format)
+    except ExportError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
