@@ -226,8 +226,8 @@ const CustomersPage: React.FC = () => {
 
           <AiNoticeBox
             compact
-            title="AI Insight: Engagement"
-            description="Co-op AI will flag customers with changing order cadence and suggest check-ins once the AI module is available."
+            title="Up next: engagement analysis"
+            description="Ask Co-op and Live Insights are available now. Automatically flagging customers whose order cadence is changing — with suggested check-ins — is still on the roadmap."
           />
 
           {loading ? (

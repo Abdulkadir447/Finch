@@ -251,15 +251,14 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         {editing ? (
           <AiNoticeBox
             compact
-            title="AI Insight"
-            description="Co-op AI will suggest price and stock adjustments based on your sales velocity once the AI module is available."
+            title="Up next: pricing & stock suggestions"
+            description="Ask Co-op is available now. Product-level recommendations — price and stock adjustments based on your sales velocity — are still on the roadmap."
           />
         ) : (
           <AiNoticeBox
             compact
-            title="Generate Product Description"
-            description="Use Co-op AI to auto-generate a compelling description based on the title and category."
-            actionLabel="Try it now"
+            title="Generate description (coming soon)"
+            description="Auto-generating a description from the title and category is still on the roadmap. Ask Co-op is available now for questions about your catalog."
           />
         )}
       </Form>

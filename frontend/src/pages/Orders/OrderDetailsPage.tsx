@@ -320,8 +320,8 @@ const OrderDetailsPage: React.FC = () => {
 
           {/* AI insights (honest placeholder) */}
           <AiNoticeBox
-            title="Co-op AI Insights"
-            description="Co-op AI will analyze this order's delivery risk, customer LTV and fulfillment route once the AI module is available."
+            title="Up next: order-level analysis"
+            description="Ask Co-op is available now. Order-level analysis — delivery risk, customer LTV and fulfillment route — is still on the roadmap."
           />
         </div>
 

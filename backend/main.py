@@ -30,6 +30,8 @@ from . import briefing as briefing_mod
 from . import importer
 from .ai import service as ai_service
 from .exports import export_report, ExportError
+from .notifications import build_daily_summary
+from .notifications.schemas import DailySummary as DailySummarySchema
 from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
@@ -1511,6 +1513,24 @@ async def billing_change_plan(
     except InvalidPlan as e:
         raise HTTPException(status_code=422, detail=str(e))
     return await billing_mod.billing_summary(db, business)
+
+
+# ---------------------------------------------------------------------------
+# Notifications (v1: in-app daily business summary)
+#
+# Computed on demand from the existing reporting/briefing layer — no second
+# calculation path, no scheduler, no persistence (so repeated same-day
+# requests yield the same summary and nothing can duplicate). The LLM is not
+# involved; every number is deterministic.
+# ---------------------------------------------------------------------------
+
+@app.get("/notifications/daily-summary", response_model=DailySummarySchema, tags=["Notifications"])
+async def notifications_daily_summary(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> DailySummarySchema:
+    """Today's verified business summary for the in-app notification panel."""
+    return await build_daily_summary(db, business)
 
 
 # ---------------------------------------------------------------------------

@@ -373,8 +373,8 @@ const CustomerProfilePage: React.FC = () => {
 
             {/* Recent activity insights (honest AI placeholder) */}
             <AiNoticeBox
-              title="Recent Activity Insights"
-              description="Co-op AI will surface this customer's engagement signals — order cadence, churn risk and suggested check-ins — once the AI module is available."
+              title="Up next: profile-level signals"
+              description="Ask Co-op is available now. Per-customer engagement signals — order cadence, churn risk and suggested check-ins — are still on the roadmap."
             />
           </div>
         </Col>

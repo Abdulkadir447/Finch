@@ -19,10 +19,11 @@ export interface AiNoticeBoxProps {
  * Co-op AI notice box (Stage R1 AI chrome: 2px gradient top border +
  * sparkle mark).
  *
- * Honesty rule: the AI module does not exist yet, so this component only
- * ever renders the chrome plus a truthful "arrives later" message and an
- * action that answers honestly — never a fabricated AI result. When the
- * AI module lands, these boxes become its presentation slots.
+ * Honesty rule: Co-op's AI (Ask Co-op, Live Insights, report explanations)
+ * is live. These boxes are reserved for a SPECIFIC analysis that is not yet
+ * built, so the copy must name that capability as "coming" while making
+ * clear the assistant itself is already available — never implying AI is
+ * unavailable, and never a fabricated result.
  */
 const AiNoticeBox: React.FC<AiNoticeBoxProps> = ({
   title,
@@ -33,7 +34,7 @@ const AiNoticeBox: React.FC<AiNoticeBoxProps> = ({
 }) => {
   const { colors } = useCoopTheme();
   const handleAction = () =>
-    onAction ?? (() => message.info('Co-op AI arrives in a later release.'));
+    onAction ?? (() => message.info('This specific analysis is still on the roadmap — Ask Co-op is available now.'));
 
   return (
     <div
