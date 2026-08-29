@@ -227,7 +227,7 @@ test('markPushOutcome syncs acknowledged ops and fails refused ones', () => {
     ids: { [c.client_id]: 101 },
     errors: [{ client_id: c2.client_id, entity: 'customer', error: 'email taken' }],
   });
-  assert.deepStrictEqual(out, { synced: 1, failed: 1 });
+  assert.deepStrictEqual(out, { synced: 1, conflicts: 0, failed: 1 });
 
   const byClient = new Map([dl.queue.get(1), dl.queue.get(2)].map((op) => [op.client_id, op.status]));
   assert.strictEqual(byClient.get(c.client_id), 'synced');
@@ -300,5 +300,92 @@ test('pendingOrderIds lists orders awaiting push', () => {
   });
   // Other ops (items/movements) are still pending, but the ORDER op is done.
   assert.deepStrictEqual(dl.queue.pendingOrderIds(), [], 'no pending order ops');
+  dl.close();
+});
+
+// ---------------------------------------------------------------------------
+// OFFLINE 4 — conflict state: parked, never auto-retried, fully retained
+// ---------------------------------------------------------------------------
+
+const EMAIL_CONFLICT = {
+  operation_id: '77',
+  entity: 'customer',
+  client_id: 'CUST-B',
+  reason: 'email_conflict',
+  error: 'customer CUST-B: email already belongs to customer 3',
+  local: { email: 'dup@x.com', full_name: 'B' },
+  server: { id: 3, client_id: 'CUST-A', full_name: 'A', email: 'dup@x.com' },
+};
+
+test('markPushOutcome parks a conflicting op as conflict (not failed/synced)', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const a = dl.customers.create(biz.id, { full_name: 'A', email: 'a@x.com' });
+  const b = dl.customers.create(biz.id, { full_name: 'B', email: 'b@x.com' });
+  const out = markPushOutcome(dl, {
+    applied: 1, skipped: 0,
+    ids: { [a.client_id]: 101 },
+    conflicts: [{ ...EMAIL_CONFLICT, client_id: b.client_id, operation_id: String(b.id) }],
+    failed: [],
+  });
+  assert.deepStrictEqual(out, { synced: 1, conflicts: 1, failed: 0 });
+  const bOp = dl.queue.get(b.id);
+  assert.strictEqual(bOp.status, 'conflict');
+  // The original payload is untouched; the structured conflict is retained.
+  assert.strictEqual(bOp.payload.email, 'b@x.com', 'original payload retained');
+  const kept = JSON.parse(bOp.last_error);
+  assert.strictEqual(kept.reason, 'email_conflict', 'conflict reason retained');
+  assert.strictEqual(kept.server.client_id, 'CUST-A', 'server snapshot retained');
+  assert.strictEqual(kept.operation_id, String(b.id), 'operation_id retained');
+  dl.close();
+});
+
+test('a conflict is NOT retried automatically (unlike a failed op)', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const c = dl.customers.create(biz.id, { full_name: 'Grace', email: 'g@x.com' });
+  const cid = c.client_id;
+  markPushOutcome(dl, {
+    applied: 0, skipped: 0, ids: {},
+    conflicts: [{ ...EMAIL_CONFLICT, client_id: cid }],
+    failed: [],
+  });
+  assert.strictEqual(dl.queue.countPending(), 0);
+  assert.strictEqual(dl.queue.countConflicts(), 1);
+
+  dl.queue.retryFailed();
+  assert.strictEqual(dl.queue.countPending(), 0, 'retryFailed does NOT re-arm conflicts');
+  assert.strictEqual(dl.queue.get(c.id).status, 'conflict', 'still parked after retryFailed');
+
+  // Conflicts are visible for OFFLINE 5's resolution UI, with the reason.
+  const parked = dl.queue.conflicts();
+  assert.strictEqual(parked.length, 1);
+  assert.strictEqual(parked[0].conflict.reason, 'email_conflict');
+  assert.strictEqual(parked[0].payload.email, 'g@x.com');
+  dl.close();
+});
+
+test('subsequent normal operations keep syncing around a parked conflict', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const stuck = dl.customers.create(biz.id, { full_name: 'Stuck', email: 's@x.com' });
+  markPushOutcome(dl, {
+    applied: 0, skipped: 0, ids: {},
+    conflicts: [{ ...EMAIL_CONFLICT, client_id: stuck.client_id }],
+    failed: [],
+  });
+
+  // A NEW local write must still flow through the queue and sync.
+  const fresh = dl.customers.create(biz.id, { full_name: 'Fresh', email: 'f@x.com' });
+  assert.deepStrictEqual(dl.queue.pending().map((o) => o.client_id), [fresh.client_id],
+    'the parked conflict is excluded from the push batch');
+
+  markPushOutcome(dl, {
+    applied: 1, skipped: 0, ids: { [fresh.client_id]: 202 },
+    conflicts: [], failed: [],
+  });
+  assert.strictEqual(dl.queue.get(fresh.id).status, 'synced');
+  assert.strictEqual(dl.queue.get(stuck.id).status, 'conflict', 'the conflict stays parked');
+  assert.strictEqual(dl.queue.countConflicts(), 1);
   dl.close();
 });

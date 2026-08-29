@@ -29,6 +29,7 @@ function initial(): SyncStatus {
     connection,
     localAvailable: local,
     pending: 0,
+    conflicts: 0,
     syncing: false,
     // Desktop: unknown until main reports (initial pull may already be done
     // on a previous launch — main re-verifies on the first pull of this run).
@@ -40,7 +41,9 @@ function initial(): SyncStatus {
 function kindFor(s: SyncStatus): SyncStatusKind {
   if (s.syncing) return 'syncing';
   if (s.connection === 'offline') return s.localAvailable ? 'offline-saved' : 'offline-no-local';
-  return s.pending > 0 ? 'needs-attention' : 'synced';
+  // needs-attention also covers OFFLINE 4 conflicts: they are never retried
+  // automatically and must be visible until resolved (OFFLINE 5).
+  return s.pending > 0 || s.conflicts > 0 ? 'needs-attention' : 'synced';
 }
 
 function set(next: SyncStatus) {
@@ -58,18 +61,20 @@ async function refresh() {
       ...status,
       connection: getConnection(),
       pending: 0,
+      conflicts: 0,
       syncing: false,
       mirrorReady: false,
     });
     return;
   }
-  // Main's status is authoritative for pending/syncing/mirrorReady; the
-  // engine (renderer) owns the cycle, main owns the mirror + queue state.
+  // Main's status is authoritative for pending/conflicts/syncing/mirrorReady;
+  // the engine (renderer) owns the cycle, main owns the mirror + queue state.
   const s = await getSyncStatus();
   set({
     ...status,
     connection: getConnection(),
     pending: s?.pending ?? 0,
+    conflicts: s?.conflicts ?? 0,
     syncing: s?.syncing ?? false,
     mirrorReady: s?.mirrorReady ?? false,
     lastSyncAt: s?.lastSyncAt ?? null,

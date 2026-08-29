@@ -6,7 +6,7 @@
   "scripts": {
     "start": "npm run electron",
     "electron": "electron .",
-    "test": "node --test"
+    "test": "node --test \"test/*.test.js\""
   },
   "devDependencies": {
     "electron": "^33.4.11"

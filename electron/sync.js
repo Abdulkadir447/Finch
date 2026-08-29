@@ -206,19 +206,28 @@ function applyPull(dataLayer, payload, { full = false } = {}) {
 }
 
 /**
- * Mark the local queue after a /sync/push batch.
- * result.ids  — client_id -> server id for every op the server ACKNOWLEDGED
- *               (applied and idempotent-skip alike: the op is done either way).
- * result.errors — per-op refusals; those ops go to 'failed' (retried next
- *               cycle by retryFailed). Ops in neither set are left pending.
+ * Mark the local queue after a /sync/push batch (OFFLINE 4 outcomes):
+ *   result.ids       -> synced   (applied or idempotent-skip: done either way)
+ *   result.conflicts -> conflict (structured entry retained; NEVER retried —
+ *                        retryFailed() only re-arms 'failed' ops)
+ *   result.failed    -> failed   (transient; retried on the next push)
+ * Ops in none of the three sets stay pending. A conflict wins over a failed
+ * entry for the same client_id (the structured info is the superset).
  */
 function markPushOutcome(dataLayer, result) {
   const ok = new Set(Object.keys(result.ids || {}));
-  const errs = new Map((result.errors || []).filter((e) => e.client_id).map((e) => [e.client_id, e.error]));
+  const conflictEntries = new Map(
+    (result.conflicts || []).filter((c) => c.client_id).map((c) => [c.client_id, c]),
+  );
+  const errs = new Map((result.failed || result.errors || []).filter((e) => e.client_id).map((e) => [e.client_id, e.error]));
   let synced = 0;
+  let conflicts = 0;
   let failed = 0;
   for (const op of dataLayer.queue.pending()) {
-    if (ok.has(op.client_id)) {
+    if (conflictEntries.has(op.client_id)) {
+      dataLayer.queue.markConflict(op.id, conflictEntries.get(op.client_id));
+      conflicts += 1;
+    } else if (ok.has(op.client_id)) {
       dataLayer.queue.markSynced(op.id);
       synced += 1;
     } else if (errs.has(op.client_id)) {
@@ -226,7 +235,7 @@ function markPushOutcome(dataLayer, result) {
       failed += 1;
     }
   }
-  return { synced, failed };
+  return { synced, conflicts, failed };
 }
 
 module.exports = { applyPull, markPushOutcome, getCursor, keyFor };

@@ -107,7 +107,55 @@ class SyncQueue {
       .run(String(error), queueId);
   }
 
-  /** Failed ops become pending again (retry on next sync attempt). */
+  /**
+   * OFFLINE 4 — record a structured CONFLICT on a queue op.
+   *
+   * A conflict is NOT a failure: retrying can't fix it (it collides with
+   * cloud state), so the op is parked in 'conflict' status — excluded from
+   * pending(), never re-armed by retryFailed() — until OFFLINE 5's
+   * resolution UI handles it. The ORIGINAL payload is untouched; the
+   * structured server response (reason, local, server, operation_id) is kept
+   * in last_error as JSON so resolution has full context.
+   */
+  markConflict(queueId, conflict) {
+    this.db
+      .prepare(
+        `UPDATE sync_queue
+            SET status='conflict', last_error=?, updated_at=datetime('now')
+          WHERE id=?`
+      )
+      .run(JSON.stringify(conflict || {}), queueId);
+  }
+
+  /** Ops waiting for human resolution (OFFLINE 5). Not retried automatically. */
+  conflicts({ business_id } = {}) {
+    const rows =
+      business_id != null
+        ? this.db
+            .prepare(
+              `SELECT * FROM sync_queue WHERE status='conflict' AND business_id=? ORDER BY id ASC`,
+            )
+            .all(business_id)
+        : this.db.prepare(`SELECT * FROM sync_queue WHERE status='conflict' ORDER BY id ASC`).all();
+    return rows.map((r) => ({
+      ...r,
+      payload: JSON.parse(r.payload),
+      conflict: r.last_error ? JSON.parse(r.last_error) : null,
+    }));
+  }
+
+  countConflicts({ business_id } = {}) {
+    const row =
+      business_id != null
+        ? this.db
+            .prepare(`SELECT COUNT(*) AS n FROM sync_queue WHERE status='conflict' AND business_id=?`)
+            .get(business_id)
+        : this.db.prepare(`SELECT COUNT(*) AS n FROM sync_queue WHERE status='conflict'`).get();
+    return row.n;
+  }
+
+  /** Failed ops become pending again (retry on next sync attempt).
+   *  CONFLICT ops are deliberately NOT re-armed — they wait for resolution. */
   retryFailed() {
     this.db
       .prepare(`UPDATE sync_queue SET status='pending', updated_at=datetime('now') WHERE status='failed'`)

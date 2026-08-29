@@ -23,7 +23,7 @@ down.
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
 | Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
-| Tests | 113 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 for the report-chart alignment + report-route regressions) + 15 local-analytics port tests + a server↔local cross-check harness + 22 Electron data-layer/sync Node tests + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
+| Tests | 122 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests) + 15 local-analytics port tests + a server↔local cross-check harness + 25 Electron data-layer/sync Node tests + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
 
 ## 2. The five parked areas — status and recommendation
 
@@ -148,11 +148,45 @@ is now local-first except the model-based AI):**
   called `.to_dict` on the coroutine — only reachable over HTTP, which the
   service-level tests never hit; route-level regression test added).
 
-**Remaining (scheduled sub-phases):** OFFLINE 4 (conflict rules: customers
-merge, products SKU-conflict flag, inventory operation-based), OFFLINE 5
-(conflict-resolution UX; the sync indicator / manual sync / pending badges
-landed with OFFLINE 3), OFFLINE 6 (E2E offline / restart / duplicate-sync
-testing in the real Electron runtime). Dashboard/Reports reads stay
+**OFFLINE 4 — conflict engine (delivered; correctness, no UI):**
+- `/sync/push` now resolves every op to exactly one outcome: `applied`,
+  `skipped` (idempotent), `conflict` (structured), or `failed` (transient,
+  retriable). The response carries `conflicts[]` with
+  `operation_id` (the local queue row id, echoed from the push op), `entity`,
+  `client_id`, `reason`, `local` (attempted values), `server` (current
+  values where safe); `failed`/`errors` (back-compat alias) hold transient
+  refusals. The endpoint stays idempotent.
+- Conflict rules (SAFE vs UNSAFE, per the ADR): client_id match = same
+  record (safe). An email already owned by a DIFFERENT customer ->
+  `email_conflict` (create or update — never silently overwritten, never
+  auto-merged; exact NAME match is not identity and creates a distinct
+  record). An SKU owned by another product -> `sku_conflict`. Unknown
+  client_id target -> `not_found`. Stale/invalid order status transition ->
+  `invalid_transition` (validated against the shared
+  `ALLOWED_ORDER_TRANSITIONS`). A stock movement that would drive cloud
+  stock negative -> `insufficient_stock` with the server's current stock
+  (operation-based model unchanged; the movement is not applied, and
+  exactly-once is preserved). The pre-checks mirror the partial unique
+  indexes (per business, live rows) — previously these collisions were raw
+  IntegrityErrors that 500'd the whole push batch.
+- Local queue: new `conflict` state. `retryFailed()` re-arms `failed` ops
+  ONLY — conflicts stay parked (never endlessly retried), with the original
+  payload untouched and the structured server entry retained on the row for
+  OFFLINE 5. `syncStatus` exposes a `conflicts` count; the TopBar pill shows
+  "N need attention" (visibility only — no resolution UI yet).
+- 9 new backend tests (email create/update conflict, name-is-not-identity,
+  SKU conflict create+update, not_found targets, invalid transition,
+  duplicate-order idempotency, conflict shape + operation_id, no-apply-on-
+  retry, tenant isolation) + 3 new Electron tests (conflict parked with
+  payload/reason retained, not re-armed by retryFailed, subsequent ops keep
+  syncing around a parked conflict).
+
+**Remaining (scheduled sub-phases):** OFFLINE 5 (conflict-resolution UX —
+the parked queue entries already carry the structured local/server context
+it will render; the sync indicator / manual sync / pending badges landed
+with OFFLINE 3/4), OFFLINE 6 (E2E offline / restart / duplicate-sync
+testing in the real Electron runtime — the gate before calling the offline
+promise production-ready). Dashboard/Reports reads stay
 server-backed for now (the deterministic engines keep working from live
 data); moving them to the local mirror is the natural next sub-phase.
 

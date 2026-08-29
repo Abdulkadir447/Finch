@@ -109,11 +109,16 @@ function syncStatus() {
   return {
     online,
     pending: dataLayer.queue.countPending(),
+    // OFFLINE 4: ops parked in 'conflict' — visible as "needs attention",
+    // never retried automatically (OFFLINE 5 resolves them).
+    conflicts: dataLayer.queue.countConflicts(),
     syncing,
     mirrorReady,
     lastSyncAt,
   };
 }
+
+
 
 function broadcastSync(win) {
   if (win && !win.isDestroyed()) win.webContents.send('coop:sync', syncStatus());
@@ -148,20 +153,21 @@ function dbHandlers(win) {
     // contract). A permanently refused op (e.g. an invalid transition) stays
     // visible as "needs attention" instead of vanishing.
     syncPendingOps: () => {
+      // retryFailed() re-arms 'failed' ops only — 'conflict' ops stay parked
+      // (OFFLINE 4: conflicts are never retried automatically).
       dataLayer.queue.retryFailed();
       return dataLayer.queue
         .pending()
         .slice(0, 200)
-        .map((o) => ({ entity: o.entity, client_id: o.client_id, operation: o.operation, payload: o.payload }));
+        .map((o) => ({ id: o.id, entity: o.entity, client_id: o.client_id, operation: o.operation, payload: o.payload }));
     },
     syncApplyPushOutcome: (result) => {
       const out = markPushOutcome(dataLayer, result);
-      if (out.synced || out.failed) {
-        lastSyncAt = new Date().toISOString();
-        broadcastSync(win);
-      }
+      if (out.synced || out.conflicts || out.failed) lastSyncAt = new Date().toISOString();
+      broadcastSync(win);
       return out;
     },
+    syncConflicts: () => dataLayer.queue.conflicts(),
     syncIngestMirror: (payload) => {
       // since == null -> full pull (verify counts); else delta (per-row).
       const res = applyPull(dataLayer, payload, { full: payload.since == null });

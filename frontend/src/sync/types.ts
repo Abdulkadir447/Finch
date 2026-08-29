@@ -38,6 +38,9 @@ export interface SyncStatus {
   localAvailable: boolean;
   /** Offline operations awaiting push. */
   pending: number;
+  /** OFFLINE 4: operations parked in 'conflict' — visible as "needs
+   *  attention", never retried automatically (resolution is OFFLINE 5). */
+  conflicts: number;
   /** True while a pull/push cycle is actively in flight. */
   syncing: boolean;
   /** True once the initial pull has populated the local mirror. Only when
@@ -70,10 +73,32 @@ export interface PullPayload {
   };
 }
 
-/** The result the server returns for a push batch (mirrors /sync/push). */
+/** One structured conflict the server returned for an op (OFFLINE 4).
+ *  Kept verbatim on the local queue op; OFFLINE 5's resolution UI reads it. */
+export interface SyncConflictEntry {
+  operation_id: string | null;
+  entity: string;
+  client_id: string;
+  /** email_conflict | sku_conflict | not_found | invalid_transition | insufficient_stock */
+  reason: string;
+  error: string;
+  /** The local attempted values. */
+  local: Record<string, unknown> | null;
+  /** The current server values (where safe to expose). */
+  server: Record<string, unknown> | null;
+}
+
+/**
+ * The result the server returns for a push batch (mirrors /sync/push).
+ * Every op resolves to exactly one outcome: applied, skipped (id in `ids`),
+ * conflict (structured, in `conflicts`), or failed (transient, in `failed`).
+ * `errors` is a back-compat alias of `failed`.
+ */
 export interface SyncPushResult {
   applied: number;
   skipped: number;
   ids: Record<string, number>;
+  conflicts: SyncConflictEntry[];
+  failed: Array<{ client_id: string; entity: string; error: string }>;
   errors: Array<{ client_id: string; entity: string; error: string }>;
 }

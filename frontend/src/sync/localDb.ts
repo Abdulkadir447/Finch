@@ -7,7 +7,7 @@
  * renderer (where the Clerk-authenticated API client lives) and routes its
  * mirror/queue operations through the bridge below.
  */
-import type { PullPayload, SyncPushResult, SyncOp } from './types';
+import type { PullPayload, SyncConflictEntry, SyncPushResult, SyncOp } from './types';
 
 export interface LocalRow {
   id: number;
@@ -57,21 +57,30 @@ export interface LocalDb {
 export interface LocalSyncStatus {
   online: boolean;
   pending: number;
+  /** OFFLINE 4: ops parked in 'conflict' — visible, never auto-retried. */
+  conflicts: number;
   syncing: boolean;
   mirrorReady: boolean;
   lastSyncAt: string | null;
+}
+
+export interface PushOutcome {
+  synced: number;
+  conflicts: number;
+  failed: number;
 }
 
 interface CoopBridge {
   db?: LocalDb;
   sync?: {
     status: () => Promise<LocalSyncStatus>;
-    pendingOps: () => Promise<SyncOp[]>;
-    applyPushOutcome: (result: SyncPushResult) => Promise<{ synced: number; failed: number }>;
+    pendingOps: () => Promise<Array<SyncOp & { id?: number }>>;
+    applyPushOutcome: (result: SyncPushResult) => Promise<PushOutcome>;
     ingestMirror: (payload: PullPayload) => Promise<{ business_id: number; cursor: string; applied: Record<string, number> }>;
     pullCursor: () => Promise<string | null>;
     pendingOrderIds: () => Promise<number[]>;
     setSyncing: (b: boolean) => Promise<boolean>;
+    conflicts: () => Promise<Array<SyncOp & { conflict: SyncConflictEntry | null }>>;
     onStatus?: (cb: (s: LocalSyncStatus) => void) => void;
   };
 }
@@ -101,8 +110,10 @@ export function getSyncStatus(): Promise<LocalSyncStatus | null> {
   return getCoop()?.sync?.status().catch(() => null) ?? Promise.resolve(null);
 }
 
-/** The next push batch (pending ops, oldest first, capped at 200). */
-export async function getPendingOps(): Promise<SyncOp[]> {
+/** The next push batch (pending ops, oldest first, capped at 200).
+ *  `id` is the queue row id (sent as operation_id so the server can echo
+ *  it back in structured conflict entries). */
+export async function getPendingOps(): Promise<Array<SyncOp & { id?: number }>> {
   return (await getCoop()?.sync?.pendingOps().catch(() => null)) ?? [];
 }
 
@@ -139,4 +150,4 @@ export function onSyncStatus(cb: (s: LocalSyncStatus) => void): () => void {
   return () => undefined; // ipcRenderer.on has no symmetric off in this bridge; single listener per app
 }
 
-export type { SyncOp, PullPayload, SyncPushResult };
+export type { SyncOp, PullPayload, SyncPushResult, SyncConflictEntry };

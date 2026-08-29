@@ -1601,6 +1601,9 @@ class SyncPushOperation(BaseModel):
     client_id: str  # client-generated ULID (idempotency key)
     operation: str  # create | update | delete
     payload: Dict[str, Any] = Field(default_factory=dict)
+    # The local queue row id (OFFLINE 4): echoed back in the structured
+    # conflict entry so the queue can attribute the conflict to its op.
+    operation_id: Optional[str] = None
 
 
 class SyncPushRequest(BaseModel):

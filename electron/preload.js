@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('coop', {
     pullCursor: () => call('syncPullCursor', null),
     pendingOrderIds: () => call('syncPendingOrderIds', null),
     setSyncing: (b) => call('syncSetSyncing', b),
+    // OFFLINE 4: parked conflicts (structured; OFFLINE 5 will resolve them).
+    conflicts: () => call('syncConflicts', null),
     // Full sync status pushed from main (mirror ready, pending, last sync).
     onStatus: (cb) => {
       ipcRenderer.on('coop:sync', (_e, data) => cb(data));

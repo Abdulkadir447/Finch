@@ -35,7 +35,9 @@ const SyncIndicator: React.FC = () => {
     label = 'Syncing…';
   } else if (s.kind === 'needs-attention') {
     dotColor = colors.warning;
-    label = `${s.pending} to sync`;
+    if (s.pending > 0 && s.conflicts > 0) label = `${s.pending} to sync · ${s.conflicts} need attention`;
+    else if (s.pending > 0) label = `${s.pending} to sync`;
+    else label = `${s.conflicts} need attention`;
   }
 
   // Manual trigger (OFFLINE 3): online desktop app with work to move, or a

@@ -70,7 +70,17 @@ async function cycle(): Promise<void> {
     // --- 1) PUSH: drain the queue (idempotent on the server's side) -------
     const ops = await getPendingOps();
     if (ops.length > 0) {
-      const { data } = await apiRef.post<SyncPushResult>('/sync/push', { operations: ops });
+      // operation_id = the local queue row id: echoed back in structured
+      // conflict entries so the queue can attribute them (OFFLINE 4).
+      const { data } = await apiRef.post<SyncPushResult>('/sync/push', {
+        operations: ops.map((o) => ({
+          entity: o.entity,
+          client_id: o.client_id,
+          operation: o.operation,
+          payload: o.payload,
+          operation_id: o.id != null ? String(o.id) : null,
+        })),
+      });
       await applyPushOutcome(data);
     }
 
