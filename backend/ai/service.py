@@ -23,6 +23,7 @@ from ..config import load_config, secret
 from ..models import Business
 from .actions import validate_actions, validate_links
 from .context import build_context
+from .history import record_turn
 from .providers.openai import ProviderError, build_provider
 from .prompts import REPAIR_PROMPT, build_system_prompt, user_prompt
 from .schemas import AiChatResponse
@@ -53,6 +54,14 @@ def ai_enabled() -> bool:
 
 def _default_model() -> str:
     return secret("OPENAI_MODEL") or _ai_config().get("model") or "gpt-4o-mini"
+
+
+def _report_key(report: Optional[dict[str, Any]]) -> Optional[str]:
+    """Which report the turn was about, if the caller attached one."""
+    if isinstance(report, dict):
+        key = str(report.get("key") or "")
+        return key[:20] or None
+    return None
 
 
 def _parse_reply(text: str) -> AiChatResponse:
@@ -174,7 +183,7 @@ async def handle_chat(
 
     if not has_data:
         # Don't spend the owner's time (or credits) on an empty business.
-        return {
+        clarify = {
             "type": "clarify",
             "kind": "clarify",
             "title": "No business data yet",
@@ -190,6 +199,9 @@ async def handle_chat(
             "model": None,
             "credits_used": 0,
         }
+        await record_turn(db, business.id, user_id, question, clarify,
+                          request_id=request_id, report_key=_report_key(report))
+        return clarify
 
     # --- Validate the proposal surface (links + actions) ---------------------
     links = validate_links(parsed.links)
@@ -213,7 +225,7 @@ async def handle_chat(
     for r in rejected:
         message += f"\n\n(Note: I couldn't prepare the requested {r['type'].lower()} — {r['reason']}.)"
 
-    return {
+    result_dict = {
         "type": parsed.type,
         "kind": parsed.kind,
         "title": parsed.title or "Co-op answer",
@@ -227,3 +239,6 @@ async def handle_chat(
         "model": result.model,
         "credits_used": credits,
     }
+    await record_turn(db, business.id, user_id, question, result_dict,
+                      request_id=request_id, report_key=_report_key(report))
+    return result_dict

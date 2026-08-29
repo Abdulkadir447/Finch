@@ -29,6 +29,8 @@ from sqlalchemy.orm import selectinload
 from . import briefing as briefing_mod
 from . import importer
 from .ai import service as ai_service
+from .ai import forecast as ai_forecast_mod
+from .ai import history as ai_history_mod
 from .exports import export_report, ExportError
 from .notifications import build_daily_summary
 from .notifications.schemas import DailySummary as DailySummarySchema
@@ -1472,6 +1474,65 @@ async def ai_usage(
         output_tokens=u["output_tokens"],
         credits_used=u["credits_used"],
     )
+
+
+@app.get("/ai/forecast", tags=["AI"])
+async def ai_forecast(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Deterministic revenue forecast (PRD Phase 3 — "Forecasting").
+
+    A transparent least-squares trend over the business's real, verified
+    monthly order data — never a black-box ML prediction, always labelled
+    as an estimate. No model call, no credits: a pure calculation over
+    verified data, so it is free and instant.
+    """
+    return await ai_forecast_mod.build_forecast(db, business.id, currency=business.currency or "USD")
+
+
+class AiHistoryItem(BaseModel):
+    id: int
+    question: str
+    answer_kind: Optional[str] = None
+    answer_title: Optional[str] = None
+    answer_summary: Optional[str] = None
+    report_key: Optional[str] = None
+    model: Optional[str] = None
+    credits_used: int = 0
+    created_at: Optional[str] = None
+
+
+class AiHistoryResponse(BaseModel):
+    items: List[AiHistoryItem]
+    total: int
+
+
+@app.get("/ai/history", response_model=AiHistoryResponse, tags=["AI"])
+async def ai_history_list(
+    limit: int = Query(30, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> AiHistoryResponse:
+    """The owner's AI activity, newest first (PRD Phase 3 — "AI history").
+
+    One entry per completed /ai/chat turn: the question, what kind of
+    answer it got and a short summary. Failed requests are not listed —
+    the history shows only what Co-op actually answered.
+    """
+    items, total = await ai_history_mod.list_history(db, business.id, limit=limit, offset=offset)
+    return AiHistoryResponse(items=items, total=total)
+
+
+@app.delete("/ai/history", tags=["AI"])
+async def ai_history_clear(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Delete the business's AI activity (explicit owner action)."""
+    deleted = await ai_history_mod.clear_history(db, business.id)
+    return {"deleted": deleted}
 
 
 # ---------------------------------------------------------------------------

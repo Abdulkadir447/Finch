@@ -11,6 +11,8 @@ import { useApiClient } from '../../services/api/client';
 import { SparkleIcon } from '../../components/ui/icons';
 import { CoopMark } from '../../components/brand/CoopLogo';
 import AnswerCard from '../../components/ai/AnswerCard';
+import ForecastCard from '../../components/ai/ForecastCard';
+import HistoryCard from '../../components/ai/HistoryCard';
 import { CoopErrorState, CoopLoading } from '../../components/ui';
 
 const SUGGESTIONS = [
@@ -260,6 +262,14 @@ const CoopAiPage: React.FC = () => {
                           {s}
                         </button>
                       ))}
+                    </div>
+
+                    {/* AI Platform: the verified forecast + the AI activity
+                        ledger (server-side — follows the business, not the
+                        browser). Both are independent of the conversation. */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginTop: 18 }}>
+                      <ForecastCard />
+                      <HistoryCard />
                     </div>
                   </div>
                 )}

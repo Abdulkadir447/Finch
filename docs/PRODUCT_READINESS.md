@@ -21,9 +21,9 @@ down.
 | Intelligent Import | 5-endpoint flow, deterministic mapper (LLM seam), read-only validate, commit with provenance + `source_order_ref` idempotency | `backend/importer.py`, `frontend/src/imports/` |
 | Day 1 Briefing + first-run onboarding | Verified deterministic insights; `/onboarding/state` + Welcome gate | `backend/briefing.py`, `frontend/src/pages/Welcome/` |
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
-| Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable | `backend/ai/`, `frontend/src/ai/` |
+| Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
-| Tests | 70 backend tests (incl. frontend↔backend contract test) + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `.github/workflows/ci.yml` |
+| Tests | 110 backend tests (incl. frontend↔backend contract test; 7 for the deterministic forecast, 6 for the AI history ledger) + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `.github/workflows/ci.yml` |
 
 ## 2. The five parked areas — status and recommendation
 

@@ -14,8 +14,9 @@ matters, and drafts the next action for you to confirm.
 - **Works offline:** Dashboard, Products, Inventory, Customers, Orders,
   order status changes, local invoices, Reports, CSV/XLSX import, and the
   locally-calculated deterministic insights.
-- **Requires internet:** real LLM calls, AI model-based explanations, cloud
-  billing/payment, cloud account auth/refresh.
+- **Requires internet:** real LLM calls, AI model-based explanations, the
+  server-side revenue forecast + AI activity, cloud billing/payment, cloud
+  account auth/refresh.
 
 The desktop app owns a local SQLite database (Electron main process); the UI
 writes locally first and syncs to the cloud when connectivity returns. The
@@ -49,6 +50,12 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
   never queries the database and never invents numbers. It can explain any
   report you're looking at and propose *drafts* from a fixed, validated
   action registry — execution always requires your explicit confirmation.
+- **Forecasting + AI history (AI Platform)** — a deterministic,
+  transparent revenue forecast (least-squares trend over your real monthly
+  sales, labelled an estimate — never a black-box ML prediction, never
+  negative) and an owner-visible, tenant-scoped AI activity ledger
+  (`ai_history`: one row per answered question). Both are server-verified,
+  deterministic and free — no model call, no credits.
 - **Real billing + credits** — plans and monthly AI-credit allowances are
   real server-side state; credits are computed from the `ai_usage` ledger
   (nothing mutable to drift) and enforced on every AI request (402 when

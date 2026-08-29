@@ -354,6 +354,33 @@ class AiUsage(Base):
         return f"<AiUsage business={self.business_id} model={self.model!r} credits={self.credits_used}>"
 
 
+class AiHistory(Base):
+    """One answered AI turn (AI Platform phase — AI history deliverable).
+
+    ``ai_usage`` meters cost (tokens/credits); ``ai_history`` is what the
+    OWNER sees: the question, the answered kind/title and a short summary.
+    One row per completed /ai/chat turn (assistant answers and grounded
+    clarify answers). Failed/unanswered requests are NOT recorded — the
+    history shows what Co-op actually answered, tenant-scoped like
+    everything else.
+    """
+
+    __tablename__ = "ai_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(String(255))  # Clerk user id of the asker
+    request_id = Column(String(64), index=True)
+    question = Column(Text, nullable=False)
+    answer_kind = Column(String(20))  # fact | calculation | forecast | suggestion | draft | clarify
+    answer_title = Column(String(255))
+    answer_summary = Column(Text)  # truncated message — full answers stay in the conversation
+    report_key = Column(String(20))  # which report the turn was about, if any
+    model = Column(String(64))
+    credits_used = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class Subscription(Base):
     """The business's active plan (Real Billing phase).
 

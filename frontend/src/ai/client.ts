@@ -88,3 +88,77 @@ export async function fetchAiUsage(api: AxiosInstance): Promise<AiUsageMonth> {
   const { data } = await api.get<AiUsageMonth>('/ai/usage');
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// AI Platform — forecasting + AI history (server-side, verified data)
+// ---------------------------------------------------------------------------
+
+/** One month of the verified revenue series (in-progress month included). */
+export interface ForecastMonthPoint {
+  key: string; // "2026-08"
+  label: string; // "Aug"
+  revenue: number;
+  orders: number;
+  in_progress: boolean;
+}
+
+/** The deterministic next-month revenue estimate (never an ML prediction). */
+export interface AiForecast {
+  available: boolean;
+  reason: 'no_sales_history' | 'insufficient_history' | null;
+  currency: string;
+  as_of: string;
+  method: string | null;
+  months: ForecastMonthPoint[];
+  completed_months: number;
+  required_months: number;
+  forecast: {
+    period: string;
+    period_label: string;
+    estimated: number;
+    low: number;
+    high: number;
+    trend_percent: number | null;
+    completed_months_used: number;
+  } | null;
+}
+
+/** One entry of the owner's AI activity (a completed /ai/chat turn). */
+export interface AiHistoryItem {
+  id: number;
+  question: string;
+  answer_kind: string | null;
+  answer_title: string | null;
+  answer_summary: string | null;
+  report_key: string | null;
+  model: string | null;
+  credits_used: number;
+  created_at: string | null;
+}
+
+export interface AiHistoryPage {
+  items: AiHistoryItem[];
+  total: number;
+}
+
+/** Deterministic revenue forecast (free, no model call — a calculation). */
+export async function fetchForecast(api: AxiosInstance): Promise<AiForecast> {
+  const { data } = await api.get<AiForecast>('/ai/forecast');
+  return data;
+}
+
+/** The owner's AI activity, newest first. */
+export async function fetchAiHistory(
+  api: AxiosInstance,
+  limit = 30,
+  offset = 0,
+): Promise<AiHistoryPage> {
+  const { data } = await api.get<AiHistoryPage>('/ai/history', { params: { limit, offset } });
+  return data;
+}
+
+/** Delete the AI activity (explicit owner action). */
+export async function clearAiHistory(api: AxiosInstance): Promise<{ deleted: number }> {
+  const { data } = await api.delete<{ deleted: number }>('/ai/history');
+  return data;
+}
