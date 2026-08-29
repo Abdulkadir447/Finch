@@ -14,6 +14,7 @@
  */
 import React from 'react';
 import { useSyncStatus } from '../../sync/syncStatus';
+import { requestManualSync } from '../../sync/engine';
 import { useCoopTheme } from '../../theme-provider';
 import { type } from '../../theme';
 
@@ -36,6 +37,11 @@ const SyncIndicator: React.FC = () => {
     dotColor = colors.warning;
     label = `${s.pending} to sync`;
   }
+
+  // Manual trigger (OFFLINE 3): online desktop app with work to move, or a
+  // mirror still being prepared — one tap drains the queue + refreshes.
+  const canSyncNow =
+    s.localAvailable && s.connection === 'online' && (s.pending > 0 || !s.mirrorReady) && !s.syncing;
 
   return (
     <span
@@ -68,6 +74,27 @@ const SyncIndicator: React.FC = () => {
         }}
       />
       {label}
+      {canSyncNow && (
+        <button
+          type="button"
+          onClick={() => requestManualSync()}
+          aria-label="Sync now"
+          title="Push pending changes and refresh from the cloud now"
+          style={{
+            border: `1px solid ${colors.outlineVariant}`,
+            background: 'transparent',
+            color: colors.primary,
+            fontWeight: 600,
+            fontSize: 11,
+            borderRadius: 9999,
+            padding: '1px 8px',
+            cursor: 'pointer',
+            marginLeft: 2,
+          }}
+        >
+          Sync now
+        </button>
+      )}
     </span>
   );
 };

@@ -6,7 +6,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { makeInventoryRepo } from '../../repositories';
+import { makeInventoryRepo, localBusinessId, isLocalModeActive, useLocalModeActivated } from '../../repositories';
+import { getLocalDb } from '../../sync/localDb';
 
 export type StockStatus = 'in' | 'low' | 'out';
 
@@ -136,11 +137,70 @@ export function useInventory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
 
+  /** Local read path (OFFLINE 3): the SQLite mirror; the summary is the
+   *  same calculation the server does, computed from the mirrored rows —
+   *  deterministic, no network. */
+  const loadLocal = useCallback(
+    async (requestedPage: number, query: string, filter: StockStatus | 'all') => {
+      const biz = await localBusinessId(api);
+      const db = getLocalDb();
+      if (!db) throw new ApiError('Local data layer unavailable.');
+      const rows = await db.productList({ business_id: biz, opts: { limit: 10000 } });
+      const mapped: InventoryProduct[] = rows.map((r) => ({
+        id: Number(r.id),
+        sku: String(r.sku ?? ''),
+        name: String(r.name ?? ''),
+        description: (r.description as string | null) ?? null,
+        category: (r.category as string | null) ?? null,
+        unit_price: Number(r.unit_price ?? 0),
+        cost_price: (r.cost_price as number | null) ?? null,
+        current_stock: Number(r.current_stock ?? 0),
+        reorder_level: Number(r.reorder_level ?? 0),
+        version: 1,
+        created_at: String(r.created_at ?? r.updated_at ?? ''),
+        updated_at: (r.updated_at as string | null) ?? null,
+      }));
+
+      // Summary — the server's /inventory/summary, same inputs, same math.
+      setSummary({
+        products_count: mapped.length,
+        inventory_value: Math.round(mapped.reduce((s, p) => s + p.current_stock * unitValueOf(p), 0) * 100) / 100,
+        low_stock_count: mapped.filter((p) => stockStatusOf(p) === 'low').length,
+        out_of_stock_count: mapped.filter((p) => stockStatusOf(p) === 'out').length,
+        categories_count: new Set(mapped.map((p) => p.category).filter(Boolean)).size,
+      });
+
+      let list = mapped;
+      if (filter === 'out') list = list.filter((p) => p.current_stock === 0);
+      else if (filter === 'low') list = list.filter((p) => p.current_stock > 0 && p.current_stock <= p.reorder_level);
+      else if (filter === 'in') list = list.filter((p) => p.current_stock > p.reorder_level);
+      const q = query.trim().toLowerCase();
+      if (q) {
+        list = list.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.sku.toLowerCase().includes(q) ||
+            (p.category ?? '').toLowerCase().includes(q),
+        );
+      }
+      list = [...list].sort((a, b) => b.id - a.id);
+      setTotal(list.length);
+      const start = (requestedPage - 1) * INVENTORY_PAGE_SIZE;
+      setItems(list.slice(start, start + INVENTORY_PAGE_SIZE));
+      setPage(requestedPage);
+    },
+    [api],
+  );
+
   const load = useCallback(
     async (requestedPage: number, query: string, filter: StockStatus | 'all') => {
       setLoading(true);
       setError(null);
       try {
+        if (isLocalModeActive()) {
+          await loadLocal(requestedPage, query, filter);
+          return;
+        }
         const [list, sum] = await Promise.all([
           api.get<{ items: InventoryProduct[]; total: number; page: number }>('/products', {
             params: {
@@ -164,7 +224,7 @@ export function useInventory() {
         setLoading(false);
       }
     },
-    [api],
+    [api, loadLocal],
   );
 
   // Debounced search/filter changes return to page 1.
@@ -176,15 +236,45 @@ export function useInventory() {
     return () => clearTimeout(timer);
   }, [search, stockFilter, load]);
 
+  // The mirror became ready (initial pull): reload from the local mirror.
+  useLocalModeActivated(() => {
+    void load(page, search.trim(), stockFilter);
+  });
+
   // Local-first stock adjustment (ADR-002 rule 5): a signed movement applied
   // to the local ledger + queued on desktop, otherwise the existing HTTP call.
   const adjustStock = (productId: number, input: AdjustInput) =>
     inventoryRepo.adjust(productId, input);
 
-  const fetchMovements = (productId: number, limit = 20) =>
-    api.get<MovementListResponse>(`/products/${productId}/movements`, {
-      params: { limit },
-    });
+  /** Movement ledger for a product — local mirror when local mode is
+   *  active (OFFLINE 3), else the server endpoint. */
+  const fetchMovements = useCallback(
+    async (productId: number, limit = 20): Promise<MovementListResponse> => {
+      if (isLocalModeActive()) {
+        const biz = await localBusinessId(api);
+        const db = getLocalDb();
+        if (!db) throw new ApiError('Local data layer unavailable.');
+        const rows = await db.stockMovements({ business_id: biz, product_id: productId });
+        const items: StockMovement[] = rows.map((r) => ({
+          id: Number(r.id),
+          product_id: Number(r.product_id),
+          change: Number(r.change),
+          reason: String(r.reason) as StockMovement['reason'],
+          note: (r.note as string | null) ?? null,
+          order_id: r.order_id != null ? Number(r.order_id) : null,
+          actor: null,
+          created_at: String(r.created_at ?? ''),
+        }));
+        items.sort((a, b) => b.id - a.id);
+        return { items: items.slice(0, limit), total: items.length, page: 1, limit };
+      }
+      const { data } = await api.get<MovementListResponse>(`/products/${productId}/movements`, {
+        params: { limit },
+      });
+      return data;
+    },
+    [api],
+  );
 
   return {
     summary,

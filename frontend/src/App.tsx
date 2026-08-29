@@ -15,6 +15,8 @@ import { coopAuthAppearance } from './auth/appearance';
 import { CoopOfflineBanner } from './auth';
 import { AppShell } from './components/layout';
 import { CoopMark } from './components/brand/CoopLogo';
+import { startSyncEngine } from './sync/engine';
+import { isLocalAvailable } from './sync/localDb';
 
 // Route-level code splitting (Stage 2.4 performance QA): each module loads
 // on demand instead of shipping everything in one initial bundle.
@@ -309,6 +311,20 @@ const RootGate: React.FC = () => {
 // Stage 1). Business pages own their data; the shell owns navigation,
 // search slots and the account menu (logout lives in the TopBar menu).
 // ---------------------------------------------------------------------------
+/**
+ * OFFLINE 3 — starts the sync engine (initial pull → mirror ready →
+ * local reads; push on startup / reconnect / interval / manual). No-op in
+ * a plain browser (no local data layer). Stopped on sign-out (unmount).
+ */
+const SyncEngineRunner: React.FC = () => {
+  const api = useApiClient();
+  useEffect(() => {
+    if (!isLocalAvailable()) return undefined;
+    return startSyncEngine(api);
+  }, [api]);
+  return null;
+};
+
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -330,6 +346,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         void handleLogout();
       }}
     >
+      <SyncEngineRunner />
       {children}
     </AppShell>
   );

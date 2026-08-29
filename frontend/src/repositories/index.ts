@@ -14,6 +14,7 @@ export {
   isLocalModeActive,
   isLocalMirrorReady,
   setLocalMirrorReady,
+  useLocalModeActivated,
 } from './localMode';
 export { makeCustomerRepo, type CustomerRepo, type CustomerValues } from './customers';
 export { makeProductRepo, type ProductRepo, type ProductValues } from './products';

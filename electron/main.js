@@ -1,6 +1,7 @@
 const { app, BrowserWindow, session, ipcMain, net } = require('electron');
 const path = require('path');
 const { createDataLayer, defaultDbPath } = require('./db');
+const { applyPull, markPushOutcome, getCursor } = require('./sync');
 
 // ---------------------------------------------------------------------------
 // Content Security Policy for the Co-op desktop app.
@@ -79,6 +80,9 @@ function createWindow () {
 
   // Show only once the first paint is ready (no blank-frame flicker).
   win.once('ready-to-show', () => win.show());
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null;
+  });
 
   // Use an absolute path relative to this script (frontend/dist/index.html).
   const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
@@ -94,38 +98,92 @@ function createWindow () {
 // ---------------------------------------------------------------------------
 let dataLayer = null;
 let online = true;
+// OFFLINE 3 sync state. The ENGINE (pull/push cycle) runs in the renderer —
+// that is where the Clerk-authenticated API client lives — main only owns
+// the mirror (SQLite ingestion), the queue bookkeeping, and this state.
+let mirrorReady = false;
+let syncing = false;
+let lastSyncAt = null;
 
-function dbHandlers() {
+function syncStatus() {
+  return {
+    online,
+    pending: dataLayer.queue.countPending(),
+    syncing,
+    mirrorReady,
+    lastSyncAt,
+  };
+}
+
+function broadcastSync(win) {
+  if (win && !win.isDestroyed()) win.webContents.send('coop:sync', syncStatus());
+}
+
+function dbHandlers(win) {
   return {
     businessEnsure: (a) => dataLayer.business.ensure(a),
+    businessGet: (id) => dataLayer.business.get(id),
     customerCreate: (a) => dataLayer.customers.create(a.business_id, a.data),
     customerUpdate: (a) => dataLayer.customers.update(a.id, a.data),
     customerDelete: (id) => dataLayer.customers.softDelete(id),
     customerGet: (id) => dataLayer.customers.get(id),
-    customerList: (bizId) => dataLayer.customers.list(bizId),
+    customerList: (a) => dataLayer.customers.list(a.business_id, a.opts || {}),
     productCreate: (a) => dataLayer.products.create(a.business_id, a.data),
     productUpdate: (a) => dataLayer.products.update(a.id, a.data),
     productDelete: (id) => dataLayer.products.softDelete(id),
     productGet: (id) => dataLayer.products.get(id),
-    productList: (bizId) => dataLayer.products.list(bizId),
+    productList: (a) => dataLayer.products.list(a.business_id, a.opts || {}),
     orderCreate: (a) => dataLayer.orders.create(a.business_id, a.data),
     orderSetStatus: (a) => dataLayer.orders.setStatus(a.business_id, a.order_id, a.status),
     orderGet: (id) => dataLayer.orders.get(id),
-    orderList: (bizId) => dataLayer.orders.list(bizId),
+    orderList: (a) => dataLayer.orders.list(a.business_id, a.opts || {}),
+    orderListDetailed: (a) => dataLayer.orders.listDetailed(a.business_id, a.opts || {}),
+    orderItemsByOrder: (a) => dataLayer.orders.itemsByOrder(a.business_id, a.opts || {}),
     stockAdjust: (a) => dataLayer.stock.adjust(a.business_id, a.product_id, a.change, a.reason, a.opts || {}),
     stockMovements: (a) => dataLayer.stock.movements(a.business_id, a.product_id || null),
-    syncStatus: () => ({
-      online,
-      pending: dataLayer.queue.countPending(),
-      // The push/pull engine lands in OFFLINE 3; until then syncing is idle.
-      syncing: false,
-    }),
+    syncStatus: () => syncStatus(),
+    // --- OFFLINE 3 sync engine surface (transport lives in the renderer) ---
+    // Failed ops re-arm here: each push attempt retries them (the queue's
+    // contract). A permanently refused op (e.g. an invalid transition) stays
+    // visible as "needs attention" instead of vanishing.
+    syncPendingOps: () => {
+      dataLayer.queue.retryFailed();
+      return dataLayer.queue
+        .pending()
+        .slice(0, 200)
+        .map((o) => ({ entity: o.entity, client_id: o.client_id, operation: o.operation, payload: o.payload }));
+    },
+    syncApplyPushOutcome: (result) => {
+      const out = markPushOutcome(dataLayer, result);
+      if (out.synced || out.failed) {
+        lastSyncAt = new Date().toISOString();
+        broadcastSync(win);
+      }
+      return out;
+    },
+    syncIngestMirror: (payload) => {
+      // since == null -> full pull (verify counts); else delta (per-row).
+      const res = applyPull(dataLayer, payload, { full: payload.since == null });
+      mirrorReady = true;
+      lastSyncAt = new Date().toISOString();
+      broadcastSync(win);
+      return res;
+    },
+    syncPullCursor: () => getCursor(dataLayer.db),
+    syncPendingOrderIds: () => dataLayer.queue.pendingOrderIds(),
+    syncSetSyncing: (b) => {
+      syncing = !!b;
+      broadcastSync(win);
+      return syncing;
+    },
   };
 }
 
+let mainWindow = null;
+
 function registerDataLayerIpc() {
   ipcMain.handle('coop:db', (event, { method, arg }) => {
-    const handlers = dbHandlers();
+    const handlers = dbHandlers(mainWindow);
     if (typeof method !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, method)) {
       throw new Error(`Blocked non-allow-listed data-layer method: ${method}`);
     }
@@ -133,11 +191,15 @@ function registerDataLayerIpc() {
   });
 }
 
-// Connectivity detection (the engine that consumes this is OFFLINE 3).
+// Connectivity detection; the renderer's sync engine (OFFLINE 3) reacts to
+// these events, and the status broadcast keeps the visible pill fresh.
 function watchConnectivity(win) {
   const update = () => {
     online = net.isOnline();
-    if (win && !win.isDestroyed()) win.webContents.send('coop:net', { online });
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('coop:net', { online });
+      broadcastSync(win);
+    }
   };
   net.on('online', update);
   net.on('offline', update);
@@ -148,10 +210,12 @@ app.whenReady().then(() => {
   dataLayer = createDataLayer(defaultDbPath(app.getPath('userData')));
   registerDataLayerIpc();
   const win = createWindow();
+  mainWindow = win;
   watchConnectivity(win);
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       const w = createWindow();
+      mainWindow = w;
       watchConnectivity(w);
     }
   });

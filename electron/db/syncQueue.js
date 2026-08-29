@@ -61,6 +61,26 @@ class SyncQueue {
       .map((r) => ({ ...r, payload: JSON.parse(r.payload) }));
   }
 
+  /** Local order ids with a pending/failed order op (the UI's "Pending
+   *  sync" chip — point #8: offline writes are visible as pending). */
+  pendingOrderIds({ business_id } = {}) {
+    const rows =
+      business_id != null
+        ? this.db
+            .prepare(
+              `SELECT DISTINCT entity_id FROM sync_queue
+                WHERE status IN ('pending','failed') AND entity='order' AND business_id=?`,
+            )
+            .all(business_id)
+        : this.db
+            .prepare(
+              `SELECT DISTINCT entity_id FROM sync_queue
+                WHERE status IN ('pending','failed') AND entity='order'`,
+            )
+            .all();
+    return rows.map((r) => Number(r.entity_id));
+  }
+
   countPending({ business_id } = {}) {
     const row =
       business_id != null

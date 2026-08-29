@@ -2,11 +2,19 @@
  * Orders data hook — same architecture as Products/Customers (Task 7).
  * Stock deduction, transition rules and rollback live on the server; this
  * hook only transports data through the Clerk-authenticated API client.
+ *
+ * OFFLINE 3: when local mode is active (desktop + populated mirror), READS
+ * come from the local SQLite mirror via the data layer — the repository
+ * decides (ADR-002). The local path mirrors the server list semantics
+ * exactly (search: customer name or order id; status filter; id desc;
+ * same page envelope) so the page is unchanged either way.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { makeOrderRepo } from '../../repositories';
+import { makeOrderRepo, localBusinessId, isLocalModeActive, useLocalModeActivated } from '../../repositories';
+import { getLocalDb, getPendingOrderIds } from '../../sync/localDb';
+import { subscribe } from '../../sync/syncStatus';
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -61,6 +69,47 @@ export const STATUS_META: Record<OrderStatus, { label: string }> = {
   cancelled: { label: 'Cancelled' },
 };
 
+/**
+ * The server's order status machine (backend ALLOWED_ORDER_TRANSITIONS),
+ * mirrored for local reads — same legal next statuses, same sorted order.
+ */
+export const ALLOWED_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ['cancelled', 'confirmed'],
+  confirmed: ['cancelled', 'shipped'],
+  shipped: ['delivered'],
+  delivered: [],
+  cancelled: [],
+};
+
+/** Map local mirror rows to the server's OrderOut shape (local read path). */
+function localOrdersResponse(rows: Array<Record<string, unknown>>, allItems: Array<Record<string, unknown>>, productName: (id: number) => string | null) {
+  const itemsByOrder = new Map<number, OrderItem[]>();
+  for (const it of allItems) {
+    const oid = Number(it.order_id);
+    const list = itemsByOrder.get(oid) ?? [];
+    list.push({
+      id: Number(it.id),
+      product_id: Number(it.product_id),
+      product_name: productName(Number(it.product_id)),
+      quantity: Number(it.quantity),
+      unit_price: Number(it.unit_price),
+      total_price: Number(it.total_price),
+    });
+    itemsByOrder.set(oid, list);
+  }
+  return rows.map((o) => ({
+    id: Number(o.id),
+    customer_id: Number(o.customer_id),
+    customer: o.customer_name ? { full_name: String(o.customer_name) } : null,
+    status: String(o.status) as OrderStatus,
+    allowed_transitions: ALLOWED_ORDER_TRANSITIONS[String(o.status) as OrderStatus] ?? [],
+    total_amount: Number(o.total_amount ?? 0),
+    order_date: String(o.order_date ?? ''),
+    created_at: String(o.created_at ?? ''),
+    items: itemsByOrder.get(Number(o.id)) ?? [],
+  })) as Order[];
+}
+
 export function useOrders() {
   const api = useApiClient();
   // OFFLINE 2: order writes go through the repository (local-first on desktop,
@@ -81,12 +130,53 @@ export function useOrders() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  // "Pending sync" chips: local orders whose push op hasn't landed yet.
+  const [pendingSyncIds, setPendingSyncIds] = useState<number[]>([]);
+
+  /** Local read path (OFFLINE 3): the SQLite mirror, server semantics. */
+  const loadLocal = useCallback(
+    async (requestedPage: number, query: string, status: OrderStatus | 'all') => {
+      const biz = await localBusinessId(api);
+      const db = getLocalDb();
+      if (!db) throw new ApiError('Local data layer unavailable.');
+      const [rows, allItems, products, pending] = await Promise.all([
+        db.orderListDetailed({ business_id: biz, opts: { limit: 10000 } }),
+        db.orderItemsByOrder({ business_id: biz, opts: { limit: 10000 } }),
+        db.productList({ business_id: biz, opts: { limit: 10000 } }),
+        getPendingOrderIds(),
+      ]);
+      const nameById = new Map<number, string>(products.map((p) => [Number(p.id), String(p.name ?? '')]));
+      let orders = localOrdersResponse(rows, allItems, (id) => nameById.get(id) ?? null);
+
+      if (status !== 'all') orders = orders.filter((o) => o.status === status);
+      const q = query.trim();
+      if (q) {
+        const ql = q.toLowerCase();
+        const asId = /^\d+$/.test(q) ? Number(q) : null;
+        orders = orders.filter(
+          (o) => (o.customer?.full_name.toLowerCase().includes(ql) ?? false) || (asId !== null && o.id === asId),
+        );
+      }
+      orders.sort((a, b) => b.id - a.id); // server list order: id desc
+
+      setTotal(orders.length);
+      const start = (requestedPage - 1) * ORDERS_PAGE_SIZE;
+      setItems(orders.slice(start, start + ORDERS_PAGE_SIZE));
+      setPage(requestedPage);
+      setPendingSyncIds(pending);
+    },
+    [api],
+  );
 
   const load = useCallback(
     async (requestedPage: number, query: string, status: OrderStatus | 'all') => {
       setLoading(true);
       setError(null);
       try {
+        if (isLocalModeActive()) {
+          await loadLocal(requestedPage, query, status);
+          return;
+        }
         const { data } = await api.get<OrderListResponse>('/orders', {
           params: {
             page: requestedPage,
@@ -98,6 +188,7 @@ export function useOrders() {
         setItems(data.items);
         setTotal(data.total);
         setPage(data.page);
+        setPendingSyncIds([]);
       } catch (e) {
         setError(
           e instanceof ApiError ? e : new ApiError('Unable to reach the Co-op API.'),
@@ -106,7 +197,7 @@ export function useOrders() {
         setLoading(false);
       }
     },
-    [api],
+    [api, loadLocal],
   );
 
   // Debounced search/filter changes return to page 1.
@@ -117,6 +208,21 @@ export function useOrders() {
     );
     return () => clearTimeout(timer);
   }, [search, statusFilter, load]);
+
+  // The mirror became ready (initial pull): a page mounted before that must
+  // stop serving HTTP reads and reload from the local mirror.
+  useLocalModeActivated(() => {
+    void load(page, search.trim(), statusFilter);
+  });
+
+  // Keep the "Pending sync" chips live: when the sync cycle drains the
+  // queue, the chips vanish without a page reload.
+  useEffect(() => {
+    return subscribe(() => {
+      if (!isLocalModeActive()) return;
+      void getPendingOrderIds().then(setPendingSyncIds).catch(() => undefined);
+    });
+  }, []);
 
   // Local-first order writes (ADR-002): create + status go to the local layer
   // (ULID + stock operation + queue) on desktop, else the existing HTTP call.
@@ -140,6 +246,7 @@ export function useOrders() {
     setStatusFilter,
     loading,
     error,
+    pendingSyncIds,
     reload: () => load(page, search.trim(), statusFilter),
     goToPage: (p: number) => load(p, search.trim(), statusFilter),
     createOrder,

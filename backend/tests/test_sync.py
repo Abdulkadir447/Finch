@@ -233,3 +233,77 @@ async def test_sync_pull_delta_filters_by_since(api):
     future = (await api.client.get("/sync/pull", params={"since": "2999-01-01T00:00:00"})).json()
     assert future["counts"]["products"] == 0
     assert future["counts"]["customers"] == 0
+
+# ---------------------------------------------------------------------------
+# Order status changes over sync (offline status changes, v1 boundary)
+# ---------------------------------------------------------------------------
+
+def _order(cid, cust_cid, total=200.0):
+    return {"entity": "order", "client_id": cid, "operation": "create",
+            "payload": {"customer_client_id": cust_cid, "status": "pending",
+                        "total_amount": total, "order_date": "2026-08-28T12:00:00"}}
+
+
+async def test_order_status_update_applies_transition(session_factory):
+    """An offline status change syncs as an order 'update' op: the transition
+    is validated against the shared machine, and a retried batch is a no-op
+    (no double apply, no double stock restore)."""
+    from backend.models import Order, StockMovement
+
+    async with session_factory() as db:
+        biz_id = 997
+        r = await sync.apply_push(db, biz_id, [
+            _cust("CUST1"), _prod("PROD1", stock=10), _order("ORD1", "CUST1"),
+            # Cancellation: the order update + its stock restore (operation, rule 5).
+            {"entity": "order", "client_id": "ORD1", "operation": "update",
+             "payload": {"status": "cancelled"}},
+            _move("MOVE-CANCEL", "PROD1", change=2, reason="order_cancelled"),
+        ])
+        assert r["applied"] == 5, f"expected 5 applied, errors={r['errors']}"
+
+        order = (await db.execute(select(Order).where(Order.business_id == biz_id))).scalars().first()
+        assert order.status.value == "cancelled"
+
+        prod = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        assert prod.current_stock == 12  # 10 + restore of 2, applied once
+
+        # Retry the ENTIRE batch (crash + reconnect): nothing re-applies.
+        r2 = await sync.apply_push(db, biz_id, [
+            _cust("CUST1"), _prod("PROD1", stock=10), _order("ORD1", "CUST1"),
+            {"entity": "order", "client_id": "ORD1", "operation": "update",
+             "payload": {"status": "cancelled"}},
+            _move("MOVE-CANCEL", "PROD1", change=2, reason="order_cancelled"),
+        ])
+        assert r2["applied"] == 0, f"retried batch must be a no-op, got {r2}"
+        assert r2["errors"] == []
+        await db.refresh(prod)
+        assert prod.current_stock == 12, "the restore must not apply twice"
+        await db.commit()
+
+
+async def test_order_update_invalid_transition_is_rejected(session_factory):
+    """pending -> delivered is not a legal transition: the op is refused with
+    a reason (visible as needs-attention), the order is untouched."""
+    from backend.models import Order
+
+    async with session_factory() as db:
+        biz_id = 998
+        r = await sync.apply_push(db, biz_id, [
+            _cust("CUST1"),
+            {"entity": "order", "client_id": "ORD1", "operation": "update",
+             "payload": {"status": "delivered"}},
+        ])
+        # The update op errors (order has no row on the server yet either).
+        assert any(e["client_id"] == "ORD1" for e in r["errors"])
+
+        # Now create the order and try the same illegal jump: still refused,
+        # and the order stays 'pending'.
+        r2 = await sync.apply_push(db, biz_id, [
+            _order("ORD1", "CUST1"),
+            {"entity": "order", "client_id": "ORD1", "operation": "update",
+             "payload": {"status": "delivered"}},
+        ])
+        assert any(e["client_id"] == "ORD1" and "cannot transition" in e["error"] for e in r2["errors"])
+        order = (await db.execute(select(Order).where(Order.business_id == biz_id))).scalars().first()
+        assert order.status.value == "pending"
+        await db.commit()

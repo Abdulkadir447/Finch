@@ -35,7 +35,7 @@ from .exports import export_report, ExportError
 from .notifications import build_daily_summary
 from .notifications.schemas import DailySummary as DailySummarySchema
 from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
-from .sync import apply_push
+from .sync import ALLOWED_ORDER_TRANSITIONS, apply_push
 from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
@@ -648,15 +648,6 @@ async def delete_customer(
 
 # Legal status transitions (MVP): shipped cannot be cancelled; delivered and
 # cancelled are terminal.
-ALLOWED_ORDER_TRANSITIONS: dict[str, set[str]] = {
-    "pending": {"confirmed", "cancelled"},
-    "confirmed": {"shipped", "cancelled"},
-    "shipped": {"delivered"},
-    "delivered": set(),
-    "cancelled": set(),
-}
-
-
 async def _load_order(id: int, business: Business, db: AsyncSession) -> Order:
     """Tenant-scoped ORM fetch with relationships; 404 when absent."""
     stmt = (

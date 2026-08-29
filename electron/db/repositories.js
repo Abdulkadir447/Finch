@@ -251,6 +251,11 @@ class OrderRepository {
     const order_client_id = ulid();
     return this.db.tx(() => {
       const total = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
+      // The PUSH payload must carry CLIENT ids for cross-references (the
+      // server resolves customer_client_id -> server id; ADR-002). The local
+      // row itself keeps local integer ids for the local UI.
+      const customer = this.db.prepare(`SELECT client_id FROM customers WHERE id=?`).get(customer_id);
+      if (!customer) throw new Error(`customer ${customer_id} is not in the local database`);
       const r = this.db
         .prepare(
           `INSERT INTO orders (client_id, business_id, customer_id, status, total_amount, order_date, updated_at)
@@ -268,16 +273,30 @@ class OrderRepository {
           )
           .run(line_client_id, business_id, order_id, it.product_id, it.quantity, it.unit_price, it.quantity * it.unit_price);
         const item = this.db.prepare(`SELECT * FROM order_items WHERE client_id=?`).get(line_client_id);
-        this.queue.enqueue({ business_id, entity: 'order_item', entity_id: item.id, client_id: line_client_id, operation: 'create', payload: item });
+        const product = this.db.prepare(`SELECT client_id FROM products WHERE id=?`).get(it.product_id);
+        if (!product) throw new Error(`product ${it.product_id} is not in the local database`);
+        this.queue.enqueue({
+          business_id, entity: 'order_item', entity_id: item.id, client_id: line_client_id, operation: 'create',
+          // Push shape: references by client_id (sync.py _apply_order_item).
+          payload: {
+            ...item,
+            order_client_id,
+            product_client_id: product.client_id,
+          },
+        });
         // Deduct stock (operation-based) — mirrors the server's create-time deduction.
-        const product = this.products.get(it.product_id);
-        if (product) {
+        const prodRow = this.products.get(it.product_id);
+        if (prodRow) {
           this.stock._adjustInline(business_id, it.product_id, -it.quantity, 'order', { order_id });
         }
       }
 
       const order = this.get(order_id);
-      this.queue.enqueue({ business_id, entity: 'order', entity_id: order_id, client_id: order_client_id, operation: 'create', payload: order });
+      this.queue.enqueue({
+        business_id, entity: 'order', entity_id: order_id, client_id: order_client_id, operation: 'create',
+        // Push shape: the server resolves customer_client_id (sync.py _apply_order).
+        payload: { ...order, customer_client_id: customer.client_id },
+      });
       return order;
     });
   }
@@ -313,6 +332,30 @@ class OrderRepository {
   list(business_id, { limit = 200 } = {}) {
     return this.db
       .prepare(`SELECT * FROM orders WHERE business_id=? AND deleted_at IS NULL ORDER BY id DESC LIMIT ?`)
+      .all(business_id, limit);
+  }
+
+  /**
+   * Orders with their customer's name (local read path, OFFLINE 3): the
+   * renderer filters/sorts/paginates these in memory, mirroring the server
+   * list semantics (search on customer name or order id; order id desc).
+   */
+  listDetailed(business_id, { limit = 10000 } = {}) {
+    return this.db
+      .prepare(
+        `SELECT o.*, c.full_name AS customer_name
+           FROM orders o
+           LEFT JOIN customers c ON c.id = o.customer_id
+          WHERE o.business_id=? AND o.deleted_at IS NULL
+          ORDER BY o.id DESC LIMIT ?`,
+      )
+      .all(business_id, limit);
+  }
+
+  /** All line items of the business's orders (grouped in the renderer). */
+  itemsByOrder(business_id, { limit = 10000 } = {}) {
+    return this.db
+      .prepare(`SELECT * FROM order_items WHERE business_id=? ORDER BY id ASC LIMIT ?`)
       .all(business_id, limit);
   }
 }

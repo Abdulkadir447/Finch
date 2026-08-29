@@ -1,12 +1,13 @@
 /**
- * Co-op sync — local data-layer access (OFFLINE 1/2).
+ * Co-op sync — local data-layer access (OFFLINE 1/2/3).
  *
- * A typed wrapper over the Electron IPC bridge (`window.coop.db`). In a plain
+ * A typed wrapper over the Electron IPC bridge (`window.coop`). In a plain
  * browser this is absent, so `isLocalAvailable()` is false and the app uses
- * the remote API as it does today. OFFLINE 2 routes the UI's core operations
- * through these repositories; until then this is the seam.
+ * the remote API as it does today. OFFLINE 3 runs the sync engine in the
+ * renderer (where the Clerk-authenticated API client lives) and routes its
+ * mirror/queue operations through the bridge below.
  */
-import type { SyncOp } from './types';
+import type { PullPayload, SyncPushResult, SyncOp } from './types';
 
 export interface LocalRow {
   id: number;
@@ -15,22 +16,32 @@ export interface LocalRow {
   [key: string]: unknown;
 }
 
+export interface LocalListQuery {
+  business_id: number;
+  opts?: { limit?: number };
+}
+
 export interface LocalDb {
   businessEnsure(b: { client_id: string; name: string; currency?: string }): Promise<LocalRow>;
+  businessGet(id: number): Promise<LocalRow | null>;
   customerCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
   customerUpdate(a: { id: number; data: object }): Promise<LocalRow>;
   customerDelete(id: number): Promise<LocalRow>;
   customerGet(id: number): Promise<LocalRow | null>;
-  customerList(bizId: number): Promise<LocalRow[]>;
+  customerList(a: LocalListQuery): Promise<LocalRow[]>;
   productCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
   productUpdate(a: { id: number; data: object }): Promise<LocalRow>;
   productDelete(id: number): Promise<LocalRow>;
-  productGet(id: number): Promise<LocalRow | null>;
-  productList(bizId: number): Promise<LocalRow[]>;
+  productGet(id: number): Promise<LocalRow>;
+  productList(a: LocalListQuery): Promise<LocalRow[]>;
   orderCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
   orderSetStatus(a: { business_id: number; order_id: number; status: string }): Promise<LocalRow>;
   orderGet(id: number): Promise<LocalRow | null>;
-  orderList(bizId: number): Promise<LocalRow[]>;
+  orderList(a: LocalListQuery): Promise<LocalRow[]>;
+  /** Orders joined with their customer's name (local read path). */
+  orderListDetailed(a: LocalListQuery): Promise<Array<LocalRow & { customer_name: string | null }>>;
+  /** All line items of the business's orders (grouped in the caller). */
+  orderItemsByOrder(a: LocalListQuery): Promise<LocalRow[]>;
   stockAdjust(a: {
     business_id: number;
     product_id: number;
@@ -41,9 +52,26 @@ export interface LocalDb {
   stockMovements(a: { business_id: number; product_id?: number | null }): Promise<LocalRow[]>;
 }
 
+export interface LocalSyncStatus {
+  online: boolean;
+  pending: number;
+  syncing: boolean;
+  mirrorReady: boolean;
+  lastSyncAt: string | null;
+}
+
 interface CoopBridge {
   db?: LocalDb;
-  sync?: { status: () => Promise<{ online: boolean; pending: number; syncing: boolean }> };
+  sync?: {
+    status: () => Promise<LocalSyncStatus>;
+    pendingOps: () => Promise<SyncOp[]>;
+    applyPushOutcome: (result: SyncPushResult) => Promise<{ synced: number; failed: number }>;
+    ingestMirror: (payload: PullPayload) => Promise<{ business_id: number; cursor: string; applied: Record<string, number> }>;
+    pullCursor: () => Promise<string | null>;
+    pendingOrderIds: () => Promise<number[]>;
+    setSyncing: (b: boolean) => Promise<boolean>;
+    onStatus?: (cb: (s: LocalSyncStatus) => void) => void;
+  };
 }
 
 function getCoop(): CoopBridge | undefined {
@@ -66,4 +94,47 @@ export async function getPendingCount(): Promise<number> {
   return s?.pending ?? 0;
 }
 
-export type { SyncOp };
+/** Main-process sync state (authoritative for pending/mirror/syncing). */
+export function getSyncStatus(): Promise<LocalSyncStatus | null> {
+  return getCoop()?.sync?.status().catch(() => null) ?? Promise.resolve(null);
+}
+
+/** The next push batch (pending ops, oldest first, capped at 200). */
+export async function getPendingOps(): Promise<SyncOp[]> {
+  return (await getCoop()?.sync?.pendingOps().catch(() => null)) ?? [];
+}
+
+/** Mark the queue after a /sync/push response (synced / failed). */
+export async function applyPushOutcome(result: SyncPushResult): Promise<void> {
+  await getCoop()?.sync?.applyPushOutcome(result).catch(() => undefined);
+}
+
+/** Upsert a /sync/pull payload into the local mirror (main process). */
+export async function ingestMirror(payload: PullPayload): Promise<void> {
+  await getCoop()?.sync?.ingestMirror(payload);
+}
+
+/** The last stored pull cursor (null before the first successful pull). */
+export async function getPullCursor(): Promise<string | null> {
+  return (await getCoop()?.sync?.pullCursor().catch(() => null)) ?? null;
+}
+
+/** Local order ids with pending/failed order ops ("Pending sync" chips). */
+export async function getPendingOrderIds(): Promise<number[]> {
+  return (await getCoop()?.sync?.pendingOrderIds().catch(() => null)) ?? [];
+}
+
+/** Tell main a pull/push cycle is in flight (drives the "Syncing…" pill). */
+export async function setSyncing(b: boolean): Promise<void> {
+  await getCoop()?.sync?.setSyncing(b).catch(() => undefined);
+}
+
+/** Subscribe to main-process status broadcasts (mirror ready, last sync). */
+export function onSyncStatus(cb: (s: LocalSyncStatus) => void): () => void {
+  const on = getCoop()?.sync?.onStatus;
+  if (!on) return () => undefined;
+  on(cb);
+  return () => undefined; // ipcRenderer.on has no symmetric off in this bridge; single listener per app
+}
+
+export type { SyncOp, PullPayload, SyncPushResult };

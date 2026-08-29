@@ -110,6 +110,9 @@ const CreateOrderPage: React.FC = () => {
   const [paymentMethod] = useState<'invoice' | 'card'>('invoice');
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
   const [createdTotal, setCreatedTotal] = useState(0);
+  // True when the created order went to the local SQLite mirror (offline /
+  // local-first) — the success screen then says so, honestly.
+  const [localCreated, setLocalCreated] = useState(false);
   const [failureMessage, setFailureMessage] = useState('');
   const [aiDraftNote, setAiDraftNote] = useState<string | null>(null);
 
@@ -288,6 +291,7 @@ const CreateOrderPage: React.FC = () => {
       };
       setCreatedOrderId(data.id);
       setCreatedTotal(data.total_amount ?? grandTotal);
+      setLocalCreated(ordersRepo.isLocal); // OFFLINE 3: honest "saved on device" state
       setStep('success');
     } catch (e) {
       setFailureMessage(e instanceof ApiError ? e.message : 'The order could not be created.');
@@ -391,7 +395,9 @@ const CreateOrderPage: React.FC = () => {
           </h2>
           <p style={{ margin: '10px 0 0', ...type.bodyCompact, color: colors.onSurfaceVariant }}>
             {success
-              ? 'Your order has been created and is queued for fulfillment.'
+              ? localCreated
+                ? 'Your order is saved on this device and will appear in your list. It uploads to the cloud automatically when Co-op is online — until then it shows “Pending sync”.'
+                : 'Your order has been created and is queued for fulfillment.'
               : 'We could not create your order. Your draft is kept — fix the issue and try again.'}
           </p>
 

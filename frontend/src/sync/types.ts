@@ -38,8 +38,36 @@ export interface SyncStatus {
   localAvailable: boolean;
   /** Offline operations awaiting push. */
   pending: number;
-  /** True while a push is actively in flight. */
+  /** True while a pull/push cycle is actively in flight. */
   syncing: boolean;
+  /** True once the initial pull has populated the local mirror. Only when
+   *  this holds (desktop + mirror ready) do reads come from SQLite. */
+  mirrorReady: boolean;
+  /** ISO timestamp of the last successful pull/push (null until first sync). */
+  lastSyncAt: string | null;
+}
+
+/**
+ * The /sync/pull mirror payload (server: backend/pull.py). Full pull (since
+ * is null) or delta (since is the last cursor). The renderer downloads it
+ * and hands it to the main-process mirror (window.coop.sync.ingestMirror).
+ */
+export interface PullPayload {
+  cursor: string;
+  since: string | null;
+  business: { id: number; name: string; currency: string; updated_at: string | null };
+  customers: Array<Record<string, unknown> & { id: number; client_id: string | null }>;
+  products: Array<Record<string, unknown> & { id: number; client_id: string | null }>;
+  orders: Array<Record<string, unknown> & { id: number; client_id: string | null }>;
+  order_items: Array<Record<string, unknown> & { id: number; client_id: string | null }>;
+  stock_movements: Array<Record<string, unknown> & { id: number; client_id: string | null }>;
+  counts: {
+    customers: number;
+    products: number;
+    orders: number;
+    order_items: number;
+    stock_movements: number;
+  };
 }
 
 /** The result the server returns for a push batch (mirrors /sync/push). */

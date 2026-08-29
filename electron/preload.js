@@ -25,26 +25,41 @@ contextBridge.exposeInMainWorld('coop', {
   // Local-first core data operations (OFFLINE 1/2 data layer).
   db: {
     businessEnsure: (b) => call('businessEnsure', b),
+    businessGet: (id) => call('businessGet', id),
     customerCreate: (a) => call('customerCreate', a),
     customerUpdate: (a) => call('customerUpdate', a),
     customerDelete: (id) => call('customerDelete', id),
     customerGet: (id) => call('customerGet', id),
-    customerList: (bizId) => call('customerList', bizId),
+    customerList: (a) => call('customerList', a),
     productCreate: (a) => call('productCreate', a),
     productUpdate: (a) => call('productUpdate', a),
     productDelete: (id) => call('productDelete', id),
     productGet: (id) => call('productGet', id),
-    productList: (bizId) => call('productList', bizId),
+    productList: (a) => call('productList', a),
     orderCreate: (a) => call('orderCreate', a),
     orderSetStatus: (a) => call('orderSetStatus', a),
     orderGet: (id) => call('orderGet', id),
-    orderList: (bizId) => call('orderList', bizId),
+    orderList: (a) => call('orderList', a),
+    orderListDetailed: (a) => call('orderListDetailed', a),
+    orderItemsByOrder: (a) => call('orderItemsByOrder', a),
     stockAdjust: (a) => call('stockAdjust', a),
     stockMovements: (a) => call('stockMovements', a),
   },
-  // Sync visibility (the engine itself lands in OFFLINE 3).
+  // Sync engine surface (OFFLINE 3). The renderer runs the pull/push cycle
+  // (it holds the Clerk-authenticated API client); these cross the bridge
+  // to the main-process mirror + queue.
   sync: {
     status: () => call('syncStatus', null),
+    pendingOps: () => call('syncPendingOps', null),
+    applyPushOutcome: (result) => call('syncApplyPushOutcome', result),
+    ingestMirror: (payload) => call('syncIngestMirror', payload),
+    pullCursor: () => call('syncPullCursor', null),
+    pendingOrderIds: () => call('syncPendingOrderIds', null),
+    setSyncing: (b) => call('syncSetSyncing', b),
+    // Full sync status pushed from main (mirror ready, pending, last sync).
+    onStatus: (cb) => {
+      ipcRenderer.on('coop:sync', (_e, data) => cb(data));
+    },
   },
   // Authoritative connectivity (Electron net.isOnline) pushed from main.
   onNet: (cb) => {

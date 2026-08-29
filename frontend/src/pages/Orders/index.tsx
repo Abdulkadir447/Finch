@@ -16,6 +16,7 @@ import { CalendarOutlined, DownloadOutlined, PlusOutlined } from '@ant-design/ic
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { radius, type } from '../../theme';
+import { tint } from '../../theme/colors';
 import { useCoopTheme } from '../../theme-provider';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, orderNumber } from '../../lib/orderStatus';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -53,6 +54,7 @@ const OrdersPage: React.FC = () => {
     setStatusFilter,
     loading,
     error,
+    pendingSyncIds,
     reload,
     goToPage,
   } = useOrders();
@@ -300,7 +302,26 @@ const OrdersPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <span style={{ ...type.labelCaps, color: colors.outline, fontSize: 11 }}>{orderNumber(o.id)}</span>
-                    <CoopBadge variant={ORDER_STATUS_VARIANT[o.status]}>{ORDER_STATUS_LABEL[o.status]}</CoopBadge>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {pendingSyncIds.includes(o.id) && (
+                        <span
+                          role="status"
+                          title="Saved on this device — uploading when Co-op is online"
+                          style={{
+                            ...type.bodyCompact,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: colors.warning,
+                            background: tint(colors.warning, 0.14),
+                            padding: '2px 8px',
+                            borderRadius: 9999,
+                          }}
+                        >
+                          Pending sync
+                        </span>
+                      )}
+                      <CoopBadge variant={ORDER_STATUS_VARIANT[o.status]}>{ORDER_STATUS_LABEL[o.status]}</CoopBadge>
+                    </span>
                   </div>
                   <div style={{ ...type.titleMd, fontSize: 17, color: colors.onSurface, marginTop: 8 }}>
                     {o.customer?.full_name ?? '—'}

@@ -6,7 +6,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { makeProductRepo } from '../../repositories';
+import { makeProductRepo, localBusinessId, isLocalModeActive, useLocalModeActivated } from '../../repositories';
+import { getLocalDb } from '../../sync/localDb';
 
 export interface Product {
   id: number;
@@ -68,11 +69,57 @@ export function useProducts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
 
+  /** Local read path (OFFLINE 3): SQLite mirror, server list semantics
+   *  (search: name/sku/category; stock filter in/low/out; id desc). */
+  const loadLocal = useCallback(
+    async (requestedPage: number, query: string, filter: ProductStockFilter) => {
+      const biz = await localBusinessId(api);
+      const db = getLocalDb();
+      if (!db) throw new ApiError('Local data layer unavailable.');
+      const rows = await db.productList({ business_id: biz, opts: { limit: 10000 } });
+      const mapped: Product[] = rows.map((r) => ({
+        id: Number(r.id),
+        sku: String(r.sku ?? ''),
+        name: String(r.name ?? ''),
+        description: (r.description as string | null) ?? null,
+        category: (r.category as string | null) ?? null,
+        unit_price: Number(r.unit_price ?? 0),
+        cost_price: (r.cost_price as number | null) ?? null,
+        current_stock: Number(r.current_stock ?? 0),
+        reorder_level: Number(r.reorder_level ?? 0),
+        created_at: String(r.created_at ?? r.updated_at ?? ''),
+        updated_at: (r.updated_at as string | null) ?? null,
+      }));
+      let list = mapped;
+      if (filter === 'out') list = list.filter((p) => p.current_stock === 0);
+      else if (filter === 'low') list = list.filter((p) => p.current_stock > 0 && p.current_stock <= p.reorder_level);
+      const q = query.trim().toLowerCase();
+      if (q) {
+        list = list.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.sku.toLowerCase().includes(q) ||
+            (p.category ?? '').toLowerCase().includes(q),
+        );
+      }
+      list = [...list].sort((a, b) => b.id - a.id);
+      setTotal(list.length);
+      const start = (requestedPage - 1) * PRODUCTS_PAGE_SIZE;
+      setItems(list.slice(start, start + PRODUCTS_PAGE_SIZE));
+      setPage(requestedPage);
+    },
+    [api],
+  );
+
   const load = useCallback(
     async (requestedPage: number, query: string, filter: ProductStockFilter) => {
       setLoading(true);
       setError(null);
       try {
+        if (isLocalModeActive()) {
+          await loadLocal(requestedPage, query, filter);
+          return;
+        }
         const { data } = await api.get<ProductListResponse>('/products', {
           params: {
             page: requestedPage,
@@ -92,7 +139,7 @@ export function useProducts() {
         setLoading(false);
       }
     },
-    [api],
+    [api, loadLocal],
   );
 
   // Debounced search always returns to page 1.
@@ -100,6 +147,11 @@ export function useProducts() {
     const timer = setTimeout(() => load(1, search.trim(), stockFilter), search ? 350 : 0);
     return () => clearTimeout(timer);
   }, [search, stockFilter, load]);
+
+  // The mirror became ready (initial pull): reload from the local mirror.
+  useLocalModeActivated(() => {
+    void load(page, search.trim(), stockFilter);
+  });
 
   // Local-first mutations (ADR-002): write to SQLite + sync queue on desktop,
   // otherwise the existing HTTP call. Components await these and reload.

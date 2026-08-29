@@ -1,15 +1,19 @@
 /**
  * Co-op sync — status store (point #12: visible, never hidden).
  *
- * Combines connectivity + local-DB availability + pending count into a single
- * user-visible SyncStatus. A tiny observable store compatible with
- * React's useSyncExternalStore. The push engine (OFFLINE 3) will update
- * `syncing`/`pending` as it runs; until then pending is read from the local
- * queue and syncing stays false.
+ * Combines connectivity + local-DB availability + pending count + mirror
+ * readiness into a single user-visible SyncStatus. A tiny observable store
+ * compatible with React's useSyncExternalStore.
+ *
+ * OFFLINE 3: the store mirrors the main-process sync state (events from
+ * `coop:sync` + a light poll as a fallback) and flips the repository layer's
+ * local-mode gate — reads only come from SQLite once the initial pull has
+ * populated the mirror (`setLocalMirrorReady`), never before.
  */
 import { useSyncExternalStore } from 'react';
+import { setLocalMirrorReady } from '../repositories/localMode';
 import { getConnection, onConnectionChange } from './connectivity';
-import { getPendingCount, isLocalAvailable } from './localDb';
+import { getSyncStatus, isLocalAvailable, onSyncStatus } from './localDb';
 import type { SyncStatus, SyncStatusKind } from './types';
 
 let status: SyncStatus = initial();
@@ -26,6 +30,10 @@ function initial(): SyncStatus {
     localAvailable: local,
     pending: 0,
     syncing: false,
+    // Desktop: unknown until main reports (initial pull may already be done
+    // on a previous launch — main re-verifies on the first pull of this run).
+    mirrorReady: false,
+    lastSyncAt: null,
   };
 }
 
@@ -37,13 +45,35 @@ function kindFor(s: SyncStatus): SyncStatusKind {
 
 function set(next: SyncStatus) {
   next.kind = kindFor(next);
+  // The repository layer's gate: local-first reads only once the mirror is
+  // a populated pull — never before (ADR-002, OFFLINE 3 activation rule).
+  if (next.mirrorReady !== status.mirrorReady) setLocalMirrorReady(next.mirrorReady);
   status = next;
   for (const l of listeners) l();
 }
 
 async function refresh() {
-  const pending = isLocalAvailable() ? await getPendingCount() : 0;
-  set({ ...status, connection: getConnection(), pending, syncing: status.syncing });
+  if (!isLocalAvailable()) {
+    set({
+      ...status,
+      connection: getConnection(),
+      pending: 0,
+      syncing: false,
+      mirrorReady: false,
+    });
+    return;
+  }
+  // Main's status is authoritative for pending/syncing/mirrorReady; the
+  // engine (renderer) owns the cycle, main owns the mirror + queue state.
+  const s = await getSyncStatus();
+  set({
+    ...status,
+    connection: getConnection(),
+    pending: s?.pending ?? 0,
+    syncing: s?.syncing ?? false,
+    mirrorReady: s?.mirrorReady ?? false,
+    lastSyncAt: s?.lastSyncAt ?? null,
+  });
 }
 
 function start() {
@@ -51,8 +81,9 @@ function start() {
   started = true;
   void refresh();
   onConnectionChange(() => void refresh());
-  // Light poll while a local layer exists (the push engine will replace this
-  // with event-driven updates in OFFLINE 3).
+  onSyncStatus(() => void refresh());
+  // Light poll while a local layer exists (events are primary; the poll
+  // covers missed broadcasts, e.g. before the first subscribe).
   if (isLocalAvailable()) {
     polling = setInterval(() => void refresh(), 5000);
   }
@@ -63,6 +94,10 @@ export function subscribe(cb: () => void): () => void {
   listeners.push(cb);
   return () => {
     listeners = listeners.filter((l) => l !== cb);
+    if (listeners.length === 0 && polling) {
+      clearInterval(polling);
+      polling = null;
+    }
   };
 }
 

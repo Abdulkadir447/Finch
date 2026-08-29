@@ -15,7 +15,9 @@
  * OFFLINE 3 calls `setLocalMirrorReady(true)` once the initial pull has
  * populated the local DB and reads are local.
  */
+import { useEffect, useRef } from 'react';
 import { isLocalAvailable } from '../sync/localDb';
+import { subscribe } from '../sync/syncStatus';
 
 let localMirrorReady = false;
 
@@ -31,4 +33,26 @@ export function isLocalMirrorReady(): boolean {
 /** True when local-first reads/writes should be used (desktop + mirror ready). */
 export function isLocalModeActive(): boolean {
   return isLocalAvailable() && localMirrorReady;
+}
+
+/**
+ * Runs `onActivated` exactly once when local mode flips from inactive to
+ * active (the initial pull succeeded). Data hooks use this to switch their
+ * reads from HTTP to the local mirror without a manual refresh — a page
+ * mounted before the mirror was ready must not keep serving HTTP reads.
+ */
+export function useLocalModeActivated(onActivated: () => void): void {
+  const cbRef = useRef(onActivated);
+  cbRef.current = onActivated;
+  useEffect(() => {
+    if (isLocalModeActive()) return undefined; // already active on mount
+    let wasActive = false;
+    return subscribe(() => {
+      const nowActive = isLocalModeActive();
+      if (nowActive && !wasActive) {
+        wasActive = true;
+        cbRef.current();
+      }
+    });
+  }, []);
 }

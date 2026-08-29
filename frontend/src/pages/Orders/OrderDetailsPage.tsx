@@ -23,7 +23,9 @@ import {
 import { formatCurrency } from '../Dashboard/kpiConfig';
 import { ApiError, useApiClient } from '../../services/api/client';
 import type { OrderStatus } from './useOrders';
-import { Order, OrderItem } from './useOrders';
+import { ALLOWED_ORDER_TRANSITIONS, Order, OrderItem } from './useOrders';
+import { isLocalModeActive, localBusinessId, makeOrderRepo } from '../../repositories';
+import { getLocalDb } from '../../sync/localDb';
 import CustomerAvatar from '../../components/ui/CustomerAvatar';
 import AiNoticeBox from '../../components/ui/AiNoticeBox';
 import {
@@ -68,6 +70,54 @@ const OrderDetailsPage: React.FC = () => {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
 
+  // OFFLINE 3 local read: the order straight from the SQLite mirror (with
+  // its customer, line items and product names) — same Order shape.
+  const loadLocal = useCallback(async () => {
+    const biz = await localBusinessId(api);
+    const db = getLocalDb();
+    if (!db) throw new ApiError('Local data layer unavailable.');
+    const [row, allItems, products] = await Promise.all([
+      db.orderGet(orderId),
+      db.orderItemsByOrder({ business_id: biz, opts: { limit: 10000 } }),
+      db.productList({ business_id: biz, opts: { limit: 10000 } }),
+    ]);
+    if (!row) throw new ApiError('Order not found on this device.');
+    const cust = row.customer_id != null ? await db.customerGet(Number(row.customer_id)) : null;
+    const bizRow = await db.businessGet(biz);
+    if (bizRow) {
+      setBusiness({
+        name: String(bizRow.name ?? ''),
+        currency: String(bizRow.currency ?? 'USD'),
+        address: null,
+        phone: null,
+        email: null,
+      });
+    }
+    const nameById = new Map<number, string>(products.map((p) => [Number(p.id), String(p.name ?? '')]));
+    const data: Order = {
+      id: Number(row.id),
+      customer_id: Number(row.customer_id),
+      customer: cust ? { full_name: String(cust.full_name ?? '') } : null,
+      status: String(row.status) as Order['status'],
+      allowed_transitions: ALLOWED_ORDER_TRANSITIONS[String(row.status) as Order['status']] ?? [],
+      total_amount: Number(row.total_amount ?? 0),
+      order_date: String(row.order_date ?? ''),
+      created_at: String(row.created_at ?? ''),
+      items: allItems
+        .filter((it) => Number(it.order_id) === Number(row.id))
+        .map((it) => ({
+          id: Number(it.id),
+          product_id: Number(it.product_id),
+          product_name: nameById.get(Number(it.product_id)) ?? null,
+          quantity: Number(it.quantity),
+          unit_price: Number(it.unit_price),
+          total_price: Number(it.total_price),
+        })),
+    };
+    setOrder(data);
+    setNextStatus(data.allowed_transitions[0] ?? null);
+  }, [api, orderId]);
+
   const load = useCallback(async () => {
     if (!Number.isInteger(orderId) || orderId <= 0) {
       setError(new ApiError('Invalid order id.'));
@@ -77,6 +127,10 @@ const OrderDetailsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      if (isLocalModeActive()) {
+        await loadLocal();
+        return;
+      }
       const { data } = await api.get<Order>(`/orders/${orderId}`);
       setOrder(data);
       setNextStatus(data.allowed_transitions[0] ?? null);
@@ -100,7 +154,7 @@ const OrderDetailsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [api, orderId]);
+  }, [api, orderId, loadLocal]);
 
   useEffect(() => {
     void load();
@@ -110,6 +164,16 @@ const OrderDetailsPage: React.FC = () => {
     if (!order || !nextStatus) return;
     setUpdating(true);
     try {
+      if (isLocalModeActive()) {
+        // Local-first (OFFLINE 3): SQLite + sync queue; the server validates
+        // the same transition when the op is pushed. Reload from the mirror.
+        await makeOrderRepo(api).setStatus(order.id, nextStatus);
+        await load();
+        messageApi.success(
+          nextStatus === 'cancelled' ? 'Order cancelled — stock restored (pending sync).' : `Order marked ${ORDER_STATUS_LABEL[nextStatus]} (pending sync).`,
+        );
+        return;
+      }
       const { data } = await api.put<Order>(`/orders/${order.id}/status`, { status: nextStatus });
       setOrder(data);
       setNextStatus(data.allowed_transitions[0] ?? null);

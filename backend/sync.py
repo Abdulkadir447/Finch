@@ -34,6 +34,16 @@ from .models import (
 
 _VALID_REASONS = {r.value for r in StockMovementReason}
 
+# Single source of truth for the order status machine. main.py's live
+# /orders/{id}/status route and this sync path both validate against it.
+ALLOWED_ORDER_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"confirmed", "cancelled"},
+    "confirmed": {"shipped", "cancelled"},
+    "shipped": {"delivered"},
+    "delivered": set(),
+    "cancelled": set(),
+}
+
 
 class SyncError(ValueError):
     """Raised for an operation the server refuses (bad entity, missing ref)."""
@@ -184,7 +194,24 @@ async def _apply_product(db, business_id, client_id, operation, payload):
 async def _apply_order(db, business_id, client_id, operation, payload):
     existing_id = await _resolve_client_id(db, Order, client_id)
     if existing_id is not None:
-        return existing_id, False  # idempotent: an order is applied once
+        if operation == "update":
+            # Offline status changes (v1 offline boundary includes order
+            # status changes). The transition is validated against the SAME
+            # machine the live route uses. Stock for a cancellation arrives
+            # as its own stock_movement operation (ADR-002 rule 5 — stock
+            # syncs as operations), so it is applied exactly once there and
+            # never re-restored here (no double restore).
+            order = (await db.execute(select(Order).where(Order.id == existing_id))).scalars().first()
+            current = order.status.value if hasattr(order.status, "value") else str(order.status)
+            requested = payload.get("status")
+            if not requested or requested == current:
+                return existing_id, False  # idempotent no-op (retried op)
+            if requested not in ALLOWED_ORDER_TRANSITIONS.get(current, set()):
+                raise SyncError(f"order {client_id}: cannot transition from '{current}' to '{requested}'")
+            order.status = OrderStatus(requested)
+            await db.flush()
+            return existing_id, True
+        return existing_id, False  # retried create -> idempotent no-op
     if operation != "create":
         raise SyncError(f"order {client_id}: operation {operation} without an existing row")
     customer_id = await _resolve_client_id(db, Customer, payload.get("customer_client_id"))

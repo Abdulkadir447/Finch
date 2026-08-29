@@ -81,13 +81,50 @@ ids; idempotent writes; operation-based inventory; visible sync state).
 - Local data layer hardened: update/delete on a non-local row now throws a
   clear "not in the local database" error instead of crashing on null.
 
-**Remaining (scheduled sub-phases):** OFFLINE 3 (the push engine: drain the
-queue on reconnect, retry, pull/refresh to populate the local mirror +
-switch reads to local, then `setLocalMirrorReady(true)` to activate
-local-first), OFFLINE 4 (conflict rules: customers merge, products
-SKU-conflict flag, inventory operation-based), OFFLINE 5 (sync UX: manual
-sync, conflict resolution, per-order "pending sync" badges), OFFLINE 6
-(E2E offline / restart / duplicate-sync testing).
+**OFFLINE 3 — sync engine (delivered; the gate is now real):**
+- Server: `GET /sync/pull` (full mirror or delta since cursor; every record
+  carries server id + client_id; soft-deleted rows included so the mirror
+  reflects deletions; stock movements delta on created_at). `POST /sync/push`
+  now also applies order `update` ops (offline status changes — validated
+  against the shared `ALLOWED_ORDER_TRANSITIONS` machine; the cancellation's
+  stock restore travels as its own `stock_movement` op, so it applies exactly
+  once — no double restore).
+- Local: `electron/sync.js` — `applyPull` upserts the mirror in one
+  transaction keyed by stable identity (ULID, or the synthetic `srv-<id>`
+  for cloud-native rows), resolves cross-references through a new `id_map`
+  table (local migration 0002), re-attaches soft deletes, dedupes the stock
+  ledger by client_id, and — on a full pull — VERIFIES local counts against
+  the cloud before committing (cursor stored last, so a failed pull keeps
+  the old cursor). `markPushOutcome` marks acknowledged ops synced and
+  refused ops failed (retried next cycle). 12 passing Node tests.
+- Engine (renderer — it owns the Clerk-authenticated client): one cycle =
+  PUSH (drain queue, idempotent) → PULL (initial full, then delta since
+  cursor; a failed delta arms a one-shot re-verified full pull). Triggers:
+  app startup, connectivity restored, 30 s online interval, manual "Sync
+  now". A failed full pull/verification leaves mirror + cursor untouched.
+- Activation (the OFFLINE 2 safety gate, now real): local mode flips on
+  only when the initial pull succeeds (`mirrorReady` from main → status
+  store → `setLocalMirrorReady`). Reads for Orders, Customers, Products and
+  Inventory then come from SQLite with the server's exact list semantics
+  (search/status/stock filters, ordering, page envelope); the summary the
+  Inventory page shows is the same calculation computed from mirrored rows.
+- User-facing sync behaviour: offline order appears in the list immediately
+  with a "Pending sync" chip (live-updated as the queue drains), the
+  success screen says "saved on this device" for local orders, the TopBar
+  pill shows Synced / Offline — saved / Syncing / N to sync + a "Sync now"
+  button, and the queue is retried on reconnect.
+- Local order/order-item push payloads now carry client-id references
+  (`customer_client_id`, `order_client_id`, `product_client_id`) — the
+  reference gap that would have made every offline order refused by the
+  server.
+
+**Remaining (scheduled sub-phases):** OFFLINE 4 (conflict rules: customers
+merge, products SKU-conflict flag, inventory operation-based), OFFLINE 5
+(conflict-resolution UX; the sync indicator / manual sync / pending badges
+landed with OFFLINE 3), OFFLINE 6 (E2E offline / restart / duplicate-sync
+testing in the real Electron runtime). Dashboard/Reports reads stay
+server-backed for now (the deterministic engines keep working from live
+data); moving them to the local mirror is the natural next sub-phase.
 
 ### 2.3 Notifications — **partially live; daily summary is the gap**
 Live: low-stock / out-of-stock alerts in the TopBar popover (real data,
