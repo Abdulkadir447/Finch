@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { makeProductRepo, localBusinessId, isLocalModeActive, useLocalModeActivated } from '../../repositories';
+import { makeProductRepo, localBusinessIdLocal, isLocalModeActive, useLocalModeActivated } from '../../repositories';
 import { getLocalDb } from '../../sync/localDb';
 
 export interface Product {
@@ -73,7 +73,7 @@ export function useProducts() {
    *  (search: name/sku/category; stock filter in/low/out; id desc). */
   const loadLocal = useCallback(
     async (requestedPage: number, query: string, filter: ProductStockFilter) => {
-      const biz = await localBusinessId(api);
+      const biz = await localBusinessIdLocal();
       const db = getLocalDb();
       if (!db) throw new ApiError('Local data layer unavailable.');
       const rows = await db.productList({ business_id: biz, opts: { limit: 10000 } });

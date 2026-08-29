@@ -63,6 +63,24 @@ export async function localBusinessId(api: AxiosInstance): Promise<number> {
   return cachedLocalBizId;
 }
 
+/**
+ * OFFLINE 3.5 — offline-safe local business id.
+ *
+ * Reads the (single-owner) local business row directly from SQLite — NO
+ * network. Use this in local-mode branches: they must work while offline.
+ * The server-backed `localBusinessId(api)` above stays for the online
+ * bootstrap (it also CREATES the row on first online run).
+ */
+export async function localBusinessIdLocal(): Promise<number> {
+  if (cachedLocalBizId != null) return cachedLocalBizId;
+  const db = getLocalDb();
+  if (!db) throw new Error('Local data layer unavailable');
+  const row = await db.businessFirst();
+  if (!row) throw new Error('No local business yet — the first online sync creates it');
+  cachedLocalBizId = Number(row.id);
+  return cachedLocalBizId;
+}
+
 /** Test/teardown helper: clear the module-level caches. */
 export function _resetIdentityCacheForTests() {
   cachedIdentity = null;

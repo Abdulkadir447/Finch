@@ -23,7 +23,7 @@ down.
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
 | Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
-| Tests | 110 backend tests (incl. frontend↔backend contract test; 7 for the deterministic forecast, 6 for the AI history ledger) + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `.github/workflows/ci.yml` |
+| Tests | 113 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 for the report-chart alignment + report-route regressions) + 15 local-analytics port tests + a server↔local cross-check harness + 22 Electron data-layer/sync Node tests + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
 
 ## 2. The five parked areas — status and recommendation
 
@@ -117,6 +117,36 @@ ids; idempotent writes; operation-based inventory; visible sync state).
   (`customer_client_id`, `order_client_id`, `product_client_id`) — the
   reference gap that would have made every offline order refused by the
   server.
+
+**OFFLINE 3.5 — local Dashboard + Reports (delivered; the whole app surface
+is now local-first except the model-based AI):**
+- `frontend/src/analytics/` — local ports of the cloud engines over the
+  mirror bundle: `localDashboard.ts` (summary, timeseries, by-category,
+  top products, recent orders, inventory summary — exact status/rounding
+  semantics), `localReports.ts` (filter contract + all four report builders,
+  verbatim), `localBriefing.ts` (the deterministic insight engine, verbatim
+  prose). `localData.ts` fetches the mirror once (short TTL + invalidation
+  on every sync event).
+- Dashboard, Reports (all four), Briefing page, Dashboard briefing banner
+  and the deterministic AI-insights bundle all take the local path when
+  local mode is active — same KPIs/tables/notes/prose as the cloud.
+- Port fidelity is PINNED by tests: 15 unit tests on the calculators, plus
+  a **cross-check harness that runs the actual server engines (FastAPI +
+  SQLAlchemy) and the local port on the same fixture and diffs the JSON
+  field-for-field** (clean: only timestamps and auto-assigned ids differ).
+- Offline export: the Export menu computes CSV from the on-screen
+  ReportData ("export exactly what you're looking at", offline); XLSX/PDF
+  are server-rendered and honestly disabled offline. The model-based AI
+  surfaces stay online-only (ADR-002) and degrade to the deterministic
+  engine offline.
+- Found + fixed while cross-checking: the report chart series took data
+  from `dict.values()` (row insertion order) while the labels were sorted —
+  values plotted under the wrong bucket whenever row order ≠ date order
+  (affected Sales, P&L, Inventory donut and Customers charts). Data now
+  follows the sorted label order; regression test added. Also fixed a
+  latent 500 on `GET /reports/{key}` (`await build_report(...).to_dict()`
+  called `.to_dict` on the coroutine — only reachable over HTTP, which the
+  service-level tests never hit; route-level regression test added).
 
 **Remaining (scheduled sub-phases):** OFFLINE 4 (conflict rules: customers
 merge, products SKU-conflict flag, inventory operation-based), OFFLINE 5

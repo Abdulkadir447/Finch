@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('coop', {
   db: {
     businessEnsure: (b) => call('businessEnsure', b),
     businessGet: (id) => call('businessGet', id),
+    businessFirst: () => call('businessFirst', null),
     customerCreate: (a) => call('customerCreate', a),
     customerUpdate: (a) => call('customerUpdate', a),
     customerDelete: (id) => call('customerDelete', id),

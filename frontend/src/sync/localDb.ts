@@ -24,6 +24,8 @@ export interface LocalListQuery {
 export interface LocalDb {
   businessEnsure(b: { client_id: string; name: string; currency?: string }): Promise<LocalRow>;
   businessGet(id: number): Promise<LocalRow | null>;
+  /** The single-owner local business row (offline-safe: no network). */
+  businessFirst(): Promise<LocalRow | null>;
   customerCreate(a: { business_id: number; data: object }): Promise<LocalRow>;
   customerUpdate(a: { id: number; data: object }): Promise<LocalRow>;
   customerDelete(id: number): Promise<LocalRow>;

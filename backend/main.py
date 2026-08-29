@@ -1697,7 +1697,7 @@ async def get_report(
     if key not in REPORT_TITLES:
         raise HTTPException(status_code=404, detail=f"Unknown report '{key}'.")
     f = _report_filters(from_, to, compare, category, product_id, customer_id)
-    return await build_report(db, business.id, key, f).to_dict()
+    return (await build_report(db, business.id, key, f)).to_dict()
 
 
 @app.get("/reports/{key}/export", tags=["Reports"])

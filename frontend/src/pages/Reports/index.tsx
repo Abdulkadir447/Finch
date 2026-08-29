@@ -44,7 +44,7 @@ const ReportsPage: React.FC = () => {
       <PageHeader
         title="Reports"
         subtitle="Verified, deterministic business analysis — the same numbers power your exports and Co-op's explanations."
-        actions={<ExportMenu reportKey={key} filters={filters} />}
+        actions={<ExportMenu reportKey={key} filters={filters} data={data} />}
       />
 
       {/* Report selector */}

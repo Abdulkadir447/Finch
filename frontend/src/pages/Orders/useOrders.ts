@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { makeOrderRepo, localBusinessId, isLocalModeActive, useLocalModeActivated } from '../../repositories';
+import { makeOrderRepo, localBusinessIdLocal, isLocalModeActive, useLocalModeActivated } from '../../repositories';
 import { getLocalDb, getPendingOrderIds } from '../../sync/localDb';
 import { subscribe } from '../../sync/syncStatus';
 
@@ -136,7 +136,7 @@ export function useOrders() {
   /** Local read path (OFFLINE 3): the SQLite mirror, server semantics. */
   const loadLocal = useCallback(
     async (requestedPage: number, query: string, status: OrderStatus | 'all') => {
-      const biz = await localBusinessId(api);
+      const biz = await localBusinessIdLocal();
       const db = getLocalDb();
       if (!db) throw new ApiError('Local data layer unavailable.');
       const [rows, allItems, products, pending] = await Promise.all([

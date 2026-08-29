@@ -123,6 +123,7 @@ function dbHandlers(win) {
   return {
     businessEnsure: (a) => dataLayer.business.ensure(a),
     businessGet: (id) => dataLayer.business.get(id),
+    businessFirst: () => dataLayer.business.first(),
     customerCreate: (a) => dataLayer.customers.create(a.business_id, a.data),
     customerUpdate: (a) => dataLayer.customers.update(a.id, a.data),
     customerDelete: (id) => dataLayer.customers.softDelete(id),

@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ApiError, useApiClient } from '../../services/api/client';
-import { makeInventoryRepo, localBusinessId, isLocalModeActive, useLocalModeActivated } from '../../repositories';
+import { makeInventoryRepo, localBusinessIdLocal, isLocalModeActive, useLocalModeActivated } from '../../repositories';
 import { getLocalDb } from '../../sync/localDb';
 
 export type StockStatus = 'in' | 'low' | 'out';
@@ -142,7 +142,7 @@ export function useInventory() {
    *  deterministic, no network. */
   const loadLocal = useCallback(
     async (requestedPage: number, query: string, filter: StockStatus | 'all') => {
-      const biz = await localBusinessId(api);
+      const biz = await localBusinessIdLocal();
       const db = getLocalDb();
       if (!db) throw new ApiError('Local data layer unavailable.');
       const rows = await db.productList({ business_id: biz, opts: { limit: 10000 } });
@@ -251,7 +251,7 @@ export function useInventory() {
   const fetchMovements = useCallback(
     async (productId: number, limit = 20): Promise<MovementListResponse> => {
       if (isLocalModeActive()) {
-        const biz = await localBusinessId(api);
+        const biz = await localBusinessIdLocal();
         const db = getLocalDb();
         if (!db) throw new ApiError('Local data layer unavailable.');
         const rows = await db.stockMovements({ business_id: biz, product_id: productId });

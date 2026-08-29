@@ -14,6 +14,16 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, useApiClient } from '../services/api/client';
+import { isLocalModeActive } from '../repositories';
+import { getLocalBundle } from '../analytics/localData';
+import type { LProduct } from '../analytics/localTypes';
+import {
+  inventorySummary as localInventorySummary,
+  summary as localSummary,
+  timeseries as localTimeseries,
+  topProducts as localTopProducts,
+} from '../analytics/localDashboard';
+import { ALLOWED_ORDER_TRANSITIONS, type OrderStatus } from '../pages/Orders/useOrders';
 import type { DashboardSummary, TimeseriesPoint, TopProduct } from '../pages/Dashboard/useDashboardData';
 import type { InventorySummary } from '../pages/Inventory/useInventory';
 import type { Product } from '../pages/Products/useProducts';
@@ -51,10 +61,96 @@ export function useAiData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
 
+  const localProduct = (p: LProduct): Product => ({
+    id: p.id,
+    sku: p.sku ?? '',
+    name: p.name,
+    description: null,
+    category: p.category,
+    unit_price: p.unit_price ?? 0,
+    cost_price: p.cost_price,
+    current_stock: p.current_stock,
+    reorder_level: p.reorder_level,
+    created_at: '',
+    updated_at: null,
+  });
+
+  /** Build the same bundle from the SQLite mirror (OFFLINE 3.5 local mode). */
+  const loadLocal = useCallback(async () => {
+    const b = await getLocalBundle();
+    const s = localSummary(b);
+    const nameById = new Map(b.customers.map((c) => [c.id, c.full_name]));
+    const prodName = new Map(b.products.map((p) => [p.id, p.name]));
+    const itemsByOrder = new Map<number, Order['items']>();
+    for (const it of b.items) {
+      const list = itemsByOrder.get(it.order_id) ?? [];
+      list.push({
+        id: it.id,
+        product_id: it.product_id,
+        product_name: prodName.get(it.product_id) ?? `Product #${it.product_id}`,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        total_price: it.total_price,
+      });
+      itemsByOrder.set(it.order_id, list);
+    }
+    const recentOrders: Order[] = [...b.orders]
+      .sort((a, z) => z.id - a.id)
+      .slice(0, 100)
+      .map((o) => ({
+        id: o.id,
+        customer_id: o.customer_id ?? 0,
+        customer: o.customer_id != null && nameById.has(o.customer_id) ? { full_name: nameById.get(o.customer_id)! } : null,
+        status: o.status as OrderStatus,
+        allowed_transitions: ALLOWED_ORDER_TRANSITIONS[o.status as OrderStatus] ?? [],
+        total_amount: o.total_amount,
+        order_date: o.order_date,
+        created_at: o.created_at ?? o.order_date,
+        items: itemsByOrder.get(o.id) ?? [],
+      }));
+    const customers: Customer[] = b.customers.slice(0, 100).map((c) => ({
+      id: c.id,
+      full_name: c.full_name,
+      email: c.email ?? '',
+      phone: null,
+      address: null,
+      company: null,
+      created_at: c.created_at ?? '',
+      updated_at: null,
+    }));
+    const lowStock: Product[] = b.products
+      .filter((p) => p.current_stock > 0 && p.current_stock <= p.reorder_level)
+      .sort((a, z) => z.id - a.id)
+      .slice(0, 5)
+      .map(localProduct);
+    const outOfStock: Product[] = b.products
+      .filter((p) => p.current_stock === 0)
+      .sort((a, z) => z.id - a.id)
+      .slice(0, 5)
+      .map(localProduct);
+    setBundle({
+      summary: s,
+      timeseries: localTimeseries(b, 30),
+      topProducts: localTopProducts(b, 5),
+      inventory: localInventorySummary(b),
+      lowStock,
+      outOfStock,
+      customers,
+      recentOrders,
+      sufficient: s.products_count > 0 || recentOrders.length > 0,
+    });
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      // OFFLINE 3.5: local mode — the deterministic AI layer works offline
+      // from the mirror (the model-based assistant stays online-only).
+      if (isLocalModeActive()) {
+        await loadLocal();
+        return;
+      }
       const [summary, ts, tops, inv, low, out, cust, ords] = await Promise.all([
         api.get<DashboardSummary>('/dashboard/summary'),
         api.get<TimeseriesPoint[]>('/dashboard/revenue/timeseries', { params: { days: 30 } }),

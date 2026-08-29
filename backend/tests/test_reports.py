@@ -278,3 +278,74 @@ def test_previous_month_range():
 def test_none_compare_has_no_previous():
     f = ReportFilters.from_query(from_str="2026-08-01", to_str="2026-08-30")
     assert f.previous_range() is None
+
+
+async def test_reports_route_serves_the_engine_over_http(api):
+    """Route-level regression: GET /reports/{key} must return the engine's
+    dict. The other tests in this file call build_report() directly, so only
+    a route-level test catches await-binding bugs in the route itself
+    (``await f().to_dict()`` calls .to_dict on the coroutine)."""
+    await api.client.post("/products", json={
+        "sku": "RT-1", "name": "Chair", "unit_price": 100.0, "current_stock": 10,
+    })
+    r = await api.client.get("/reports/sales")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["key"] == "sales"
+    assert body["title"] == "Sales Report"
+    assert body["kpis"] and body["tables"] and body["chart"]
+    assert body["filters"]["compare"] == "none"
+
+    r2 = await api.client.get("/reports/not-a-report")
+    assert r2.status_code == 404
+
+
+async def test_report_chart_data_aligns_with_sorted_labels(session_factory):
+    """Regression: chart series data must follow the SAME sorted-key order as
+    the labels. The values were once taken from dict.values() (insertion
+    order of the order rows), so when row order != date order the values
+    were plotted under the wrong bucket.
+
+    Self-contained business: one customer, one product, two shipped orders
+    created so that the LATER-dated order gets the SMALLER id (reverse of
+    date order) — the exact condition that exposed the misalignment."""
+    async with session_factory() as db:
+        b = Business(name="Chart", owner_id="u-chart")
+        c = Customer(business_id=None, full_name="Chart C", email="cc@x.com")
+        p = Product(business_id=None, sku="CH-1", name="Chair", unit_price=100.0, current_stock=50)
+        db.add_all([b, c, p])
+        await db.flush()
+        c.business_id = b.id
+        p.business_id = b.id
+
+        today = dt.date.today()
+        o_late = Order(business_id=b.id, customer_id=c.id,
+                       order_date=dt.datetime.combine(today, dt.time.min),
+                       status=OrderStatus.shipped, total_amount=210.0)
+        db.add(o_late)
+        await db.flush()
+        db.add(OrderItem(business_id=b.id, order_id=o_late.id, product_id=p.id,
+                         quantity=2, unit_price=100.0, total_price=200.0))
+        o_early = Order(business_id=b.id, customer_id=c.id,
+                        order_date=dt.datetime.combine(today - dt.timedelta(days=1), dt.time.min),
+                        status=OrderStatus.shipped, total_amount=100.0)
+        db.add(o_early)
+        await db.flush()
+        db.add(OrderItem(business_id=b.id, order_id=o_early.id, product_id=p.id,
+                         quantity=1, unit_price=100.0, total_price=100.0))
+        await db.commit()
+        assert o_late.id != o_early.id
+
+        bid = b.id
+        f = ReportFilters.from_query()
+        r = await build_report(db, bid, "sales", f)
+        labels = r.chart.labels
+        data = r.chart.series[0]["data"]
+        assert len(labels) == 2 and labels[0] < labels[1], f"labels sorted, got {labels}"
+        # The EARLIER label must carry the earlier day's revenue (100), the
+        # later label the later day's (210) — regardless of row insertion order.
+        assert data[0] == 100.0, f"first bucket should be the earlier day, got {data}"
+        assert data[1] == 210.0, f"second bucket should be the later day, got {data}"
+
+        r2 = await build_report(db, bid, "profit-loss", f)
+        assert r2.chart.series[0]["data"][0] == 100.0, "P&L revenue aligned with labels"

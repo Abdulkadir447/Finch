@@ -37,6 +37,11 @@ class BusinessRepository {
     return this.db.prepare(`SELECT * FROM business WHERE id=?`).get(id);
   }
 
+  /** The (single-owner) local business row, or null. */
+  first() {
+    return this.db.prepare(`SELECT * FROM business ORDER BY id ASC LIMIT 1`).get() || null;
+  }
+
   update(id, { name, currency }) {
     this.db
       .prepare(`UPDATE business SET name=COALESCE(?, name), currency=COALESCE(?, currency), updated_at=? WHERE id=?`)

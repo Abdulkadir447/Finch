@@ -40,12 +40,25 @@ export interface ReportTable {
   numeric_cols: number[];
 }
 
+/**
+ * The compact filters dict the engine returns (server ReportFilters
+ * .to_query_dict() / local port) — NOT the UI's ReportFilterState.
+ */
+export interface ReportFiltersDict {
+  from: string;
+  to: string;
+  compare: string;
+  category: string | null;
+  product_id: number | null;
+  customer_id: number | null;
+}
+
 export interface ReportData {
   key: string;
   title: string;
   period_label: string;
   compare: string;
-  filters: ReportFilterState;
+  filters: ReportFiltersDict;
   generated_at: string;
   kpis: ReportKpi[];
   chart: ReportChart;

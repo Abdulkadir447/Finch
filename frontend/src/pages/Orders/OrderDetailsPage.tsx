@@ -24,7 +24,7 @@ import { formatCurrency } from '../Dashboard/kpiConfig';
 import { ApiError, useApiClient } from '../../services/api/client';
 import type { OrderStatus } from './useOrders';
 import { ALLOWED_ORDER_TRANSITIONS, Order, OrderItem } from './useOrders';
-import { isLocalModeActive, localBusinessId, makeOrderRepo } from '../../repositories';
+import { isLocalModeActive, localBusinessIdLocal, makeOrderRepo } from '../../repositories';
 import { getLocalDb } from '../../sync/localDb';
 import CustomerAvatar from '../../components/ui/CustomerAvatar';
 import AiNoticeBox from '../../components/ui/AiNoticeBox';
@@ -73,7 +73,7 @@ const OrderDetailsPage: React.FC = () => {
   // OFFLINE 3 local read: the order straight from the SQLite mirror (with
   // its customer, line items and product names) — same Order shape.
   const loadLocal = useCallback(async () => {
-    const biz = await localBusinessId(api);
+    const biz = await localBusinessIdLocal();
     const db = getLocalDb();
     if (!db) throw new ApiError('Local data layer unavailable.');
     const [row, allItems, products] = await Promise.all([

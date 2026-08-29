@@ -13,6 +13,15 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, useApiClient } from '../../services/api/client';
+import { isLocalModeActive } from '../../repositories';
+import { getLocalBundle } from '../../analytics/localData';
+import {
+  byCategory,
+  recentOrders,
+  summary as localSummary,
+  timeseries as localTimeseries,
+  topProducts as localTopProducts,
+} from '../../analytics/localDashboard';
 
 export interface DashboardSummary {
   revenue_today: number;
@@ -95,6 +104,19 @@ export function useDashboardData(): DashboardData {
     setLoading(true);
     setError(null);
     try {
+      // OFFLINE 3.5: local mode — the same KPIs from the SQLite mirror
+      // (verbatim port of the server's dashboard endpoints).
+      if (isLocalModeActive()) {
+        const b = await getLocalBundle();
+        setSummary(localSummary(b));
+        setTimeseries(localTimeseries(b, 30));
+        setCategories(byCategory(b));
+        setOrders(recentOrders(b, 8));
+        setTopProducts(localTopProducts(b, 5));
+        setBusiness({ name: b.business.name, currency: b.business.currency });
+        setLastUpdated(new Date());
+        return;
+      }
       const [s, ts, cats, ords, tops, biz] = await Promise.all([
         api.get<DashboardSummary>('/dashboard/summary'),
         api.get<TimeseriesPoint[]>('/dashboard/revenue/timeseries', {

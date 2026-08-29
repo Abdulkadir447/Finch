@@ -11,12 +11,16 @@ matters, and drafts the next action for you to confirm.
 
 ### Offline boundary (v1)
 
-- **Works offline:** Dashboard, Products, Inventory, Customers, Orders,
-  order status changes, local invoices, Reports, CSV/XLSX import, and the
-  locally-calculated deterministic insights.
+- **Works offline (once the initial pull has populated the local mirror):**
+  Dashboard, Products, Inventory, Customers, Orders, order status changes,
+  local invoices, Reports (including CSV export of exactly what's on
+  screen), the Day 1 Briefing, and the locally-calculated deterministic
+  insights — all computed from the local SQLite mirror by the same
+  deterministic engines the cloud uses.
 - **Requires internet:** real LLM calls, AI model-based explanations, the
-  server-side revenue forecast + AI activity, cloud billing/payment, cloud
-  account auth/refresh.
+  server-side revenue forecast + AI activity, XLSX/PDF report exports,
+  cloud billing/payment, cloud account auth/refresh, and the initial
+  mirror pull itself (first run on a device).
 
 The desktop app owns a local SQLite database (Electron main process); the UI
 writes locally first and syncs to the cloud when connectivity returns. The
@@ -63,10 +67,18 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
   the UI says so.
 - **Multi-tenant** — Clerk authentication; every query is scoped to the
   caller's auto-provisioned business.
+- **Offline-first sync (OFFLINE 3 + 3.5)** — the desktop app mirrors your
+  business into local SQLite (verified initial pull + delta refresh),
+  serves the Dashboard, Reports, Briefing and the four operational modules
+  from that mirror, writes locally first with a visible "Pending sync"
+  state, and drains the queue to the cloud on reconnect (idempotent,
+  one-way in v1 — conflicts are OFFLINE 4). The local report/dashboard
+  calculations are a verified port of the cloud engines: same numbers
+  online and offline.
 
-Provisional by design: payment provider (nothing is charged yet),
-offline/sync for the desktop wrapper, and the Settings "coming soon"
-sections. See `docs/PRODUCT_READINESS.md` for the full status.
+Provisional by design: payment provider (nothing is charged yet), and the
+Settings "coming soon" sections. See `docs/PRODUCT_READINESS.md` for the
+full status.
 
 ## Repository layout
 

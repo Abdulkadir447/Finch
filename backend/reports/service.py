@@ -243,7 +243,9 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
             ]},
         ]
     else:
-        series = [{"name": "Revenue", "data": [_round(v) for v in cur_series.values()]}]
+        # Data follows the SAME sorted-key order as the labels (dict order is
+        # insertion order and would misalign values against the axis).
+        series = [{"name": "Revenue", "data": [_round(cur_series.get(k, 0)) for k in sorted(cur_series)]}]
 
     # Tables: top products / by category / top customers (line-level).
     by_product: dict[tuple, dict] = {}
@@ -411,7 +413,8 @@ async def profit_loss_report(db, business_id: int, f: ReportFilters) -> ReportDa
         filters=f.to_query_dict(),
         kpis=kpis,
         chart=ReportChart("bar", [_fmt_bucket(k, mode) for k in sorted(rev_series)],
-                          [{"name": "Revenue", "data": [_round(v) for v in rev_series.values()]},
+                          # Data follows the SAME sorted-key order as the labels.
+                          [{"name": "Revenue", "data": [_round(rev_series.get(k, 0)) for k in sorted(rev_series)]},
                            {"name": "Gross profit", "data": [_round(gp_series.get(k, 0)) for k in sorted(rev_series)]}],
                           money=True),
         tables=tables,
@@ -500,7 +503,7 @@ async def inventory_report(db, business_id: int, f: ReportFilters) -> ReportData
         compare=f.compare,
         filters=f.to_query_dict(),
         kpis=kpis,
-        chart=ReportChart("donut", cats, [{"name": "Value", "data": [_round(v) for v in by_cat.values()]}], money=True),
+        chart=ReportChart("donut", cats, [{"name": "Value", "data": [_round(by_cat.get(c, 0)) for c in cats]}], money=True),
         tables=[
             ReportTable("Stock risk", ["Product", "SKU", "On hand", "Reorder level", "Value"],
                         [[p.name, p.sku or "—", p.current_stock, p.reorder_level or 0, _round(value(p))] for p in risk[:15]],
@@ -629,7 +632,7 @@ async def customers_report(db, business_id: int, f: ReportFilters) -> ReportData
         filters=f.to_query_dict(),
         kpis=kpis,
         chart=ReportChart("bar", [_fmt_bucket(k, mode) for k in sorted(new_series)],
-                          [{"name": "New customers", "data": [v for v in new_series.values()]}]),
+                          [{"name": "New customers", "data": [new_series.get(k, 0) for k in sorted(new_series)]}]),
         tables=[
             ReportTable("Top customers (period)", ["Customer", "Orders", "Revenue (period)", "Lifetime revenue", "Last order"],
                         top_rows, [1, 2, 3]),

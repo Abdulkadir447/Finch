@@ -9,7 +9,7 @@
  * The remote branch is byte-for-byte the previous behaviour, so the app is
  * unchanged in a browser and local-first in the desktop app.
  */
-export { fetchIdentity, localBusinessId, type BusinessIdentity } from './identity';
+export { fetchIdentity, localBusinessId, localBusinessIdLocal, type BusinessIdentity } from './identity';
 export {
   isLocalModeActive,
   isLocalMirrorReady,

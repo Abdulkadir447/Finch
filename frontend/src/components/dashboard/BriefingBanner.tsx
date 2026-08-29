@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { radius, spacing, type } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 import { useApiClient } from '../../services/api/client';
+import { isLocalModeActive } from '../../repositories';
+import { getLocalBundle } from '../../analytics/localData';
+import { briefingBanner as localBriefingBanner } from '../../analytics/localBriefing';
 import { SparkleIcon } from '../ui/icons';
 
 const SEEN_KEY = 'coop:briefing-seen';
@@ -30,6 +33,23 @@ const BriefingBanner: React.FC = () => {
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
+    // OFFLINE 3.5: local mode — the deterministic briefing from the mirror.
+    if (isLocalModeActive()) {
+      getLocalBundle()
+        .then((b) => {
+          if (cancelled) return;
+          const bf = localBriefingBanner(b);
+          setReady(bf.ready);
+          const top = bf.insights?.[0];
+          if (top) setHeadline(top.title);
+        })
+        .catch(() => {
+          if (!cancelled) setReady(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
     api
       .get<{ ready: boolean; insights: Array<{ title: string; severity: string }> }>('/dashboard/briefing')
       .then(({ data }) => {

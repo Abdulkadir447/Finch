@@ -25,6 +25,9 @@ import { colors as colorTokens } from '../../theme';
 type Colors = typeof colorTokens;
 import { useCoopTheme } from '../../theme-provider';
 import { useApiClient, ApiError } from '../../services/api/client';
+import { isLocalModeActive } from '../../repositories';
+import { getLocalBundle } from '../../analytics/localData';
+import { buildLocalBriefing } from '../../analytics/localBriefing';
 import { CoopButton, CoopCard, CoopErrorState, CoopLoading, CoopBadge } from '../../components/ui';
 import { SparkleIcon } from '../../components/ui/icons';
 
@@ -245,6 +248,13 @@ const BriefingPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // OFFLINE 3.5: local mode — the deterministic briefing engine over the
+      // SQLite mirror (verbatim port of backend/briefing.py).
+      if (isLocalModeActive()) {
+        const b = await getLocalBundle();
+        setData(buildLocalBriefing(b) as unknown as BriefingPayload);
+        return;
+      }
       const { data } = await api.get<BriefingPayload>('/dashboard/briefing');
       setData(data);
     } catch (e) {

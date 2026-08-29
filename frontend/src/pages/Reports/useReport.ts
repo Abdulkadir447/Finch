@@ -7,6 +7,9 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useApiClient } from '../../services/api/client';
+import { isLocalModeActive } from '../../repositories';
+import { getLocalBundle } from '../../analytics/localData';
+import { buildLocalReport, parseFilters } from '../../analytics/localReports';
 import {
   presetDates,
   type CompareMode,
@@ -42,8 +45,25 @@ export function useReport(key: string) {
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<ReportMeta | null>(null);
 
-  // Meta (categories etc.) once.
+  // Meta (categories etc.) once — local categories come from the mirror.
   useEffect(() => {
+    if (isLocalModeActive()) {
+      void getLocalBundle()
+        .then((b) =>
+          setMeta({
+            reports: [
+              { key: 'sales', title: 'Sales' },
+              { key: 'profit-loss', title: 'Profit & Loss' },
+              { key: 'inventory', title: 'Inventory' },
+              { key: 'customers', title: 'Customers' },
+            ],
+            categories: [...new Set(b.products.map((p) => p.category).filter(Boolean) as string[])].sort(),
+            compare_options: ['none', 'previous_period', 'previous_month', 'previous_year'],
+          }),
+        )
+        .catch(() => undefined);
+      return;
+    }
     api.get<ReportMeta>('/reports/meta').then((r) => setMeta(r.data)).catch(() => undefined);
   }, [api]);
 
@@ -51,6 +71,21 @@ export function useReport(key: string) {
     setLoading(true);
     setError(null);
     try {
+      // OFFLINE 3.5: local mode — the same engine's calculations over the
+      // SQLite mirror (verbatim port; same filter contract).
+      if (isLocalModeActive()) {
+        const b = await getLocalBundle();
+        const f = parseFilters({
+          from: filters.from,
+          to: filters.to,
+          compare: filters.compare,
+          category: filters.category || null,
+          product_id: filters.product_id,
+          customer_id: filters.customer_id,
+        });
+        setData(buildLocalReport(b, key, f));
+        return;
+      }
       const { data } = await api.get<ReportData>(`/reports/${key}`, { params: toParams(filters) });
       setData(data);
     } catch (e) {

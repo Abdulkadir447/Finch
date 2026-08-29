@@ -10,9 +10,36 @@ import { DownloadOutlined, FileExcelOutlined, FilePdfOutlined, FileTextOutlined 
 import { useApiClient } from '../../services/api/client';
 import { useCoopTheme } from '../../theme-provider';
 import { radius, type } from '../../theme';
-import type { ReportFilterState } from './reportConfig';
+import { isLocalModeActive } from '../../repositories';
+import type { ReportData, ReportFilterState } from './reportConfig';
 
 type Fmt = 'csv' | 'xlsx' | 'pdf';
+
+/**
+ * Client-side CSV of exactly what is on screen (OFFLINE 3.5 local mode):
+ * the KPIs + tables of the SAME ReportData object the page renders, so the
+ * file can't disagree with the numbers above it. XLSX/PDF remain
+ * server-rendered (and are honestly disabled offline).
+ */
+function buildCsv(d: ReportData): string {
+  const esc = (v: string | number | null) => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines: string[] = [];
+  lines.push(`${d.title} — ${d.period_label}`);
+  lines.push(`Generated,${d.generated_at}`);
+  lines.push('');
+  lines.push('KPI,Value');
+  for (const k of d.kpis) lines.push(`${esc(k.label)},${esc(k.value)}`);
+  for (const t of d.tables) {
+    lines.push('');
+    lines.push(t.title);
+    lines.push(t.columns.map(esc).join(','));
+    for (const r of t.rows) lines.push(r.map(esc).join(','));
+  }
+  return lines.join('\n');
+}
 
 const OPTIONS: Array<{ fmt: Fmt; label: string; icon: React.ReactNode }> = [
   { fmt: 'csv', label: 'CSV', icon: <FileTextOutlined /> },
@@ -28,14 +55,39 @@ function toParams(f: ReportFilterState): Record<string, string | number> {
   return p;
 }
 
-const ExportMenu: React.FC<{ reportKey: string; filters: ReportFilterState }> = ({ reportKey, filters }) => {
+const ExportMenu: React.FC<{ reportKey: string; filters: ReportFilterState; data?: ReportData | null }> = ({
+  reportKey,
+  filters,
+  data,
+}) => {
   const api = useApiClient();
   const { colors } = useCoopTheme();
   const [busy, setBusy] = useState<Fmt | null>(null);
   const [open, setOpen] = useState(false);
+  const local = isLocalModeActive();
+
+  /** Local CSV export of the on-screen data (no network). */
+  const downloadLocalCsv = () => {
+    if (!data) return;
+    const blob = new Blob([buildCsv(data)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `coop_${reportKey}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const download = async (fmt: Fmt) => {
     setOpen(false);
+    if (local) {
+      // CSV is computed from the on-screen ReportData; XLSX/PDF are
+      // server-rendered and stay online-only (the menu disables them).
+      downloadLocalCsv();
+      return;
+    }
     setBusy(fmt);
     try {
       const resp = await api.get(`/reports/${reportKey}/export`, {
@@ -105,14 +157,17 @@ const ExportMenu: React.FC<{ reportKey: string; filters: ReportFilterState }> = 
             }}
           >
             <div style={{ padding: '6px 10px 8px', ...type.bodyCompact, fontSize: 11.5, color: colors.outline }}>
-              Exports the current filters
+              {local ? 'CSV from the data on screen (offline)' : 'Exports the current filters'}
             </div>
-            {OPTIONS.map((o) => (
+            {OPTIONS.map((o) => {
+              const offlineOnly = local && o.fmt !== 'csv';
+              return (
               <button
                 key={o.fmt}
                 type="button"
                 role="menuitem"
-                disabled={busy !== null}
+                title={offlineOnly ? 'Server-rendered — connect to export this format' : undefined}
+                disabled={busy !== null || offlineOnly || (local && !data)}
                 onClick={() => void download(o.fmt)}
                 style={{
                   display: 'flex',
@@ -121,22 +176,23 @@ const ExportMenu: React.FC<{ reportKey: string; filters: ReportFilterState }> = 
                   width: '100%',
                   border: 'none',
                   background: 'transparent',
-                  color: busy === o.fmt ? colors.outline : colors.onSurface,
+                  color: busy === o.fmt || offlineOnly || (local && !data) ? colors.outline : colors.onSurface,
                   fontWeight: 600,
                   fontSize: 13,
                   borderRadius: radius.md,
                   padding: '9px 10px',
-                  cursor: busy === null ? 'pointer' : 'progress',
+                  cursor: busy === null && !offlineOnly && (data || !local) ? 'pointer' : 'default',
                   textAlign: 'left',
                   fontFamily: 'inherit',
                 }}
-                onMouseEnter={(e) => { if (busy === null) e.currentTarget.style.background = colors.surfaceContainerLow; }}
+                onMouseEnter={(e) => { if (busy === null && !offlineOnly) e.currentTarget.style.background = colors.surfaceContainerLow; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
               >
                 {busy === o.fmt ? 'Preparing…' : o.label}
                 <span aria-hidden style={{ color: colors.outline }}>{o.icon}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
