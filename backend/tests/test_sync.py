@@ -170,3 +170,66 @@ async def test_unknown_reference_is_reported_not_fatal(session_factory):
         assert r["applied"] == 0
         assert r["errors"] and "customer_client_id" in r["errors"][0]["error"]
         await db.commit()
+
+
+async def test_sync_pull_returns_full_mirror(api):
+    """GET /sync/pull returns the full mirror (business + all entities), each
+    record carrying id + client_id (null for live-created rows) + a cursor."""
+    p = (await api.client.post("/products", json={
+        "sku": "P-1", "name": "Chair", "unit_price": 100.0, "current_stock": 10,
+    })).json()
+    c = (await api.client.post("/customers", json={
+        "full_name": "Grace", "email": "g@x.com",
+    })).json()
+    o = (await api.client.post("/orders", json={
+        "customer_id": c["id"],
+        "items": [{"product_id": p["id"], "quantity": 2, "unit_price": 100.0}],
+    })).json()
+
+    r = await api.client.get("/sync/pull")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["cursor"]
+    assert body["business"]["id"] is not None
+    assert body["counts"]["products"] == 1
+    assert body["counts"]["customers"] == 1
+    assert body["counts"]["orders"] == 1
+    assert body["counts"]["order_items"] == 1
+    assert body["counts"]["stock_movements"] >= 1  # order creation deducts stock
+    prod = body["products"][0]
+    assert prod["id"] == p["id"]
+    assert prod["client_id"] is None  # created live, not offline
+    assert prod["sku"] == "P-1"
+    order = body["orders"][0]
+    assert order["id"] == o["id"]
+    assert order["customer_id"] == c["id"]
+    assert order["status"] == "pending"
+
+
+async def test_sync_pull_delta_filters_by_since(api):
+    """GET /sync/pull?since=... returns only records updated after the cursor.
+
+    Uses far-past / far-future cursors so the test is deterministic (no
+    wall-clock precision dependence)."""
+    await api.client.post("/products", json={
+        "sku": "P-1", "name": "Chair", "unit_price": 100.0, "current_stock": 10,
+    })
+    await api.client.post("/customers", json={
+        "full_name": "Grace", "email": "g@x.com",
+    })
+
+    # Full pull (no since) returns everything.
+    full = (await api.client.get("/sync/pull")).json()
+    assert full["cursor"]
+    assert full["counts"]["products"] == 1
+    assert full["counts"]["customers"] == 1
+
+    # Delta with a far-past cursor returns everything (all records are newer).
+    past = (await api.client.get("/sync/pull", params={"since": "2000-01-01T00:00:00"})).json()
+    assert past["counts"]["products"] == 1
+    assert past["counts"]["customers"] == 1
+
+    # Delta with a far-future cursor returns nothing (no records that new).
+    future = (await api.client.get("/sync/pull", params={"since": "2999-01-01T00:00:00"})).json()
+    assert future["counts"]["products"] == 0
+    assert future["counts"]["customers"] == 0

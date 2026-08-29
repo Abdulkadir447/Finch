@@ -34,6 +34,7 @@ from .notifications import build_daily_summary
 from .notifications.schemas import DailySummary as DailySummarySchema
 from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
 from .sync import apply_push
+from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
@@ -1564,6 +1565,22 @@ async def sync_push(
     skipped counts, a client_id -> server id map, and any per-op errors."""
     ops = [o.model_dump() for o in req.operations]
     return await apply_push(db, business.id, ops)
+
+
+@app.get("/sync/pull", tags=["Sync"])
+async def sync_pull(
+    since: Optional[datetime] = Query(None, description="Delta cursor (ISO). Omit for a full dump."),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Cloud -> local mirror payload (OFFLINE 3, Part 1).
+
+    No ``since`` -> full dump (initial pull, includes soft-deleted rows so the
+    mirror can reflect deletions). ``since`` set -> delta (rows changed since
+    the cursor). Each record carries ``id`` + ``client_id`` so the local/cloud
+    identity mapping stays stable. Returns a ``cursor`` for the next delta.
+    """
+    return await build_pull_payload(db, business, since=since)
 
 
 # ---------------------------------------------------------------------------
