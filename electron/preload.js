@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld('coop', {
     orderItemsByOrder: (a) => call('orderItemsByOrder', a),
     stockAdjust: (a) => call('stockAdjust', a),
     stockMovements: (a) => call('stockMovements', a),
+    customerDiscardLocal: (id) => call('customerDiscardLocal', id),
+    productDiscardLocal: (id) => call('productDiscardLocal', id),
+    stockSetLocal: (a) => call('stockSetLocal', a),
   },
   // Sync engine surface (OFFLINE 3). The renderer runs the pull/push cycle
   // (it holds the Clerk-authenticated API client); these cross the bridge
@@ -59,6 +62,9 @@ contextBridge.exposeInMainWorld('coop', {
     setSyncing: (b) => call('syncSetSyncing', b),
     // OFFLINE 4: parked conflicts (structured; OFFLINE 5 will resolve them).
     conflicts: () => call('syncConflicts', null),
+    // OFFLINE 5: resolution actions.
+    requeue: (a) => call('syncRequeue', a),
+    resolveConflict: (a) => call('syncResolveConflict', a),
     // Full sync status pushed from main (mirror ready, pending, last sync).
     onStatus: (cb) => {
       ipcRenderer.on('coop:sync', (_e, data) => cb(data));

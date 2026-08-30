@@ -154,6 +154,46 @@ class SyncQueue {
     return row.n;
   }
 
+  /**
+   * OFFLINE 5 — re-queue a parked conflict with (optionally) a corrected
+   * payload. This is how a resolution becomes a NEW VALIDATED operation:
+   * e.g. a create whose email/SKU now changed. The original client_id is
+   * preserved (idempotency key), status returns to 'pending', and the next
+   * sync cycle pushes it through the normal server validation.
+   *
+   * payloadOverride is shallow-merged over the original payload (the
+   * op-level fields entity/client_id/operation never change).
+   */
+  requeue(queueId, payloadOverride = null) {
+    const op = this.get(queueId);
+    if (!op || op.status !== 'conflict') return null;
+    const payload = payloadOverride ? { ...op.payload, ...payloadOverride } : op.payload;
+    this.db
+      .prepare(
+        `UPDATE sync_queue
+            SET status='pending', payload=?, last_error=NULL, attempts=0, updated_at=datetime('now')
+          WHERE id=?`,
+      )
+      .run(JSON.stringify(payload), queueId);
+    return this.get(queueId);
+  }
+
+  /**
+   * OFFLINE 5 — terminal state for a conflict the user resolved by DISCARD
+   * (keep cloud / drop the local change). Excluded from pending() AND
+   * conflicts() — it no longer needs attention, and it is never pushed.
+   * (The local data correction, if any, happens through the data-layer
+   * resolution methods — never by editing the queue row directly.)
+   */
+  resolveConflict(queueId) {
+    const op = this.get(queueId);
+    if (!op || op.status !== 'conflict') return null;
+    this.db
+      .prepare(`UPDATE sync_queue SET status='resolved', updated_at=datetime('now') WHERE id=?`)
+      .run(queueId);
+    return this.get(queueId);
+  }
+
   /** Failed ops become pending again (retry on next sync attempt).
    *  CONFLICT ops are deliberately NOT re-armed — they wait for resolution. */
   retryFailed() {

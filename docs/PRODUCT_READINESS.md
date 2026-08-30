@@ -23,7 +23,7 @@ down.
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
 | Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
-| Tests | 122 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests) + 15 local-analytics port tests + a server↔local cross-check harness + 25 Electron data-layer/sync Node tests + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
+| Tests | 122 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests) + 15 local-analytics port tests + a server↔local cross-check harness + 29 Electron data-layer/sync Node tests (incl. 4 OFFLINE 5 resolution primitives) + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
 
 ## 2. The five parked areas — status and recommendation
 
@@ -181,12 +181,43 @@ is now local-first except the model-based AI):**
   payload/reason retained, not re-armed by retryFailed, subsequent ops keep
   syncing around a parked conflict).
 
-**Remaining (scheduled sub-phases):** OFFLINE 5 (conflict-resolution UX —
-the parked queue entries already carry the structured local/server context
-it will render; the sync indicator / manual sync / pending badges landed
-with OFFLINE 3/4), OFFLINE 6 (E2E offline / restart / duplicate-sync
-testing in the real Electron runtime — the gate before calling the offline
-promise production-ready). Dashboard/Reports reads stay
+**OFFLINE 5 — conflict-resolution UX (delivered):**
+- **Sync Center** (`/sync`, nav item + the TopBar pill now links to it):
+  shows pending upload, last sync/connection, and every parked conflict.
+- Each conflict renders its structured context side-by-side (**this device**
+  vs **cloud**) with type-specific choices — and every choice executes
+  through the repository/sync pathway (the UI never mutates the database
+  directly):
+  - customer email conflict → *use a new email* (re-queued or re-enqueued
+    through the repo, then pushed and re-validated) or *keep cloud*
+    (never-synced local customer discarded locally via a resolution-only
+    method; an already-synced customer converges back to cloud values via a
+    repository update). Never auto-merges unrelated customers.
+  - product SKU conflict → *use a new SKU* or *keep cloud* (same rules).
+  - stock movement rejected (insufficient stock) → *retry* (re-queued;
+    applies once the cloud stock allows) or *discard movement, align local
+    stock* (local-only correction: signed 'correction' ledger entry, NO
+    queue op — no fake "merge stock" button).
+  - order status conflict → *set status* (deliberate, offered only from the
+    legal next statuses of the current cloud status) or *keep cloud status*
+    (a converging no-op update).
+  - not_found → *discard* (the op is dropped; any local-only record stays
+    on the device, said plainly).
+- Resolution primitives (Electron data layer): `queue.requeue(id,
+  override)` (corrected payload, same client_id, back to pending),
+  `queue.resolveConflict(id)` (terminal 'resolved' — never retried, excluded
+  from needs-attention), `customerDiscardLocal` / `productDiscardLocal`
+  (soft-delete a never-synced row WITHOUT queueing a delete op that could
+  never apply), `stockSetLocal` (align row + local 'correction' ledger
+  entry, no queue op).
+- After any resolution a manual sync cycle is requested; while offline the
+  resolution still works and the new op syncs on reconnect. 4 new Electron
+  tests (requeue correctness, terminal resolved state, discard-without-op,
+  local stock correction + ledger).
+
+**Remaining (scheduled sub-phases):** OFFLINE 6 (E2E offline / restart /
+duplicate-sync testing in the real Electron runtime — the gate before
+calling the offline promise production-ready). Dashboard/Reports reads stay
 server-backed for now (the deterministic engines keep working from live
 data); moving them to the local mirror is the natural next sub-phase.
 

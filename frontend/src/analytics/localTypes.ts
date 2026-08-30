@@ -36,6 +36,8 @@ export interface LOrderItem {
 
 export interface LProduct {
   id: number;
+  /** Client-generated ULID (the stable identity used across sync). */
+  client_id: string;
   name: string;
   sku: string | null;
   category: string | null;

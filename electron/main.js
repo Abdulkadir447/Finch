@@ -147,6 +147,10 @@ function dbHandlers(win) {
     orderItemsByOrder: (a) => dataLayer.orders.itemsByOrder(a.business_id, a.opts || {}),
     stockAdjust: (a) => dataLayer.stock.adjust(a.business_id, a.product_id, a.change, a.reason, a.opts || {}),
     stockMovements: (a) => dataLayer.stock.movements(a.business_id, a.product_id || null),
+    // OFFLINE 5 — resolution-only local corrections (no queue ops).
+    customerDiscardLocal: (id) => dataLayer.customers.discardLocal(id),
+    productDiscardLocal: (id) => dataLayer.products.discardLocal(id),
+    stockSetLocal: (a) => dataLayer.stock.setLocalStock(a.product_id, a.value, a.note || null),
     syncStatus: () => syncStatus(),
     // --- OFFLINE 3 sync engine surface (transport lives in the renderer) ---
     // Failed ops re-arm here: each push attempt retries them (the queue's
@@ -168,6 +172,18 @@ function dbHandlers(win) {
       return out;
     },
     syncConflicts: () => dataLayer.queue.conflicts(),
+    // OFFLINE 5 — resolution actions on a parked conflict (broadcast so the
+    // TopBar's "needs attention" count updates immediately).
+    syncRequeue: (a) => {
+      const out = dataLayer.queue.requeue(a.queueId, a.payloadOverride || null);
+      if (out) broadcastSync(win);
+      return out;
+    },
+    syncResolveConflict: (a) => {
+      const out = dataLayer.queue.resolveConflict(a.queueId);
+      if (out) broadcastSync(win);
+      return out;
+    },
     syncIngestMirror: (payload) => {
       // since == null -> full pull (verify counts); else delta (per-row).
       const res = applyPull(dataLayer, payload, { full: payload.since == null });

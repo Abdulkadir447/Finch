@@ -107,6 +107,21 @@ class CustomerRepository {
       .prepare(`SELECT * FROM customers WHERE business_id=? AND deleted_at IS NULL ORDER BY id DESC LIMIT ?`)
       .all(business_id, limit);
   }
+
+  /**
+   * OFFLINE 5 — resolution-only local soft-delete for a customer that was
+   * NEVER synced (its create parked as a conflict). Deliberately does NOT
+   * enqueue a delete op: the server has no row for this client_id, so a
+   * delete would just become a not_found conflict.
+   */
+  discardLocal(id) {
+    const existing = this.db.prepare(`SELECT * FROM customers WHERE id=?`).get(id);
+    if (!existing) throw new Error(`customer ${id} is not in the local database`);
+    this.db
+      .prepare(`UPDATE customers SET deleted_at=?, updated_at=? WHERE id=?`)
+      .run(new Date().toISOString(), new Date().toISOString(), id);
+    return this.db.prepare(`SELECT * FROM customers WHERE id=?`).get(id);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +190,20 @@ class ProductRepository {
   }
 
   /**
+   * OFFLINE 5 — resolution-only local soft-delete for a product that was
+   * NEVER synced (its create parked as a conflict). No queue op: the server
+   * has no row for this client_id.
+   */
+  discardLocal(id) {
+    const existing = this.db.prepare(`SELECT * FROM products WHERE id=?`).get(id);
+    if (!existing) throw new Error(`product ${id} is not in the local database`);
+    this.db
+      .prepare(`UPDATE products SET deleted_at=?, updated_at=? WHERE id=?`)
+      .run(new Date().toISOString(), new Date().toISOString(), id);
+    return this.db.prepare(`SELECT * FROM products WHERE id=?`).get(id);
+  }
+
+  /**
    * Record the initial-stock ledger entry for a freshly created product.
    * The stock value is already persisted by the product INSERT, so this only
    * appends the movement row + enqueues its sync op (no stock mutation).
@@ -234,6 +263,32 @@ class StockRepository {
     return this.db
       .prepare(`SELECT * FROM stock_movements WHERE business_id=? ORDER BY id DESC LIMIT ?`)
       .all(business_id, limit);
+  }
+
+  /**
+   * OFFLINE 5 — resolution-only stock correction. When the user DISCARDS a
+   * rejected movement (the cloud refused it, e.g. insufficient stock), the
+   * local row must be brought back to the cloud's value — as a LOCAL
+   * correction: a signed ledger entry with reason 'correction' and NO queue
+   * op (pushing the delta again would just re-conflict). ADR-002 rule 5 is
+   * preserved for everything that actually syncs.
+   */
+  setLocalStock(product_id, value, note = 'Sync conflict resolution: aligned to cloud stock') {
+    const product = this.products.get(product_id);
+    if (!product) throw new Error(`product ${product_id} is not in the local database`);
+    const from = product.current_stock || 0;
+    const delta = value - from;
+    this.db.tx(() => {
+      this.db.prepare(`UPDATE products SET current_stock=?, updated_at=? WHERE id=?`).run(value, now(), product_id);
+      if (delta !== 0) {
+        const mc = ulid();
+        this.db
+          .prepare(`INSERT INTO stock_movements (client_id, business_id, product_id, change, reason, note, order_id, created_at)
+                    VALUES (?, ?, ?, ?, 'correction', ?, NULL, ?)`)
+          .run(mc, product.business_id, product_id, delta, note, now());
+      }
+    });
+    return this.products.get(product_id);
   }
 }
 

@@ -67,12 +67,16 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
   the UI says so.
 - **Multi-tenant** — Clerk authentication; every query is scoped to the
   caller's auto-provisioned business.
-- **Offline-first sync (OFFLINE 3 + 3.5)** — the desktop app mirrors your
+- **Offline-first sync (OFFLINE 3 → 5)** — the desktop app mirrors your
   business into local SQLite (verified initial pull + delta refresh),
   serves the Dashboard, Reports, Briefing and the four operational modules
   from that mirror, writes locally first with a visible "Pending sync"
   state, and drains the queue to the cloud on reconnect (idempotent,
-  one-way in v1 — conflicts are OFFLINE 4). The local report/dashboard
+  one-way in v1). Changes that collide with the cloud (same email/SKU,
+  rejected stock movement, stale order status) are parked as explicit
+  conflicts with both versions shown side-by-side in the **Sync Center** —
+  you decide (new value / keep cloud / discard), nothing is auto-merged,
+  and nothing is silently lost. The local report/dashboard
   calculations are a verified port of the cloud engines: same numbers
   online and offline.
 

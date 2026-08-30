@@ -389,3 +389,84 @@ test('subsequent normal operations keep syncing around a parked conflict', () =>
   assert.strictEqual(dl.queue.countConflicts(), 1);
   dl.close();
 });
+
+// ---------------------------------------------------------------------------
+// OFFLINE 5 — resolution primitives: requeue / resolve / local corrections
+// ---------------------------------------------------------------------------
+
+test('requeue turns a parked conflict back into a pending op (payload corrected)', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const c = dl.customers.create(biz.id, { full_name: 'Grace', email: 'dup@x.com' });
+  markPushOutcome(dl, {
+    applied: 0, skipped: 0, ids: {},
+    conflicts: [{ operation_id: String(c.id), entity: 'customer', client_id: c.client_id,
+      reason: 'email_conflict', error: 'email taken', local: { email: 'dup@x.com' }, server: null }],
+    failed: [],
+  });
+  assert.strictEqual(dl.queue.get(c.id).status, 'conflict');
+
+  const requeued = dl.queue.requeue(c.id, { email: 'unique@x.com' });
+  assert.strictEqual(requeued.status, 'pending', 'back in the push queue');
+  assert.strictEqual(requeued.payload.email, 'unique@x.com', 'corrected value applied');
+  assert.strictEqual(requeued.payload.full_name, 'Grace', 'untouched fields preserved');
+  assert.strictEqual(requeued.last_error, null, 'conflict info cleared on requeue');
+  assert.strictEqual(dl.queue.countConflicts(), 0);
+  assert.strictEqual(dl.queue.countPending(), 1);
+
+  // Requeue is only valid for parked conflicts.
+  assert.strictEqual(dl.queue.requeue(c.id, {}), null, 'a pending op cannot be re-queued');
+  dl.close();
+});
+
+test('resolveConflict parks the op in a terminal resolved state', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const c = dl.customers.create(biz.id, { full_name: 'Grace', email: 'g@x.com' });
+  dl.queue.markConflict(c.id, { reason: 'email_conflict' });
+
+  dl.queue.resolveConflict(c.id);
+  const op = dl.queue.get(c.id);
+  assert.strictEqual(op.status, 'resolved');
+  assert.strictEqual(dl.queue.countConflicts(), 0);
+  assert.strictEqual(dl.queue.countPending(), 0);
+  assert.strictEqual(dl.queue.conflicts().length, 0, 'no longer needs attention');
+  // Even retryFailed cannot resurrect it.
+  dl.queue.retryFailed();
+  assert.strictEqual(dl.queue.get(c.id).status, 'resolved');
+  dl.close();
+});
+
+test('discardLocal soft-deletes a never-synced row WITHOUT queueing an op', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const c = dl.customers.create(biz.id, { full_name: 'Ghost', email: 'ghost@x.com' });
+  const p = dl.products.create(biz.id, { name: 'Ghost P', sku: 'G1', unit_price: 1 });
+  const pendingBefore = dl.queue.countPending();
+
+  dl.customers.discardLocal(c.id);
+  dl.products.discardLocal(p.id);
+
+  assert.ok(!dl.customers.get(c.id), 'customer soft-deleted');
+  assert.ok(!dl.products.get(p.id), 'product soft-deleted');
+  assert.strictEqual(dl.queue.countPending(), pendingBefore, 'no delete op was queued');
+  dl.close();
+});
+
+test('setLocalStock corrects the row and the ledger without queueing', () => {
+  const dl = setup();
+  const biz = dl.business.ensure({ client_id: 'B1', name: 'Acme' });
+  const p = dl.products.create(biz.id, { name: 'Chair', sku: 'C1', unit_price: 100, current_stock: 8 });
+  // The offline order already deducted 2 locally (8 -> 6); the cloud refused
+  // it (its stock was lower). Resolution: align local to the cloud value 7.
+  dl.products.update(p.id, { current_stock: undefined }); // no-op keep
+  const pendingBefore = dl.queue.countPending();
+
+  dl.stock.setLocalStock(p.id, 7, 'aligned to cloud stock');
+  assert.strictEqual(dl.products.get(p.id).current_stock, 7, 'row corrected');
+  assert.strictEqual(dl.queue.countPending(), pendingBefore, 'correction is local-only');
+  const movements = dl.stock.movements(biz.id, p.id);
+  const corr = movements.find((m) => m.reason === 'correction' && m.change === -1);
+  assert.ok(corr, 'a signed correction ledger entry was recorded');
+  dl.close();
+});

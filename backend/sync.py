@@ -116,7 +116,7 @@ async def _sku_owner(db, business_id: int, sku: Optional[str]):
     if not sku:
         return None
     row = (await db.execute(
-        select(Product.id, Product.client_id, Product.name, Product.sku)
+        select(Product.id, Product.client_id, Product.name, Product.sku, Product.unit_price)
         .where(
             Product.business_id == business_id,
             Product.deleted_at.is_(None),
@@ -127,7 +127,13 @@ async def _sku_owner(db, business_id: int, sku: Optional[str]):
 
 
 def _product_snapshot(row) -> dict:
-    return {"id": row.id, "client_id": row.client_id, "name": row.name, "sku": row.sku}
+    return {
+        "id": row.id,
+        "client_id": row.client_id,
+        "name": row.name,
+        "sku": row.sku,
+        "unit_price": row.unit_price,
+    }
 
 
 async def _resolve_client_id(db, model, client_id: str) -> Optional[int]:

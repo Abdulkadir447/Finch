@@ -52,6 +52,22 @@ export interface LocalDb {
     opts?: Record<string, unknown>;
   }): Promise<LocalRow>;
   stockMovements(a: { business_id: number; product_id?: number | null }): Promise<LocalRow[]>;
+  // OFFLINE 5 — resolution-only local corrections (never queue an op).
+  customerDiscardLocal(id: number): Promise<LocalRow>;
+  productDiscardLocal(id: number): Promise<LocalRow>;
+  stockSetLocal(a: { product_id: number; value: number; note?: string | null }): Promise<LocalRow>;
+}
+
+/** A parked conflict as returned by the queue (queue row + structured entry). */
+export interface ParkedConflict {
+  /** Queue row id (the sync operation id). */
+  id: number;
+  entity: string; // customer | product | order | order_item | stock_movement
+  entity_id: number; // the local row this op targets
+  client_id: string;
+  operation: string; // create | update | delete
+  payload: Record<string, unknown>;
+  conflict: SyncConflictEntry | null;
 }
 
 export interface LocalSyncStatus {
@@ -80,7 +96,10 @@ interface CoopBridge {
     pullCursor: () => Promise<string | null>;
     pendingOrderIds: () => Promise<number[]>;
     setSyncing: (b: boolean) => Promise<boolean>;
-    conflicts: () => Promise<Array<SyncOp & { conflict: SyncConflictEntry | null }>>;
+    conflicts: () => Promise<ParkedConflict[]>;
+    // OFFLINE 5 — resolution actions.
+    requeue: (a: { queueId: number; payloadOverride?: Record<string, unknown> | null }) => Promise<unknown>;
+    resolveConflict: (a: { queueId: number }) => Promise<unknown>;
     onStatus?: (cb: (s: LocalSyncStatus) => void) => void;
   };
 }
@@ -143,6 +162,21 @@ export async function setSyncing(b: boolean): Promise<void> {
 }
 
 /** Subscribe to main-process status broadcasts (mirror ready, last sync). */
+/** Parked conflicts (OFFLINE 4) — queue row + structured server entry. */
+export async function getConflicts(): Promise<ParkedConflict[]> {
+  return (await getCoop()?.sync?.conflicts().catch(() => null)) ?? [];
+}
+
+/** OFFLINE 5 — re-queue a parked conflict (optionally with corrected fields). */
+export async function requeueConflict(queueId: number, payloadOverride?: Record<string, unknown>): Promise<boolean> {
+  return (await getCoop()?.sync?.requeue({ queueId, payloadOverride: payloadOverride ?? null }) ?? null) != null;
+}
+
+/** OFFLINE 5 — terminally resolve (discard) a parked conflict. */
+export async function resolveConflictOp(queueId: number): Promise<boolean> {
+  return (await getCoop()?.sync?.resolveConflict({ queueId }) ?? null) != null;
+}
+
 export function onSyncStatus(cb: (s: LocalSyncStatus) => void): () => void {
   const on = getCoop()?.sync?.onStatus;
   if (!on) return () => undefined;

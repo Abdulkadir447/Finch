@@ -29,8 +29,8 @@ const today = todayIso();
 const D = (n: number) => addDays(today, -n);
 
 const products: LProduct[] = [
-  { id: 11, name: 'Chair', sku: 'C1', category: 'Furniture', unit_price: 100, cost_price: 40, current_stock: 10, reorder_level: 3 },
-  { id: 12, name: 'Cup', sku: 'K1', category: 'Kitchen', unit_price: 10, cost_price: null, current_stock: 5, reorder_level: 2 },
+  { id: 11, client_id: 'P-11', name: 'Chair', sku: 'C1', category: 'Furniture', unit_price: 100, cost_price: 40, current_stock: 10, reorder_level: 3 },
+  { id: 12, client_id: 'P-12', name: 'Cup', sku: 'K1', category: 'Kitchen', unit_price: 10, cost_price: null, current_stock: 5, reorder_level: 2 },
 ];
 const customers: LCustomer[] = [
   { id: 1, full_name: 'Grace', email: 'g@x.com', created_at: today },

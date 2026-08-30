@@ -36,6 +36,7 @@ const BriefingPage = lazy(() => import('./pages/Briefing'));
 const NotFoundPage = lazy(() => import('./pages/NotFound'));
 const CoopAiPage = lazy(() => import('./pages/CoopAi'));
 const BillingPage = lazy(() => import('./pages/Billing'));
+const SyncPage = lazy(() => import('./pages/Sync'));
 
 const RouteFallback = () => (
   <div style={{ minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -390,8 +391,9 @@ const App: React.FC = () => {
                         <Route path="/orders" element={<OrdersPage />} />
                         <Route path="/orders/new" element={<CreateOrderPage />} />
                         <Route path="/orders/:id" element={<OrderDetailsPage />} />
-                        <Route path="/coop-ai" element={<CoopAiPage />} />
-                        <Route path="/billing" element={<BillingPage />} />
+              <Route path="/coop-ai" element={<CoopAiPage />} />
+              <Route path="/billing" element={<BillingPage />} />
+              <Route path="/sync" element={<SyncPage />} />
                         <Route path="/import" element={<ImportPage />} />
                         <Route path="/briefing" element={<BriefingPage />} />
                         <Route path="/settings" element={<SettingsPage />} />

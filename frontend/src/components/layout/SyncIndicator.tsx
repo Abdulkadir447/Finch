@@ -13,6 +13,7 @@
  * connection returns.
  */
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useSyncStatus } from '../../sync/syncStatus';
 import { requestManualSync } from '../../sync/engine';
 import { useCoopTheme } from '../../theme-provider';
@@ -45,11 +46,13 @@ const SyncIndicator: React.FC = () => {
   const canSyncNow =
     s.localAvailable && s.connection === 'online' && (s.pending > 0 || !s.mirrorReady) && !s.syncing;
 
-  return (
+  // In the desktop app the pill is the entry point to the Sync Center
+  // (OFFLINE 5): pending, parked conflicts, last sync.
+  const pill = (
     <span
       role="status"
       aria-label={`Sync status: ${label}`}
-      title={label}
+      title={s.localAvailable ? `${label} — open Sync Center` : label}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -62,6 +65,7 @@ const SyncIndicator: React.FC = () => {
         fontSize: 12,
         color: colors.onSurfaceVariant,
         whiteSpace: 'nowrap',
+        cursor: s.localAvailable ? 'pointer' : 'default',
       }}
     >
       <span
@@ -79,7 +83,11 @@ const SyncIndicator: React.FC = () => {
       {canSyncNow && (
         <button
           type="button"
-          onClick={() => requestManualSync()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            requestManualSync();
+          }}
           aria-label="Sync now"
           title="Push pending changes and refresh from the cloud now"
           style={{
@@ -99,6 +107,15 @@ const SyncIndicator: React.FC = () => {
       )}
     </span>
   );
+
+  if (s.localAvailable) {
+    return (
+      <Link to="/sync" style={{ textDecoration: 'none', lineHeight: 0 }} aria-label="Open Sync Center">
+        {pill}
+      </Link>
+    );
+  }
+  return pill;
 };
 
 export default SyncIndicator;

@@ -71,6 +71,7 @@ export async function getLocalBundle(): Promise<LocalBundle> {
   }));
   const products: LProduct[] = productRows.map((p) => ({
     id: Number(p.id),
+    client_id: String(p.client_id ?? ''),
     name: String(p.name ?? ''),
     sku: p.sku != null ? String(p.sku) : null,
     category: p.category != null ? String(p.category) : null,
