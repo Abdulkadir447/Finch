@@ -10,16 +10,31 @@ rows).
 Full vs. delta:
   * No ``since``  -> full dump (initial pull). Includes soft-deleted rows so
                      the mirror can reflect deletions.
-  * ``since`` set -> delta: rows with ``updated_at > since`` (and, for the
-                     immutable stock_movements ledger, ``created_at > since``).
+  * ``since`` set -> delta: rows with ``updated_at >= (since - 1s)`` (and,
+                     for the immutable stock_movements ledger,
+                     ``created_at >= (since - 1s)``). Comparing against a
+                     floor one second BEFORE the cursor makes deltas
+                     at-least-once: a row updated in the same second as the
+                     cursor is re-delivered (harmless — the client upserts
+                     idempotently by client_id) instead of being lost. The
+                     1-second step is what makes the same-second guarantee
+                     hold on SQLite, where CURRENT_TIMESTAMP stores
+                     'YYYY-MM-DD HH:MM:SS' but SQLAlchemy binds datetime
+                     parameters as 'YYYY-MM-DD HH:MM:SS.ffffff' — in that
+                     text comparison a plain ``>= cursor`` sorts same-second
+                     rows BELOW the bound value and would drop them from
+                     every future delta.
 
 The payload is read-only and carries no secrets. Each record carries both
 ``id`` (server id) and ``client_id`` (ULID, or null for cloud-native rows) so
-the local/cloud identity mapping stays stable (OFFLINE 3 requirement).
+the local/cloud identity mapping stays stable (OFFLINE 3 requirement). The
+returned ``cursor`` is second-precision and monotone non-decreasing
+(max(now, incoming since)) so the ``>=`` delta is at-least-once and never
+regresses.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from sqlalchemy import select
@@ -49,11 +64,29 @@ async def build_pull_payload(
     """Build the mirror payload for a business (full dump, or delta since ``since``)."""
     bid = business.id
 
+    # Normalise the incoming cursor to SECOND precision. The outgoing cursor
+    # is monotone non-decreasing (max of now and the incoming cursor), also
+    # at second precision, so the cursor never regresses.
+    if since is not None:
+        since = since.replace(microsecond=0)
+
+    # AT-LEAST-ONCE FLOOR: deltas compare against (cursor - 1s). On Postgres
+    # (real timestamps) this is a harmless 1-second overlap that idempotent
+    # client upserts absorb. On SQLite it is REQUIRED for same-second rows:
+    # CURRENT_TIMESTAMP stores 'YYYY-MM-DD HH:MM:SS' (second precision) while
+    # SQLAlchemy binds datetime parameters with a 6-digit fractional suffix
+    # ('YYYY-MM-DD HH:MM:SS.ffffff'). In that text comparison a same-second
+    # row ('...:47') sorts BELOW the bound cursor ('...:47.000000'), so a
+    # plain ``>= cursor`` would silently drop every same-second row from
+    # every future delta. Stepping the floor back one second puts every
+    # same-second row strictly above the bound value on both backends.
+    floor = since - timedelta(seconds=1) if since is not None else None
+
     def _updated(model):
-        return [model.updated_at > since] if since is not None else []
+        return [model.updated_at >= floor] if floor is not None else []
 
     def _created(model):
-        return [model.created_at > since] if since is not None else []
+        return [model.created_at >= floor] if floor is not None else []
 
     customers = (
         (await db.execute(
@@ -140,8 +173,14 @@ async def build_pull_payload(
         "updated_at": _iso(business.updated_at),
     }
 
+    # Second-precision, monotone non-decreasing cursor (max of now and the
+    # incoming cursor) so the ``>=`` delta is at-least-once and never
+    # regresses across pulls.
+    now_trunc = datetime.utcnow().replace(microsecond=0)
+    new_cursor = now_trunc if since is None or now_trunc >= since else since
+
     return {
-        "cursor": datetime.utcnow().isoformat(),
+        "cursor": new_cursor.isoformat(),
         "since": _iso(since),
         "business": business_out,
         "customers": customers_out,

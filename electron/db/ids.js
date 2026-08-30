@@ -42,4 +42,9 @@ function ulid(ts = Date.now()) {
   return encode128(buf);
 }
 
-module.exports = { ulid };
+// Synthetic local client_id prefix for cloud-mirrored rows (client_id is
+// null on the server). A synthetic key is NOT a real client id: push
+// payloads must reference such rows by their SERVER id instead.
+const SYNTHETIC_PREFIX = 'srv-';
+
+module.exports = { ulid, SYNTHETIC_PREFIX };

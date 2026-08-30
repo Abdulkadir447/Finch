@@ -1,7 +1,7 @@
 const { app, BrowserWindow, session, ipcMain, net } = require('electron');
 const path = require('path');
 const { createDataLayer, defaultDbPath } = require('./db');
-const { applyPull, markPushOutcome, getCursor } = require('./sync');
+const { createDataLayerApp } = require('./dataLayerApp');
 
 // ---------------------------------------------------------------------------
 // Content Security Policy for the Co-op desktop app.
@@ -97,116 +97,22 @@ function createWindow () {
 // IPC methods below — there is no generic "call any method" channel.
 // ---------------------------------------------------------------------------
 let dataLayer = null;
-let online = true;
-// OFFLINE 3 sync state. The ENGINE (pull/push cycle) runs in the renderer —
-// that is where the Clerk-authenticated API client lives — main only owns
-// the mirror (SQLite ingestion), the queue bookkeeping, and this state.
-let mirrorReady = false;
-let syncing = false;
-let lastSyncAt = null;
-
-function syncStatus() {
-  return {
-    online,
-    pending: dataLayer.queue.countPending(),
-    // OFFLINE 4: ops parked in 'conflict' — visible as "needs attention",
-    // never retried automatically (OFFLINE 5 resolves them).
-    conflicts: dataLayer.queue.countConflicts(),
-    syncing,
-    mirrorReady,
-    lastSyncAt,
-  };
-}
-
-
-
-function broadcastSync(win) {
-  if (win && !win.isDestroyed()) win.webContents.send('coop:sync', syncStatus());
-}
-
-function dbHandlers(win) {
-  return {
-    businessEnsure: (a) => dataLayer.business.ensure(a),
-    businessGet: (id) => dataLayer.business.get(id),
-    businessFirst: () => dataLayer.business.first(),
-    customerCreate: (a) => dataLayer.customers.create(a.business_id, a.data),
-    customerUpdate: (a) => dataLayer.customers.update(a.id, a.data),
-    customerDelete: (id) => dataLayer.customers.softDelete(id),
-    customerGet: (id) => dataLayer.customers.get(id),
-    customerList: (a) => dataLayer.customers.list(a.business_id, a.opts || {}),
-    productCreate: (a) => dataLayer.products.create(a.business_id, a.data),
-    productUpdate: (a) => dataLayer.products.update(a.id, a.data),
-    productDelete: (id) => dataLayer.products.softDelete(id),
-    productGet: (id) => dataLayer.products.get(id),
-    productList: (a) => dataLayer.products.list(a.business_id, a.opts || {}),
-    orderCreate: (a) => dataLayer.orders.create(a.business_id, a.data),
-    orderSetStatus: (a) => dataLayer.orders.setStatus(a.business_id, a.order_id, a.status),
-    orderGet: (id) => dataLayer.orders.get(id),
-    orderList: (a) => dataLayer.orders.list(a.business_id, a.opts || {}),
-    orderListDetailed: (a) => dataLayer.orders.listDetailed(a.business_id, a.opts || {}),
-    orderItemsByOrder: (a) => dataLayer.orders.itemsByOrder(a.business_id, a.opts || {}),
-    stockAdjust: (a) => dataLayer.stock.adjust(a.business_id, a.product_id, a.change, a.reason, a.opts || {}),
-    stockMovements: (a) => dataLayer.stock.movements(a.business_id, a.product_id || null),
-    // OFFLINE 5 — resolution-only local corrections (no queue ops).
-    customerDiscardLocal: (id) => dataLayer.customers.discardLocal(id),
-    productDiscardLocal: (id) => dataLayer.products.discardLocal(id),
-    stockSetLocal: (a) => dataLayer.stock.setLocalStock(a.product_id, a.value, a.note || null),
-    syncStatus: () => syncStatus(),
-    // --- OFFLINE 3 sync engine surface (transport lives in the renderer) ---
-    // Failed ops re-arm here: each push attempt retries them (the queue's
-    // contract). A permanently refused op (e.g. an invalid transition) stays
-    // visible as "needs attention" instead of vanishing.
-    syncPendingOps: () => {
-      // retryFailed() re-arms 'failed' ops only — 'conflict' ops stay parked
-      // (OFFLINE 4: conflicts are never retried automatically).
-      dataLayer.queue.retryFailed();
-      return dataLayer.queue
-        .pending()
-        .slice(0, 200)
-        .map((o) => ({ id: o.id, entity: o.entity, client_id: o.client_id, operation: o.operation, payload: o.payload }));
-    },
-    syncApplyPushOutcome: (result) => {
-      const out = markPushOutcome(dataLayer, result);
-      if (out.synced || out.conflicts || out.failed) lastSyncAt = new Date().toISOString();
-      broadcastSync(win);
-      return out;
-    },
-    syncConflicts: () => dataLayer.queue.conflicts(),
-    // OFFLINE 5 — resolution actions on a parked conflict (broadcast so the
-    // TopBar's "needs attention" count updates immediately).
-    syncRequeue: (a) => {
-      const out = dataLayer.queue.requeue(a.queueId, a.payloadOverride || null);
-      if (out) broadcastSync(win);
-      return out;
-    },
-    syncResolveConflict: (a) => {
-      const out = dataLayer.queue.resolveConflict(a.queueId);
-      if (out) broadcastSync(win);
-      return out;
-    },
-    syncIngestMirror: (payload) => {
-      // since == null -> full pull (verify counts); else delta (per-row).
-      const res = applyPull(dataLayer, payload, { full: payload.since == null });
-      mirrorReady = true;
-      lastSyncAt = new Date().toISOString();
-      broadcastSync(win);
-      return res;
-    },
-    syncPullCursor: () => getCursor(dataLayer.db),
-    syncPendingOrderIds: () => dataLayer.queue.pendingOrderIds(),
-    syncSetSyncing: (b) => {
-      syncing = !!b;
-      broadcastSync(win);
-      return syncing;
-    },
-  };
-}
+let dataLayerApp = null; // createDataLayerApp(dataLayer) — shared handler surface
 
 let mainWindow = null;
 
+function broadcastSync(win) {
+  if (dataLayerApp && win && !win.isDestroyed()) {
+    win.webContents.send('coop:sync', dataLayerApp.status());
+  }
+}
+
 function registerDataLayerIpc() {
+  const handlers = dataLayerApp.handlers;
+  handlers._onStatusChange(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) broadcastSync(mainWindow);
+  });
   ipcMain.handle('coop:db', (event, { method, arg }) => {
-    const handlers = dbHandlers(mainWindow);
     if (typeof method !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, method)) {
       throw new Error(`Blocked non-allow-listed data-layer method: ${method}`);
     }
@@ -218,10 +124,9 @@ function registerDataLayerIpc() {
 // these events, and the status broadcast keeps the visible pill fresh.
 function watchConnectivity(win) {
   const update = () => {
-    online = net.isOnline();
+    const online = dataLayerApp.handlers.setOnline(net.isOnline());
     if (win && !win.isDestroyed()) {
       win.webContents.send('coop:net', { online });
-      broadcastSync(win);
     }
   };
   net.on('online', update);
@@ -231,6 +136,7 @@ function watchConnectivity(win) {
 
 app.whenReady().then(() => {
   dataLayer = createDataLayer(defaultDbPath(app.getPath('userData')));
+  dataLayerApp = createDataLayerApp(dataLayer); // cold start: trust an existing mirror
   registerDataLayerIpc();
   const win = createWindow();
   mainWindow = win;

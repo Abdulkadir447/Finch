@@ -11,7 +11,7 @@
  */
 'use strict';
 
-const { ulid } = require('./ids');
+const { ulid, SYNTHETIC_PREFIX } = require('./ids');
 
 const now = () => new Date().toISOString();
 
@@ -226,10 +226,31 @@ class ProductRepository {
 // Stock (operation-based, ADR-002 rule 5)
 // ---------------------------------------------------------------------------
 class StockRepository {
-  constructor(db, queue, products) {
+  constructor(db, queue, products, idmap) {
     this.db = db;
     this.queue = queue;
     this.products = products;
+    this.idmap = idmap;
+  }
+
+  /**
+   * Push-shape product reference: client_id for locally-created products,
+   * or the SERVER id (via id_map) for cloud-mirrored ones, which have no
+   * client_id. The server resolves whichever is present.
+   */
+  productRefs(productId) {
+    const p = this.products.get(productId);
+    if (!p) return null;
+    // Cloud-mirrored rows carry a SYNTHETIC client_id (srv-<server id>); they
+    // must be referenced by SERVER id (the server has no row with that
+    // client_id). Locally-created rows carry a real ULID client_id.
+    if (p.client_id && p.client_id.startsWith(SYNTHETIC_PREFIX)) {
+      return { product_client_id: null, product_server_id: Number(p.client_id.slice(SYNTHETIC_PREFIX.length)) };
+    }
+    if (p.client_id) {
+      return { product_client_id: p.client_id, product_server_id: null };
+    }
+    return { product_client_id: null, product_server_id: this.idmap ? this.idmap.serverId('product', productId) : null };
   }
 
   /** Apply a signed stock change + record a movement (offline-safe). */
@@ -246,9 +267,10 @@ class StockRepository {
         .prepare(`INSERT INTO stock_movements (client_id, business_id, product_id, change, reason, note, order_id, created_at)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(mc, business_id, product_id, change, reason, note ?? null, order_id ?? null, now());
+      const refs = this.productRefs(product_id) || {};
       this.queue.enqueue({
         business_id, entity: 'stock_movement', entity_id: Number(r.lastInsertRowid), client_id: mc, operation: 'create',
-        payload: { product_client_id: product.client_id, change, reason, note, order_id, applied_at: now() },
+        payload: { ...refs, change, reason, note, order_id, applied_at: now() },
       });
     });
     return this.products.get(product_id);
@@ -282,6 +304,8 @@ class StockRepository {
       this.db.prepare(`UPDATE products SET current_stock=?, updated_at=? WHERE id=?`).run(value, now(), product_id);
       if (delta !== 0) {
         const mc = ulid();
+        // Local-only correction (resolution of a rejected movement): recorded
+        // in the local ledger but NOT queued — it must not re-push.
         this.db
           .prepare(`INSERT INTO stock_movements (client_id, business_id, product_id, change, reason, note, order_id, created_at)
                     VALUES (?, ?, ?, ?, 'correction', ?, NULL, ?)`)
@@ -296,11 +320,29 @@ class StockRepository {
 // Orders (create deducts stock; status changes may restore it)
 // ---------------------------------------------------------------------------
 class OrderRepository {
-  constructor(db, queue, products, stock) {
+  constructor(db, queue, products, stock, idmap) {
     this.db = db;
     this.queue = queue;
     this.products = products;
     this.stock = stock;
+    this.idmap = idmap;
+  }
+
+  /**
+   * Push-shape customer reference: client_id for locally-created customers,
+   * or the SERVER id (via id_map) for cloud-mirrored ones, which have no
+   * client_id. The server resolves whichever is present.
+   */
+  customerRefs(customerId) {
+    const c = this.db.prepare(`SELECT client_id FROM customers WHERE id=?`).get(customerId);
+    if (!c) return null;
+    if (c.client_id && c.client_id.startsWith(SYNTHETIC_PREFIX)) {
+      return { customer_client_id: null, customer_server_id: Number(c.client_id.slice(SYNTHETIC_PREFIX.length)) };
+    }
+    if (c.client_id) {
+      return { customer_client_id: c.client_id, customer_server_id: null };
+    }
+    return { customer_client_id: null, customer_server_id: this.idmap ? this.idmap.serverId('customer', customerId) : null };
   }
 
   /**
@@ -311,11 +353,12 @@ class OrderRepository {
     const order_client_id = ulid();
     return this.db.tx(() => {
       const total = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
-      // The PUSH payload must carry CLIENT ids for cross-references (the
-      // server resolves customer_client_id -> server id; ADR-002). The local
-      // row itself keeps local integer ids for the local UI.
-      const customer = this.db.prepare(`SELECT client_id FROM customers WHERE id=?`).get(customer_id);
-      if (!customer) throw new Error(`customer ${customer_id} is not in the local database`);
+      // The PUSH payload carries client ids for locally-created references and
+      // SERVER ids for cloud-mirrored references (which have no client_id);
+      // the server resolves whichever is present (ADR-002). The local row
+      // itself keeps local integer ids for the local UI.
+      const custRefs = this.customerRefs(customer_id);
+      if (!custRefs) throw new Error(`customer ${customer_id} is not in the local database`);
       const r = this.db
         .prepare(
           `INSERT INTO orders (client_id, business_id, customer_id, status, total_amount, order_date, updated_at)
@@ -333,15 +376,15 @@ class OrderRepository {
           )
           .run(line_client_id, business_id, order_id, it.product_id, it.quantity, it.unit_price, it.quantity * it.unit_price);
         const item = this.db.prepare(`SELECT * FROM order_items WHERE client_id=?`).get(line_client_id);
-        const product = this.db.prepare(`SELECT client_id FROM products WHERE id=?`).get(it.product_id);
-        if (!product) throw new Error(`product ${it.product_id} is not in the local database`);
+        const prodRefs = this.stock.productRefs(it.product_id);
+        if (!prodRefs) throw new Error(`product ${it.product_id} is not in the local database`);
         this.queue.enqueue({
           business_id, entity: 'order_item', entity_id: item.id, client_id: line_client_id, operation: 'create',
-          // Push shape: references by client_id (sync.py _apply_order_item).
+          // Push shape: references by client_id or server id (sync.py _apply_order_item).
           payload: {
             ...item,
             order_client_id,
-            product_client_id: product.client_id,
+            ...prodRefs,
           },
         });
         // Deduct stock (operation-based) — mirrors the server's create-time deduction.
@@ -354,8 +397,8 @@ class OrderRepository {
       const order = this.get(order_id);
       this.queue.enqueue({
         business_id, entity: 'order', entity_id: order_id, client_id: order_client_id, operation: 'create',
-        // Push shape: the server resolves customer_client_id (sync.py _apply_order).
-        payload: { ...order, customer_client_id: customer.client_id },
+        // Push shape: the server resolves the customer by client_id or server id.
+        payload: { ...order, ...custRefs },
       });
       return order;
     });
@@ -433,9 +476,10 @@ StockRepository.prototype._adjustInline = function (business_id, product_id, cha
     .prepare(`INSERT INTO stock_movements (client_id, business_id, product_id, change, reason, note, order_id, created_at)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(mc, business_id, product_id, change, reason, note ?? null, order_id ?? null, now());
+  const refs = this.productRefs(product_id) || {};
   this.queue.enqueue({
     business_id, entity: 'stock_movement', entity_id: Number(r.lastInsertRowid), client_id: mc, operation: 'create',
-    payload: { product_client_id: product.client_id, change, reason, note, order_id, applied_at: now() },
+    payload: { ...refs, change, reason, note, order_id, applied_at: now() },
   });
 };
 

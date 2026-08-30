@@ -26,11 +26,22 @@ const {
 function createDataLayer(file, opts = {}) {
   const db = openDb(file, opts);
   const queue = new SyncQueue(db);
+  // server-id <-> local-id mapping (populated by mirror pulls; sync.js).
+  const idmap = {
+    serverId: (entity, localId) => {
+      const r = db.prepare(`SELECT server_id FROM id_map WHERE entity=? AND local_id=?`).get(entity, Number(localId));
+      return r ? Number(r.server_id) : null;
+    },
+    localId: (entity, serverId) => {
+      const r = db.prepare(`SELECT local_id FROM id_map WHERE entity=? AND server_id=?`).get(entity, Number(serverId));
+      return r ? Number(r.local_id) : null;
+    },
+  };
   const business = new BusinessRepository(db);
   const customers = new CustomerRepository(db, queue);
   const products = new ProductRepository(db, queue);
-  const stock = new StockRepository(db, queue, products);
-  const orders = new OrderRepository(db, queue, products, stock);
+  const stock = new StockRepository(db, queue, products, idmap);
+  const orders = new OrderRepository(db, queue, products, stock, idmap);
   return {
     db,
     queue,
@@ -39,6 +50,7 @@ function createDataLayer(file, opts = {}) {
     products,
     stock,
     orders,
+    idmap,
     close: () => db.close(),
   };
 }

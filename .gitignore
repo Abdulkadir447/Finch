@@ -44,3 +44,6 @@ Thumbs.db
 
 # Python virtualenvs
 .venv/
+
+# OFFLINE 6 E2E build artifact (compiled renderer sync stack)
+electron/e2e/renderer/

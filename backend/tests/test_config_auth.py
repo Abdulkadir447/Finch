@@ -58,3 +58,26 @@ def test_clerk_frontend_api_explicit_wins(clean_env, monkeypatch):
     monkeypatch.setenv("COOP_ENV", "production")
     monkeypatch.setenv("CLERK_FRONTEND_API", "prod.clerk.accounts.dev")
     assert clerk_auth.get_frontend_api() == "prod.clerk.accounts.dev"
+
+
+async def test_e2e_test_auth_seam(clean_env, monkeypatch):
+    """OFFLINE 6 seam: COOP_TEST_AUTH_USER lets a spawned server process run
+    the real request path without a live Clerk instance (non-production)."""
+    monkeypatch.setenv("COOP_ENV", "testing")
+    monkeypatch.setenv("COOP_TEST_AUTH_USER", "e2e-owner")
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="anything")
+    user = await clerk_auth.verify_clerk_token(creds)
+    assert user.user_id == "e2e-owner"
+    assert user.session_id == "e2e-session"
+
+
+async def test_e2e_test_auth_seam_forbidden_in_production(clean_env, monkeypatch):
+    monkeypatch.setenv("COOP_ENV", "production")
+    monkeypatch.setenv("COOP_TEST_AUTH_USER", "e2e-owner")
+    from fastapi.security import HTTPAuthorizationCredentials
+
+    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials="anything")
+    with pytest.raises(RuntimeError, match="forbidden in production"):
+        await clerk_auth.verify_clerk_token(creds)

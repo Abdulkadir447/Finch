@@ -14,9 +14,20 @@ def _cust(cid, name="Grace", email="g@x.com"):
 
 
 def _prod(cid, name="Chair", sku="C1", price=100.0, stock=10):
+    """Product CREATE op. The server ignores current_stock in a create payload
+    (ADR-002 rule 5 — stock syncs as operations); use _prod_initial to pair
+    the create with its 'initial' movement, as the real client does."""
     return {"entity": "product", "client_id": cid, "operation": "create",
             "payload": {"name": name, "sku": sku, "unit_price": price, "cost_price": None,
                         "current_stock": stock, "reorder_level": 5, "category": None, "description": None}}
+
+
+def _prod_initial(cid, stock, cid_suffix="-INIT"):
+    """The 'initial' stock movement that pairs a product create (client
+    protocol: stock is established by operations, never by the create value)."""
+    if not stock:
+        return []
+    return [_move(cid + cid_suffix, cid, change=stock, reason="initial")]
 
 
 def _move(cid, prod_cid, change, reason="correction"):
@@ -74,7 +85,7 @@ async def test_update_and_delete_apply(session_factory):
 async def test_stock_movement_applies_change_exactly_once(session_factory):
     async with session_factory() as db:
         biz_id = 997
-        await sync.apply_push(db, biz_id, [_prod("PROD1", stock=10)])
+        await sync.apply_push(db, biz_id, [_prod("PROD1", stock=10), *_prod_initial("PROD1", 10)])
         # A -3 movement, pushed twice (retry) must apply only once.
         await sync.apply_push(db, biz_id, [_move("MOVE1", "PROD1", change=-3)])
         await sync.apply_push(db, biz_id, [_move("MOVE1", "PROD1", change=-3)])
@@ -82,7 +93,7 @@ async def test_stock_movement_applies_change_exactly_once(session_factory):
         assert p.current_stock == 7, "the -3 movement must apply exactly once (10 -> 7)"
         moves = (await db.execute(
             select(StockMovement).where(StockMovement.business_id == biz_id))).scalars().all()
-        assert len(moves) == 1, "exactly one movement row"
+        assert len(moves) == 2, "exactly the initial + the -3 movement, the retry adds nothing"
         await db.commit()
 
 
@@ -92,7 +103,7 @@ async def test_stock_cannot_go_negative(session_factory):
     not a generic failure — and nothing is applied."""
     async with session_factory() as db:
         biz_id = 996
-        await sync.apply_push(db, biz_id, [_prod("PROD1", stock=2)])
+        await sync.apply_push(db, biz_id, [_prod("PROD1", stock=2), *_prod_initial("PROD1", 2)])
         r = await sync.apply_push(db, biz_id, [_move("MOVE1", "PROD1", change=-5)])
         assert r["applied"] == 0
         assert len(r["conflicts"]) == 1
@@ -189,8 +200,9 @@ async def test_unknown_reference_is_reported_not_fatal(session_factory):
         assert len(r["conflicts"]) == 1
         c = r["conflicts"][0]
         assert c["reason"] == "not_found"
-        assert "customer_client_id" in c["error"]
+        assert "customer" in c["error"] and "DOES_NOT_EXIST" in c["error"]
         assert c["local"]["customer_client_id"] == "DOES_NOT_EXIST"
+        assert c["local"]["customer_server_id"] is None
         await db.commit()
 
 
@@ -270,18 +282,18 @@ async def test_order_status_update_applies_transition(session_factory):
     """An offline status change syncs as an order 'update' op: the transition
     is validated against the shared machine, and a retried batch is a no-op
     (no double apply, no double stock restore)."""
-    from backend.models import Order, StockMovement
+    from backend.models import Order
 
     async with session_factory() as db:
         biz_id = 997
         r = await sync.apply_push(db, biz_id, [
-            _cust("CUST1"), _prod("PROD1", stock=10), _order("ORD1", "CUST1"),
+            _cust("CUST1"), _prod("PROD1", stock=10), *_prod_initial("PROD1", 10), _order("ORD1", "CUST1"),
             # Cancellation: the order update + its stock restore (operation, rule 5).
             {"entity": "order", "client_id": "ORD1", "operation": "update",
              "payload": {"status": "cancelled"}},
             _move("MOVE-CANCEL", "PROD1", change=2, reason="order_cancelled"),
         ])
-        assert r["applied"] == 5, f"expected 5 applied, errors={r['errors']}"
+        assert r["applied"] == 6, f"expected 6 applied, errors={r['errors']}"
 
         order = (await db.execute(select(Order).where(Order.business_id == biz_id))).scalars().first()
         assert order.status.value == "cancelled"
@@ -463,6 +475,7 @@ async def test_duplicate_order_push_remains_idempotent(session_factory):
         batch = [
             _cust("CUST1"),
             _prod("PROD1", stock=10),
+            *_prod_initial("PROD1", 10),
             _order("ORD1", "CUST1"),
             {"entity": "order_item", "client_id": "ORDIT1", "operation": "create",
              "payload": {"order_client_id": "ORD1", "product_client_id": "PROD1",
@@ -470,15 +483,17 @@ async def test_duplicate_order_push_remains_idempotent(session_factory):
             _move("MOVE1", "PROD1", change=-2, reason="order"),
         ]
         r1 = await sync.apply_push(db, biz_id, batch)
-        assert r1["applied"] == 5 and r1["skipped"] == 0
+        assert r1["applied"] == 6 and r1["skipped"] == 0
         r2 = await sync.apply_push(db, biz_id, batch)  # crash + retry
         assert r2["applied"] == 0
-        assert r2["skipped"] == 5
+        assert r2["skipped"] == 6
         assert r2["conflicts"] == [] and r2["failed"] == []
         assert r2["ids"]["ORD1"] == r1["ids"]["ORD1"], "stable client_id -> server id map"
         n_orders = await _count(db, Order, biz_id)
         n_moves = await _count(db, StockMovement, biz_id)
-        assert n_orders == 1 and n_moves == 1
+        assert n_orders == 1 and n_moves == 2  # initial + order deduction, each once
+        prod = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        assert prod.current_stock == 8, "10 - 2, applied exactly once"
         await db.commit()
 
 

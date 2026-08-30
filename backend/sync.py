@@ -145,6 +145,33 @@ async def _resolve_client_id(db, model, client_id: str) -> Optional[int]:
     return row
 
 
+async def _resolve_ref(db, model, client_id: Optional[str], server_id: Optional[int], business_id: int) -> Optional[int]:
+    """Resolve a cross-reference from a push payload (ADR-002).
+
+    Locally-created rows carry a client_id; cloud-mirrored rows carry the
+    SERVER id (they have no client_id). Whichever is present is resolved,
+    tenant-scoped; a server id is only honoured when it belongs to THIS
+    business (a stale/guessed id from another tenant is a miss, not a
+    resolution).
+    """
+    if client_id:
+        row = await _resolve_client_id(db, model, client_id)
+        if row is not None:
+            return row
+    if server_id is not None:
+        try:
+            sid = int(server_id)
+        except (TypeError, ValueError):
+            return None
+        row = (
+            await db.execute(
+                select(model.id).where(model.id == sid, model.business_id == business_id)
+            )
+        ).scalars().first()
+        return row
+    return None
+
+
 async def apply_push(db, business_id: int, operations: list[dict[str, Any]]) -> dict[str, Any]:
     """Apply a batch of client operations idempotently. Returns a summary.
 
@@ -352,7 +379,13 @@ async def _apply_product(db, business_id, client_id, operation, payload):
         description=payload.get("description"),
         unit_price=payload.get("unit_price") or 0.0,
         cost_price=payload.get("cost_price"),
-        current_stock=payload.get("current_stock") or 0,
+        # ADR-002 rule 5: stock syncs as OPERATIONS, never as a value. The
+        # client's current_stock in the create payload is ignored on purpose:
+        # initial stock arrives as the paired 'initial' stock movement (which
+        # is applied once, keyed by its own client_id). Starting here at the
+        # client's value AND applying the initial movement would double-count
+        # (proven by the OFFLINE 6 E2E: lamp 10 -> 18 instead of 8).
+        current_stock=0,
         reorder_level=payload.get("reorder_level") or 0,
         created_by="offline-sync",
     )
@@ -396,12 +429,13 @@ async def _apply_order(db, business_id, client_id, operation, payload):
             reason="not_found", entity="order", client_id=client_id,
             local={"operation": operation},
         )
-    customer_id = await _resolve_client_id(db, Customer, payload.get("customer_client_id"))
+    customer_id = await _resolve_ref(db, Customer, payload.get("customer_client_id"), payload.get("customer_server_id"), business_id)
     if customer_id is None:
         raise SyncConflict(
-            f"order {client_id}: unknown customer_client_id {payload.get('customer_client_id')!r}",
+            f"order {client_id}: unknown customer reference "
+            f"(client_id={payload.get('customer_client_id')!r}, server_id={payload.get('customer_server_id')!r})",
             reason="not_found", entity="order", client_id=client_id,
-            local={"customer_client_id": payload.get("customer_client_id")},
+            local={"customer_client_id": payload.get("customer_client_id"), "customer_server_id": payload.get("customer_server_id")},
         )
     status = payload.get("status") or "pending"
     if status not in {s.value for s in OrderStatus}:
@@ -426,19 +460,21 @@ async def _apply_order_item(db, business_id, client_id, operation, payload):
         return existing_id, False
     if operation != "create":
         raise SyncError(f"order_item {client_id}: operation {operation} without an existing row")
-    order_id = await _resolve_client_id(db, Order, payload.get("order_client_id"))
-    product_id = await _resolve_client_id(db, Product, payload.get("product_client_id"))
+    order_id = await _resolve_ref(db, Order, payload.get("order_client_id"), payload.get("order_server_id"), business_id)
+    product_id = await _resolve_ref(db, Product, payload.get("product_client_id"), payload.get("product_server_id"), business_id)
     if order_id is None:
         raise SyncConflict(
-            f"order_item {client_id}: unknown order_client_id {payload.get('order_client_id')!r}",
+            f"order_item {client_id}: unknown order reference "
+            f"(client_id={payload.get('order_client_id')!r}, server_id={payload.get('order_server_id')!r})",
             reason="not_found", entity="order_item", client_id=client_id,
-            local={"order_client_id": payload.get("order_client_id")},
+            local={"order_client_id": payload.get("order_client_id"), "order_server_id": payload.get("order_server_id")},
         )
     if product_id is None:
         raise SyncConflict(
-            f"order_item {client_id}: unknown product_client_id {payload.get('product_client_id')!r}",
+            f"order_item {client_id}: unknown product reference "
+            f"(client_id={payload.get('product_client_id')!r}, server_id={payload.get('product_server_id')!r})",
             reason="not_found", entity="order_item", client_id=client_id,
-            local={"product_client_id": payload.get("product_client_id")},
+            local={"product_client_id": payload.get("product_client_id"), "product_server_id": payload.get("product_server_id")},
         )
     qty = payload.get("quantity") or 0
     price = payload.get("unit_price") or 0.0
@@ -466,12 +502,13 @@ async def _apply_stock_movement(db, business_id, client_id, operation, payload):
         return existing_id, False  # idempotent: the change is applied exactly once
     if operation != "create":
         raise SyncError(f"stock_movement {client_id}: operation {operation} without an existing row")
-    product_id = await _resolve_client_id(db, Product, payload.get("product_client_id"))
+    product_id = await _resolve_ref(db, Product, payload.get("product_client_id"), payload.get("product_server_id"), business_id)
     if product_id is None:
         raise SyncConflict(
-            f"stock_movement {client_id}: unknown product_client_id {payload.get('product_client_id')!r}",
+            f"stock_movement {client_id}: unknown product reference "
+            f"(client_id={payload.get('product_client_id')!r}, server_id={payload.get('product_server_id')!r})",
             reason="not_found", entity="stock_movement", client_id=client_id,
-            local={"product_client_id": payload.get("product_client_id")},
+            local={"product_client_id": payload.get("product_client_id"), "product_server_id": payload.get("product_server_id")},
         )
     change = int(payload.get("change") or 0)
     reason = payload.get("reason") or "correction"

@@ -33,8 +33,14 @@ const CURSOR_KEY = 'pull_cursor';
 
 /** Stable local identity key: the row's ULID, or `srv-<server_id>` for
  *  cloud-native rows (client_id is null on the server). */
+// Cloud-native rows (client_id is null on the server) get a deterministic
+// SYNTHETIC local key so the mirror upsert is stable across pulls. A
+// synthetic key is NOT a real client id: push payloads must reference such
+// rows by their SERVER id instead (repositories.js checks SYNTHETIC_PREFIX).
+const SYNTHETIC_PREFIX = 'srv-';
+
 function keyFor(row) {
-  return row.client_id || `srv-${row.id}`;
+  return row.client_id || `${SYNTHETIC_PREFIX}${row.id}`;
 }
 
 function getCursor(db) {
@@ -238,4 +244,4 @@ function markPushOutcome(dataLayer, result) {
   return { synced, conflicts, failed };
 }
 
-module.exports = { applyPull, markPushOutcome, getCursor, keyFor };
+module.exports = { applyPull, markPushOutcome, getCursor, keyFor, SYNTHETIC_PREFIX };
