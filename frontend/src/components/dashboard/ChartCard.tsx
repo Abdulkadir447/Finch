@@ -1,6 +1,7 @@
 import React from 'react';
 import Chart from './chart';
-import { Card, Space, Typography, theme as antdTheme } from 'antd';
+import { radius, spacing, type as typeScale } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
 import type {
   ApexAxisChartSeries,
   ApexNonAxisChartSeries,
@@ -10,9 +11,9 @@ import type {
 export interface ChartCardProps {
   title: string;
   subtitle?: string;
-  /** Optional header-extra node (e.g. range switch — left as a slot for later phases). */
+  /** Optional header-extra node (e.g. range switch). */
   extra?: React.ReactNode;
-  type: 'line' | 'area' | 'bar' | 'donut' | 'pie';
+  type: 'line' | 'area' | 'bar' | 'column' | 'donut' | 'pie';
   options: ApexOptions;
   series: ApexAxisChartSeries | ApexNonAxisChartSeries;
   height?: number;
@@ -27,21 +28,12 @@ function isDarkColor(hex?: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5;
 }
 
-function isSeriesEmpty(series: ChartCardProps['series']): boolean {
-  if (!series || series.length === 0) return true;
-  return series.every((s) => {
-    const data = (s as { data?: unknown[] }).data;
-    return !data || data.length === 0;
-  });
-}
-
 /**
- * Theme-aware ApexCharts card for the Dashboard (UXDS 9.10 Charts Section).
+ * Co-op analytics chart card (Stitch "Revenue Overview" pattern).
  *
- * - Picks chart text/grid/tooltip colors from the ACTIVE antd theme tokens,
- *   so light/dark switching (Finch theme.ts) works with zero extra wiring.
- * - Empty state is handled natively by ApexCharts' `chart.noData` option —
- *   no custom chart implementation, per project convention.
+ * - CoopCard chrome (title-md heading + muted subtitle + extra slot).
+ * - Chart text/grid/tooltip colors follow the light Co-op palette.
+ * - Empty state is handled natively by ApexCharts' `chart.noData` option.
  */
 const ChartCard: React.FC<ChartCardProps> = ({
   title,
@@ -52,35 +44,33 @@ const ChartCard: React.FC<ChartCardProps> = ({
   series,
   height = 320,
 }) => {
-  const { token } = antdTheme.useToken();
-  const dark = isDarkColor(token.colorBgBase);
-  const empty = isSeriesEmpty(series);
+  const { colors, isDark } = useCoopTheme();
+  const dark = isDarkColor(colors.surface) || isDark;
 
   const baseOptions: ApexOptions = {
     chart: {
-      fontFamily: token.fontFamily,
-      foreColor: token.colorTextSecondary,
+      fontFamily: 'Inter, sans-serif',
+      foreColor: colors.onSurfaceVariant,
       toolbar: { show: false },
       zoom: { enabled: false },
-      animations: { enabled: true, speed: 220 }, // UXDS 9.25
+      animations: { enabled: true, speed: 220 },
     },
     // ApexCharts v6: `noData` is a top-level option — native empty state.
     noData: {
       text: 'No data available yet',
       align: 'center',
       verticalAlign: 'middle',
-      // Secondary (not tertiary) text: keeps AA contrast on dark surfaces.
-      style: { color: token.colorTextSecondary, fontSize: `${token.fontSize}px` },
+      style: { color: colors.outline, fontSize: '14px' },
     },
-    grid: { borderColor: token.colorBorderSecondary, strokeDashArray: 4 },
+    grid: { borderColor: colors.borderSubtle, strokeDashArray: 4 },
     dataLabels: { enabled: false },
     tooltip: { theme: dark ? 'dark' : 'light' },
     xaxis: {
       axisBorder: { show: false },
       axisTicks: { show: false },
-      labels: { style: { colors: token.colorTextTertiary } },
+      labels: { style: { colors: colors.outline } },
     },
-    yaxis: { labels: { style: { colors: token.colorTextTertiary } } },
+    yaxis: { labels: { style: { colors: colors.outline } } },
   };
 
   // Shallow-merge per chart group so caller options win where provided.
@@ -92,27 +82,42 @@ const ChartCard: React.FC<ChartCardProps> = ({
   if (options.yaxis) merged.yaxis = { ...baseOptions.yaxis, ...options.yaxis };
 
   return (
-    <Card
-      title={
-        <Space size={8}>
-          <Typography.Text
-            strong
-            style={{ color: token.colorText, fontSize: token.fontSizeHeading4 }}
-          >
-            {title}
-          </Typography.Text>
-          {subtitle && (
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, fontWeight: 400 }}>
-              {subtitle}
-            </Typography.Text>
-          )}
-        </Space>
-      }
-      extra={extra}
-      styles={{ body: { padding: 16 } }}
+    <div
+      style={{
+        background: colors.surfaceContainerLowest,
+        border: `1px solid ${colors.borderSubtle}`,
+        borderRadius: radius.lg,
+        padding: 20,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
     >
-      <Chart options={merged} series={series} type={type} height={height} />
-    </Card>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: spacing.md,
+          marginBottom: 16,
+        }}
+      >
+        <div>
+          <div style={{ ...typeScale.titleMd, color: colors.onSurface }}>{title}</div>
+          {subtitle && (
+            <div style={{ ...typeScale.bodyCompact, fontSize: 12, color: colors.outline, marginTop: 2 }}>
+              {subtitle}
+            </div>
+          )}
+        </div>
+        {extra}
+      </div>
+      <div style={{ flex: 1 }}>
+        {/* 'column' is supported by ApexCharts at runtime (vertical bars);
+            the react wrapper's type union just doesn't list it. */}
+        <Chart options={merged} series={series} type={type as Exclude<typeof type, 'column'>} height={height} />
+      </div>
+    </div>
   );
 };
 

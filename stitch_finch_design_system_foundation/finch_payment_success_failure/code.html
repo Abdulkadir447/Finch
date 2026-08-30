@@ -1,0 +1,169 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Payment Status Screens</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#b55700",
+                        "primary-fixed": "#e1e0ff",
+                        "tertiary-fixed": "#ffdbc8",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#311300",
+                        "surface-container-low": "#f5f2fe",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#c0c1ff",
+                        "on-primary-container": "#f9f6ff",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "on-secondary-fixed": "#25005a",
+                        "error": "#ba1a1a",
+                        "surface-container": "#efecf9",
+                        "on-secondary-container": "#fffbff",
+                        "on-primary-fixed-variant": "#2c2cc3",
+                        "primary": "#4143d5",
+                        "surface-dim": "#dbd8e5",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#474adb",
+                        "on-tertiary-fixed-variant": "#733500",
+                        "on-background": "#1b1b23",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#5a00c6",
+                        "surface-bright": "#fcf8ff",
+                        "surface-container-high": "#e9e6f3",
+                        "secondary": "#712ae2",
+                        "on-tertiary-container": "#fff6f2",
+                        "on-surface": "#1b1b23",
+                        "surface-container-highest": "#e4e1ed",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#e4e1ed",
+                        "background": "#fcf8ff",
+                        "tertiary": "#904400",
+                        "on-primary-fixed": "#05006c",
+                        "on-surface-variant": "#464555",
+                        "surface": "#fcf8ff",
+                        "secondary-container": "#8a4cfc",
+                        "outline-variant": "#c6c5d7",
+                        "inverse-surface": "#303039",
+                        "primary-container": "#5b5fef",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#f2effc",
+                        "outline": "#767586",
+                        "secondary-fixed": "#eaddff",
+                        "secondary-fixed-dim": "#d2bbff",
+                        "tertiary-fixed-dim": "#ffb689",
+                        "success": "#16a34a",
+                        "on-success": "#ffffff",
+                        "success-container": "#bbf7d0",
+                        "on-success-container": "#166534"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "md": "16px",
+                        "xs": "4px",
+                        "sm": "8px",
+                        "xl": "32px",
+                        "2xl": "48px",
+                        "3xl": "64px"
+                    },
+                    "fontFamily": {
+                        "body-compact": ["Inter"],
+                        "page-title": ["Inter"],
+                        "page-title-mobile": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "section-heading": ["Inter"],
+                        "body-default": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-compact": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "page-title": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "page-title-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "section-heading": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-default": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex items-center justify-center p-lg font-body-default">
+<!-- Container for both states side-by-side for presentation -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-xl max-w-5xl w-full">
+<!-- Success State Modal -->
+<div class="bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/30 flex flex-col items-center justify-center p-2xl relative overflow-hidden">
+<!-- Decorative background element -->
+<div class="absolute -top-24 -right-24 w-48 h-48 bg-success-container rounded-full blur-3xl opacity-30"></div>
+<div class="w-20 h-20 bg-success-container rounded-full flex items-center justify-center mb-lg relative z-10 animate-[pulse_2s_infinite]">
+<span class="material-symbols-outlined text-[40px] text-on-success-container" data-icon="check_circle" data-weight="fill">check_circle</span>
+</div>
+<h2 class="font-section-heading text-section-heading text-on-surface mb-sm text-center relative z-10">Payment Successful</h2>
+<p class="font-body-default text-body-default text-on-surface-variant mb-xl text-center relative z-10">Your transaction has been processed securely.</p>
+<!-- Transaction Details -->
+<div class="w-full bg-surface-container-low rounded-lg p-lg mb-xl border border-surface-dim relative z-10">
+<div class="flex justify-between items-center mb-md border-b border-surface-variant pb-sm">
+<span class="font-body-compact text-body-compact text-on-surface-variant">Amount Paid</span>
+<span class="font-section-heading text-section-heading text-on-surface">$249.00</span>
+</div>
+<div class="flex justify-between items-center mb-sm">
+<span class="font-body-compact text-body-compact text-on-surface-variant">Transaction ID</span>
+<span class="font-body-compact text-body-compact text-on-surface font-mono">TXN-8F92-K4M</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-compact text-body-compact text-on-surface-variant">Date</span>
+<span class="font-body-compact text-body-compact text-on-surface">Oct 24, 2023, 14:32 PST</span>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors duration-200 rounded-lg py-md px-lg font-body-default text-body-default font-semibold flex items-center justify-center gap-sm relative z-10 shadow-[0_4px_12px_rgba(91,95,239,0.2)]">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Back to Dashboard
+            </button>
+</div>
+<!-- Failure State Modal -->
+<div class="bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/30 flex flex-col items-center justify-center p-2xl relative overflow-hidden">
+<!-- Decorative background element -->
+<div class="absolute -top-24 -left-24 w-48 h-48 bg-error-container rounded-full blur-3xl opacity-30"></div>
+<div class="w-20 h-20 bg-error-container rounded-full flex items-center justify-center mb-lg relative z-10">
+<span class="material-symbols-outlined text-[40px] text-error" data-icon="error" data-weight="fill">error</span>
+</div>
+<h2 class="font-section-heading text-section-heading text-on-surface mb-sm text-center relative z-10">Payment Failed</h2>
+<p class="font-body-default text-body-default text-on-surface-variant mb-lg text-center relative z-10">We couldn't process your transaction.</p>
+<!-- Error Details -->
+<div class="w-full bg-error-container/20 rounded-lg p-md mb-xl border border-error-container relative z-10 flex items-start gap-md">
+<span class="material-symbols-outlined text-error mt-xs" data-icon="info">info</span>
+<div>
+<h3 class="font-label-caps text-label-caps text-error mb-xs">Reason</h3>
+<p class="font-body-compact text-body-compact text-on-surface-variant">Insufficient funds available on the selected payment method. Please use a different card or contact your bank.</p>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row w-full gap-md relative z-10">
+<button class="flex-1 bg-surface-container-low border border-outline-variant text-on-surface hover:bg-surface-variant transition-colors duration-200 rounded-lg py-md px-md font-body-compact text-body-compact font-semibold flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined" data-icon="support_agent">support_agent</span>
+                    Contact Support
+                </button>
+<button class="flex-1 bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors duration-200 rounded-lg py-md px-md font-body-compact text-body-compact font-semibold flex items-center justify-center gap-sm shadow-[0_4px_12px_rgba(91,95,239,0.2)]">
+<span class="material-symbols-outlined" data-icon="refresh">refresh</span>
+                    Try Again
+                </button>
+</div>
+</div>
+</div>
+</body></html>

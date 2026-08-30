@@ -1,4 +1,4 @@
-"""Shared fixtures for the Finch backend test suite.
+"""Shared fixtures for the Co-op backend test suite.
 
 Uses an isolated SQLite database (or Postgres when TEST_DATABASE_URL is set)
 and overrides the two auth/db dependencies so tests can drive multiple tenants
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-os.environ.setdefault("FINCH_ENV", "testing")
+os.environ.setdefault("COOP_ENV", "testing")
 
 import pytest
 import pytest_asyncio
@@ -25,7 +25,7 @@ from backend.models import Base
 async def engine(tmp_path):
     """Per-test isolated database. Postgres when TEST_DATABASE_URL is set,
     otherwise a temp SQLite file (aiosqlite)."""
-    url = os.getenv("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{tmp_path / 'finch_test.db'}"
+    url = os.getenv("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{tmp_path / 'coop_test.db'}"
     eng = create_async_engine(url)
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

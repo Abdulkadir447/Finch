@@ -1,5 +1,7 @@
 /**
- * Settings module (Task 9, UXDS Ch15) — two-column layout (UXDS 15.3).
+ * Settings module (Task 9, UXDS Ch15) — two-column layout (UXDS 15.3),
+ * restyled onto the Co-op design layer: PageHeader · CoopCard section
+ * menu · CoopCard company form · shared loading/empty states.
  *
  * Scope this task: Company Settings only (UXDS 15.6), fully functional.
  * All other categories render honest "Coming soon" panels — no invented
@@ -11,22 +13,17 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Button,
-  Card,
   Col,
   Divider,
-  Empty,
   Form,
   Input,
   Menu,
   Row,
-  Select,
   Space,
-  Spin,
   Typography,
   message,
-  theme as antdTheme,
 } from 'antd';
+import CoopSelect from '../../components/ui/CoopSelect';
 import {
   BankOutlined,
   BellOutlined,
@@ -39,6 +36,14 @@ import {
 } from '@ant-design/icons';
 import { useUser } from '@clerk/react';
 import { CURRENCY_OPTIONS, TIMEZONE_OPTIONS, useSettings } from './useSettings';
+import {
+  CoopButton,
+  CoopCard,
+  CoopErrorState,
+  CoopEmptyState,
+  CoopLoading,
+} from '../../components/ui';
+import PageHeader from '../../components/layout/PageHeader';
 
 const SECTIONS = [
   { key: 'company', label: 'Company', icon: <BankOutlined /> },
@@ -74,7 +79,6 @@ interface CompanyFormValues {
 }
 
 const SettingsPage: React.FC = () => {
-  const { token } = antdTheme.useToken();
   const [messageApi, messageCtx] = message.useMessage();
   const [active, setActive] = useState('company');
   const [form] = Form.useForm<CompanyFormValues>();
@@ -135,32 +139,28 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div>
       {messageCtx}
 
-      {/* Header (UXDS 15.4) */}
-      <Space direction="vertical" size={2}>
-        <Typography.Title level={2} style={{ margin: 0, color: token.colorText, fontWeight: 600 }}>
-          Settings
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          Configure your business and application preferences.
-        </Typography.Text>
-      </Space>
+      <PageHeader
+        title="Settings"
+        subtitle="Configure your business and application preferences."
+      />
 
       {error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error.isAuthError ? 'Authentication required' : 'Unable to load settings'}
-          description={error.message}
-        />
+        <div style={{ marginBottom: 16 }}>
+          <CoopErrorState
+            title={error.isAuthError ? 'Authentication required' : 'Unable to load settings'}
+            detail={error.message}
+            onRetry={() => undefined}
+          />
+        </div>
       )}
 
       {/* Two-column layout (UXDS 15.3) */}
       <Row gutter={[16, 16]}>
         <Col xs={24} md={6} lg={5}>
-          <Card styles={{ body: { padding: 8 } }}>
+          <CoopCard flush bodyPadding={8}>
             <Menu
               mode="inline"
               selectedKeys={[active]}
@@ -168,43 +168,42 @@ const SettingsPage: React.FC = () => {
               items={SECTIONS.map((s) => ({ key: s.key, icon: s.icon, label: s.label }))}
               style={{ border: 'none' }}
             />
-          </Card>
+          </CoopCard>
         </Col>
 
         <Col xs={24} md={18} lg={19}>
           {active === 'company' ? (
-            <Card
+            <CoopCard
               title="Company Settings"
               extra={
                 <Space>
-                  <Button onClick={handleReset} disabled={loading || saving}>
+                  <CoopButton variant="secondary" onClick={handleReset} disabled={loading || saving}>
                     Reset
-                  </Button>
-                  <Button type="primary" onClick={handleSave} loading={saving} disabled={loading}>
+                  </CoopButton>
+                  <CoopButton onClick={handleSave} loading={saving} disabled={loading}>
                     Save Changes
-                  </Button>
+                  </CoopButton>
                 </Space>
               }
             >
               {loading ? (
-                <div style={{ textAlign: 'center', padding: 48 }}>
-                  <Spin />
-                </div>
+                <CoopLoading height={240} label="Loading company settings…" />
               ) : (
                 <Form form={form} layout="vertical" requiredMark>
                   {/* Clerk identity — read-only, separate from business data */}
                   <Alert
                     type="info"
                     showIcon
-                    style={{ marginBottom: token.marginLG }}
+                    style={{ marginBottom: 24 }}
                     message="Signed-in account"
                     description={
                       <Space direction="vertical" size={0}>
                         <Typography.Text>
                           {user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'Unknown'}
                         </Typography.Text>
-                        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                          {user?.primaryEmailAddress?.emailAddress ?? ''} · managed by Clerk, not editable here
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          {user?.primaryEmailAddress?.emailAddress ?? ''} · managed by Clerk, not
+                          editable here
                         </Typography.Text>
                       </Space>
                     }
@@ -273,12 +272,12 @@ const SettingsPage: React.FC = () => {
                   <Row gutter={16}>
                     <Col xs={24} sm={12}>
                       <Form.Item label="Currency" name="currency" rules={[{ required: true }]}>
-                        <Select options={CURRENCY_OPTIONS.map((c) => ({ value: c, label: c }))} />
+                        <CoopSelect options={CURRENCY_OPTIONS.map((c) => ({ value: c, label: c }))} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} sm={12}>
                       <Form.Item label="Time Zone" name="timezone">
-                        <Select
+                        <CoopSelect
                           allowClear
                           showSearch
                           placeholder="Select time zone"
@@ -307,21 +306,14 @@ const SettingsPage: React.FC = () => {
                   </Row>
                 </Form>
               )}
-            </Card>
+            </CoopCard>
           ) : (
-            <Card title={COMING_SOON[active]?.title ?? 'Settings'}>
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Space direction="vertical" size={2}>
-                    <Typography.Text>{COMING_SOON[active]?.blurb}</Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      Coming soon — not yet implemented.
-                    </Typography.Text>
-                  </Space>
-                }
+            <CoopCard title={COMING_SOON[active]?.title ?? 'Settings'}>
+              <CoopEmptyState
+                title={COMING_SOON[active]?.title ?? 'Settings'}
+                description={`${COMING_SOON[active]?.blurb ?? ''} Coming soon — not yet implemented.`}
               />
-            </Card>
+            </CoopCard>
           )}
         </Col>
       </Row>

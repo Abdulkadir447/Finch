@@ -1,123 +1,121 @@
-import React, { useMemo } from 'react';
-import { Alert, Button, Col, Row, theme as antdTheme } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Col, Row, Segmented } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import type { ApexOptions } from 'apexcharts';
 import DashboardHeader from './DashboardHeader';
+import BriefingBanner from '../../components/dashboard/BriefingBanner';
 import { KPI_DEFINITIONS, formatCurrency } from './kpiConfig';
 import { useDashboardData } from './useDashboardData';
-import KpiCard, { KpiTrend } from '../../components/dashboard/KpiCard';
+import KpiCard from '../../components/dashboard/KpiCard';
 import ChartCard from '../../components/dashboard/ChartCard';
 import RecentOrdersTable, { OrderRow, OrderStatus } from '../../components/dashboard/RecentOrdersTable';
-import { brand, semantic } from '../../theme';
+import AiInsightsCard from '../../components/dashboard/AiInsightsCard';
+import InventoryBreakdownCard from '../../components/dashboard/InventoryBreakdownCard';
+import QuickActionsCard from '../../components/dashboard/QuickActionsCard';
+import TopProductsCard from '../../components/dashboard/TopProductsCard';
+import { useCoopTheme } from '../../theme-provider';
+import { CoopErrorState } from '../../components/ui';
 
 /**
- * Finch Dashboard — LIVE DATA WIRING (UXDS Chapter 9).
+ * Co-op Dashboard — Stitch presentation (finch_business_dashboard_qa_polished)
+ * over the EXISTING data architecture:
  *
- * Sections:
- *   1. DashboardHeader        — title / greeting / date (UXDS 9.5)
- *   2. KPI grid               — six stat cards fed by /dashboard/summary
- *   3. Charts row             — Revenue area (/dashboard/revenue/timeseries)
- *                               + Inventory donut (/dashboard/inventory/by-category)
- *   4. Recent Orders table    — /orders (latest 8)
+ *   useDashboardData (unchanged loader)
+ *     → KPI_DEFINITIONS (unchanged config layer)
+ *       → NEW Stitch presentation (this file + the dashboard components)
  *
- * Honesty rule: no fabricated numbers. Real zeros are shown as zeros;
- * empty series keep the native ApexCharts noData state; the Forecast KPI
- * stays empty until the AI module exists. Errors surface as a banner with
+ * Layout (12-col):
+ *   1. Briefing banner — Day 1 Briefing headline (dismissable)
+ *   2. Header          — business identity + live "last updated"
+ *   3. KPI row         — 4 stat cards (Revenue • Orders • Inventory • Products)
+ *   4. AI insights     — Co-op AI · Live Insights (real rule-based
+ *                        observations from the live data bundle + Ask Co-op)
+ *   5. Charts row      — Revenue (Monthly/Weekly) + Inventory breakdown donut
+ *   6. Bottom row      — Recent Orders + Quick Actions / Top Products
+ *
+ * Honesty rule: no fabricated numbers. Real zeros render as zeros, empty
+ * series keep the native "no data" state, and the AI summary is a
+ * placeholder until the AI module exists. Errors surface as a banner with
  * Retry (UXDS 9.23) without replacing the widgets.
  */
 
 const DAYS_IN_CHART = 30;
-const DAYS_IN_SPARK = 14;
+const DAYS_WEEKLY = 7;
+
+type RevenueRange = 'monthly' | 'weekly';
 
 const DashboardPage: React.FC = () => {
-  const { token } = antdTheme.useToken();
+  const { colors } = useCoopTheme();
   const navigate = useNavigate();
-  const { loading, error, summary, timeseries, categories, orders, retry } =
-    useDashboardData();
+  const {
+    loading,
+    error,
+    summary,
+    timeseries,
+    categories,
+    orders,
+    topProducts,
+    business,
+    lastUpdated,
+    retry,
+  } = useDashboardData();
+
+  const [range, setRange] = useState<RevenueRange>('monthly');
 
   // ------------------------------------------------------------------
-  // Series construction. Days without sales are filled with REAL zeros;
-  // when the backend reports no points at all the series stays empty so
-  // the chart shows its honest "No data available yet" state.
+  // Revenue series (real data, zero-filled for missing days).
+  //   monthly → last 30 days · weekly → last 7 days (same daily points).
   // ------------------------------------------------------------------
   const revenueSeries = useMemo(() => {
+    const days = range === 'monthly' ? DAYS_IN_CHART : DAYS_WEEKLY;
     if (timeseries.length === 0) return { categories: [] as string[], data: [] as number[] };
     const byDate = new Map(timeseries.map((p) => [p.date, p.revenue]));
-    const days = Array.from({ length: DAYS_IN_CHART }, (_, i) =>
-      dayjs().subtract(DAYS_IN_CHART - 1 - i, 'day').format('YYYY-MM-DD'),
+    const dayKeys = Array.from({ length: days }, (_, i) =>
+      dayjs().subtract(days - 1 - i, 'day').format('YYYY-MM-DD'),
     );
     return {
-      categories: days.map((d) => dayjs(d).format('MMM D')),
-      data: days.map((d) => byDate.get(d) ?? 0),
+      categories: dayKeys.map((d) => dayjs(d).format('MMM D')),
+      data: dayKeys.map((d) => byDate.get(d) ?? 0),
     };
-  }, [timeseries]);
+  }, [timeseries, range]);
 
-  const revenueSpark = useMemo(() => {
-    if (timeseries.length === 0) return [] as number[];
-    const byDate = new Map(timeseries.map((p) => [p.date, p.revenue]));
-    return Array.from({ length: DAYS_IN_SPARK }, (_, i) => {
-      const d = dayjs().subtract(DAYS_IN_SPARK - 1 - i, 'day').format('YYYY-MM-DD');
-      return byDate.get(d) ?? 0;
-    });
-  }, [timeseries]);
-
-  // ------------------------------------------------------------------
-  // KPI values from the summary payload.
-  // ------------------------------------------------------------------
-  const kpiLive = useMemo(() => {
-    if (!summary) return null;
-    const growthTrend: KpiTrend | null =
-      summary.revenue_growth_percent !== null
-        ? { percent: summary.revenue_growth_percent, comparisonLabel: 'Compared to last month' }
-        : null;
-    return {
-      profit: { value: formatCurrency(summary.profit_month), caption: 'This month' },
-      revenue: {
-        value: formatCurrency(summary.revenue_month),
-        trend: growthTrend,
-        caption: 'This month',
-        sparkData: revenueSpark,
-      },
-      orders: { value: String(summary.orders_month), caption: `${summary.orders_today} today` },
-      inventory: {
-        value: formatCurrency(summary.inventory_value),
-        caption: `${summary.low_stock_count} low · ${summary.out_of_stock_count} out · ${summary.products_count} products`,
-      },
-      'customer-growth': {
-        value: String(summary.customers_total),
-        caption: `${summary.customers_new_month} new this month`,
-      },
-    } as Record<string, { value: string; trend?: KpiTrend | null; caption?: string; sparkData?: number[] }>;
-  }, [summary, revenueSpark]);
-
-  // ------------------------------------------------------------------
-  // Chart options (theme-aware via tokens; series injected below).
-  // ------------------------------------------------------------------
   const revenueOptions: ApexOptions = useMemo(
     () => ({
       chart: { type: 'area' },
-      colors: [brand.primary],
+      colors: [colors.primary],
       stroke: { curve: 'monotoneCubic', width: 2.5 },
       fill: { type: 'gradient', gradient: { opacityFrom: 0.28, opacityTo: 0.02 } },
       xaxis: { categories: revenueSeries.categories },
       yaxis: { labels: { formatter: (v: number) => formatCurrency(v) } },
       tooltip: { y: { formatter: (v: number) => formatCurrency(v) } },
     }),
-    [revenueSeries.categories],
+    [revenueSeries.categories, colors.primary],
   );
 
-  const inventoryOptions: ApexOptions = useMemo(
-    () => ({
-      chart: { type: 'donut' },
-      colors: [brand.primary, semantic.info, semantic.success, semantic.warning, brand.primaryHover],
-      labels: categories.map((c) => c.category),
-      legend: { position: 'bottom', labels: { colors: token.colorTextSecondary } },
-      stroke: { colors: [token.colorBgContainer], width: 2 },
-      tooltip: { y: { formatter: (v: number) => formatCurrency(v) } },
-    }),
-    [categories, token],
-  );
+  // ------------------------------------------------------------------
+  // KPI values from the summary payload (business calcs unchanged).
+  // ------------------------------------------------------------------
+  const kpiLive = useMemo(() => {
+    if (!summary) return null;
+    const healthPercent =
+      summary.products_count > 0
+        ? Math.round(((summary.products_count - summary.out_of_stock_count) / summary.products_count) * 100)
+        : null;
+    return {
+      revenue: {
+        value: formatCurrency(summary.revenue_month),
+        trend:
+          summary.revenue_growth_percent !== null
+            ? { percent: summary.revenue_growth_percent, comparisonLabel: 'vs last month' }
+            : null,
+        caption: 'This month',
+      },
+      orders: { value: String(summary.orders_month), caption: `${summary.orders_today} today` },
+      'inventory-health': { value: healthPercent !== null ? `${healthPercent}%` : '—', caption: 'Stock availability' },
+      products: { value: String(summary.products_count), caption: 'Total active items' },
+    } as Record<string, { value: string; trend?: { percent: number; comparisonLabel: string } | null; caption?: string }>;
+  }, [summary]);
 
   const orderRows: OrderRow[] = useMemo(
     () =>
@@ -132,43 +130,59 @@ const DashboardPage: React.FC = () => {
     [orders],
   );
 
+  const renderKpiSub = (key: string): React.ReactNode | undefined => {
+    if (!summary) return undefined;
+    if (key === 'orders') {
+      return <span>{summary.orders_today} today</span>;
+    }
+    if (key === 'inventory-health') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600, color: colors.warning }}>
+            <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: colors.warning }} />
+            {summary.low_stock_count} Low
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600, color: colors.error }}>
+            <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: colors.error }} />
+            {summary.out_of_stock_count} Out
+          </span>
+        </span>
+      );
+    }
+    return undefined;
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <DashboardHeader />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <BriefingBanner />
+      <DashboardHeader business={business} lastUpdated={lastUpdated} />
 
       {/* Error banner (UXDS 9.23): widgets underneath stay visible. */}
       {error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error.isAuthError ? 'Authentication required' : 'Unable to load dashboard data'}
-          description={error.message}
-          action={
-            <Button size="small" danger onClick={retry}>
-              Retry
-            </Button>
-          }
+        <CoopErrorState
+          title={error.isAuthError ? 'Authentication required' : 'Unable to load dashboard data'}
+          detail={error.message}
+          onRetry={retry}
         />
       )}
 
-      {/* KPI cards: 2 cols (small) → 3 cols (medium) → 6 cols (standard) */}
+      {/* KPI cards: 1 col (mobile) → 2 (tablet) → 4 (desktop) */}
       <section aria-label="Key performance indicators">
         <Row gutter={[16, 16]}>
           {KPI_DEFINITIONS.map((kpi) => {
-            const isForecast = kpi.key === 'forecast';
-            const live = !isForecast && kpiLive ? kpiLive[kpi.key] : undefined;
+            const live = kpiLive ? kpiLive[kpi.key] : undefined;
             return (
-              <Col xs={12} md={8} xl={4} key={kpi.key}>
+              <Col xs={24} sm={12} xl={6} key={kpi.key}>
                 <KpiCard
                   title={kpi.title}
                   icon={kpi.icon}
                   accent={kpi.accent}
                   value={live?.value ?? '—'}
                   trend={live?.trend ?? null}
+                  sub={renderKpiSub(kpi.key)}
                   caption={live?.caption}
-                  sparkData={live?.sparkData ?? []}
                   isEmpty={!live}
-                  loading={!isForecast && loading}
+                  loading={!kpiLive && loading}
                   onClick={kpi.route ? () => navigate(kpi.route as string) : undefined}
                 />
               </Col>
@@ -177,13 +191,18 @@ const DashboardPage: React.FC = () => {
         </Row>
       </section>
 
-      {/* Charts row: primary Revenue, secondary Inventory (UXDS 9.10 / 9.26) */}
+      {/* Co-op AI live insights (Stage 2.2 Layer 1 — proactive) */}
+      <section aria-label="Co-op AI insights">
+        <AiInsightsCard />
+      </section>
+
+      {/* Charts row: Revenue (Monthly/Weekly) + Inventory breakdown */}
       <section aria-label="Analytics charts">
         <Row gutter={[16, 16]}>
           <Col xs={24} xl={16}>
             <ChartCard
-              title="Revenue"
-              subtitle={revenueSeries.data.length ? `Last ${DAYS_IN_CHART} days` : 'Awaiting data'}
+              title="Revenue Overview"
+              subtitle={revenueSeries.data.length ? (range === 'monthly' ? 'Last 30 days' : 'Last 7 days') : 'Awaiting data'}
               type="area"
               options={revenueOptions}
               series={
@@ -191,23 +210,42 @@ const DashboardPage: React.FC = () => {
                   ? [{ name: 'Revenue', data: revenueSeries.data }]
                   : [{ name: 'Revenue', data: [] }]
               }
+              height={320}
+              extra={
+                <Segmented
+                  size="small"
+                  value={range}
+                  onChange={(v) => setRange(v as RevenueRange)}
+                  options={[
+                    { label: 'Monthly', value: 'monthly' },
+                    { label: 'Weekly', value: 'weekly' },
+                  ]}
+                />
+              }
             />
           </Col>
           <Col xs={24} xl={8}>
-            <ChartCard
-              title="Inventory Value"
-              subtitle={categories.length ? 'By category, at cost' : 'Awaiting data'}
-              type="donut"
-              options={inventoryOptions}
-              series={categories.map((c) => c.value)}
+            <InventoryBreakdownCard
+              categories={categories}
+              total={summary?.inventory_value ?? 0}
             />
           </Col>
         </Row>
       </section>
 
-      {/* Recent activity / orders (UXDS 9.15) */}
-      <section aria-label="Recent orders">
-        <RecentOrdersTable orders={orderRows} />
+      {/* Bottom row: Recent Orders + right rail (Quick Actions / Top Products) */}
+      <section aria-label="Recent orders and quick actions">
+        <Row gutter={[16, 16]}>
+          <Col xs={24} xl={16}>
+            <RecentOrdersTable orders={orderRows} />
+          </Col>
+          <Col xs={24} xl={8}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
+              <QuickActionsCard />
+              <TopProductsCard products={topProducts} />
+            </div>
+          </Col>
+        </Row>
       </section>
     </div>
   );

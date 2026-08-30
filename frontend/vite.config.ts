@@ -25,6 +25,7 @@ export default defineConfig({
     include: [
       'react-apexcharts/core',
       'apexcharts/area',
+      'apexcharts/bar',
       'apexcharts/pie',
       'apexcharts/features/legend',
       'apexcharts/features/keyboard',

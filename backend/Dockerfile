@@ -1,4 +1,4 @@
-# Finch backend image (Supabase/Postgres via asyncpg).
+# Co-op backend image (Supabase/Postgres via asyncpg).
 #
 # The app is a package (`backend.main`); uvicorn is therefore launched from the
 # repository root so `backend.main`'s relative imports resolve (Task 11 / audit

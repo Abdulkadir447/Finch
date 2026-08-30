@@ -1,0 +1,490 @@
+Co-op UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 14 — AI Assistant Experience & Conversation Interface
+14.1 Purpose
+
+The AI Assistant is the defining feature of Co-op. Unlike traditional business software that requires users to manually search for information, Co-op allows users to interact with their business using natural language.
+
+The AI Assistant serves as a business advisor, analyst, report generator, invoice assistant, forecasting engine, and productivity companion. It understands the user's business context and provides actionable insights rather than generic responses.
+
+Powered by the OpenAI Responses API (GPT-5.5), the assistant combines business data with advanced language understanding to help users make faster and more informed decisions.
+
+14.2 Design Principles
+
+The AI experience follows six core principles:
+
+Context-Aware — Understand the current page and business data.
+Action-Oriented — Perform tasks, not just answer questions.
+Transparent — Clearly indicate when information is estimated or unavailable.
+Fast — Stream responses with minimal waiting.
+Non-Intrusive — Available everywhere without disrupting workflows.
+Trustworthy — Never fabricate business information.
+14.3 Core Capabilities
+
+Version 1.0 supports:
+
+Business Intelligence
+Summarize business performance
+Explain reports
+Explain charts
+Compare periods
+Identify trends
+Report Generation
+
+Generate:
+
+Sales reports
+Profit & Loss reports
+Inventory reports
+Customer reports
+Forecast summaries
+Invoice Assistance
+
+Generate:
+
+Professional invoices
+Invoice descriptions
+Payment reminders
+Payment summaries
+Forecasting
+
+Predict:
+
+Revenue
+Sales
+Inventory demand
+Customer growth
+Business Questions
+
+Example questions:
+
+How is my business performing?
+Which products sell the fastest?
+What caused revenue to decrease?
+Which customers should I contact?
+Which products should I reorder?
+14.4 AI Availability
+
+The assistant is available throughout the application.
+
+Accessible from:
+
+Dashboard
+Orders
+Inventory
+Customers
+Reports
+Settings
+
+Users should never need to navigate away from their current task to interact with AI.
+
+14.5 AI Entry Points
+
+Users can access the assistant through:
+
+Floating AI button
+Keyboard shortcut
+Command Palette
+Context menus
+AI action buttons
+
+Shortcut:
+
+Ctrl + Shift + A
+14.6 Floating AI Assistant
+
+The default interface is a dockable floating panel.
+
+Collapsed state:
+
+🤖
+
+Expanded state:
+
+┌──────────────────────────────┐
+│ Co-op AI                     │
+├──────────────────────────────┤
+│ Conversation                 │
+│                              │
+│ User                         │
+│ AI                           │
+│                              │
+├──────────────────────────────┤
+│ Ask anything...              │
+└──────────────────────────────┘
+
+The panel can be:
+
+Docked
+Undocked
+Resized
+Minimized
+Moved
+
+Its position is remembered between sessions.
+
+14.7 Full-Screen AI Workspace
+
+For long conversations, users can expand the assistant into a dedicated workspace.
+
+Layout:
+
+┌──────────────────────────────────────────────────────────────┐
+│ Conversation History │ Active Conversation                  │
+├──────────────────────┼──────────────────────────────────────┤
+│ Past Chats           │ Messages                             │
+│                      │                                      │
+│                      │                                      │
+├──────────────────────┴──────────────────────────────────────┤
+│ Prompt Input                                        Send ▶  │
+└──────────────────────────────────────────────────────────────┘
+
+This mode is ideal for in-depth business analysis.
+
+14.8 Conversation Layout
+
+Each message contains:
+
+Avatar
+Sender
+Timestamp
+Message
+Actions
+
+Example:
+
+👤 You
+
+Summarize today's business performance.
+
+────────────
+
+🤖 Co-op AI
+
+Revenue increased by 14%.
+
+Orders increased by 9%.
+
+Two products require restocking.
+
+Generated in 1.3 seconds.
+14.9 Suggested Prompts
+
+When the conversation is empty, Co-op displays suggested prompts.
+
+Examples:
+
+How is my business performing today?
+Generate this month's sales report.
+Explain this chart.
+Forecast next month's revenue.
+Which products should I reorder?
+Show my top customers.
+Summarize inventory performance.
+Create an invoice for Order #1045.
+
+Suggested prompts update based on the current module.
+
+14.10 Context Awareness
+
+The AI automatically understands the active page.
+
+Examples:
+
+Dashboard
+
+"Summarize today's business."
+
+Orders
+
+"Explain this order."
+
+Inventory
+
+"Which products are low in stock?"
+
+Customers
+
+"Summarize this customer's purchase history."
+
+Reports
+
+"Explain this chart."
+
+Users should not need to manually provide context that is already available.
+
+14.11 AI Actions
+
+The assistant can perform actions directly from chat.
+
+Examples:
+
+Generate report
+Create invoice
+Export report
+Open customer
+Open order
+Restock product
+Copy summary
+
+Action buttons appear below relevant responses.
+
+14.12 Streaming Responses
+
+Responses stream in real time.
+
+Behavior:
+
+Token-by-token rendering
+Typing indicator
+Stop generation button
+Retry button
+
+Streaming should begin within 500 milliseconds when possible.
+
+14.13 Rich Response Components
+
+AI responses may include:
+
+Tables
+Charts
+KPI cards
+Lists
+Code blocks (developer mode)
+Download buttons
+Report previews
+
+These components match Co-op's design system.
+
+14.14 Explain Chart
+
+When users request an explanation of a chart, AI should:
+
+Identify trends.
+Highlight unusual values.
+Explain possible causes.
+Suggest business actions.
+
+Example:
+
+Revenue increased steadily throughout the month, with a noticeable spike during the final week. This appears to coincide with higher order volume. Consider increasing inventory for your best-selling products before the next reporting period.
+
+14.15 Report Generation
+
+Users can request reports naturally.
+
+Example:
+
+Generate this month's Profit & Loss report.
+
+AI responds by:
+
+Generating the report.
+Displaying a preview.
+Summarizing key findings.
+Offering export options.
+14.16 Invoice Generation
+
+Users may create invoices conversationally.
+
+Example:
+
+Create an invoice for Order #1045.
+
+The assistant generates a preview containing:
+
+Company logo
+Customer information
+Line items
+Tax information
+QR code
+Payment terms
+Signature area
+
+Users can print, export, or email the invoice.
+
+14.17 Conversation History
+
+Conversation history is synchronized through Supabase.
+
+Each conversation records:
+
+Title
+Timestamp
+Module
+User prompt
+AI response
+
+Users can:
+
+Rename chats
+Delete chats
+Search chats
+Pin important conversations
+14.18 Attachments
+
+Version 1.0 supports:
+
+PDF
+CSV
+Excel
+
+Users can ask:
+
+Summarize this report.
+Analyze this spreadsheet.
+Explain this PDF.
+
+The AI references uploaded files alongside Co-op business data where appropriate.
+
+14.19 AI Settings
+
+Users can configure:
+
+Response length
+Preferred tone (Professional, Concise, Detailed)
+Streaming on/off
+Conversation history retention
+Auto-suggestions
+Default export format
+
+Settings are stored per user account.
+
+14.20 Offline Behavior
+
+When offline:
+
+The AI panel remains accessible but clearly indicates that AI services require an internet connection.
+
+Users can:
+
+View previous conversations
+Copy responses
+Search AI history
+
+Unavailable:
+
+New AI conversations
+Forecast generation
+Report summaries
+Invoice generation via AI
+14.21 Notifications
+
+Notifications include:
+
+AI response completed
+Report generated
+Forecast ready
+Invoice created
+Export completed
+
+Clicking a notification opens the associated conversation or artifact.
+
+14.22 Error Handling
+
+Examples:
+
+Connection Lost
+
+AI is currently unavailable. Your business data remains accessible offline.
+
+Rate Limit
+
+Too many requests. Please wait a moment and try again.
+
+Unexpected Error
+
+Something went wrong while generating the response. Please retry.
+
+Errors should preserve the user's prompt for easy resubmission.
+
+14.23 Keyboard Shortcuts
+Shortcut	Action
+Ctrl + Shift + A	Open AI Assistant
+Ctrl + Enter	Send Message
+Shift + Enter	New Line
+Esc	Close Panel
+Ctrl + L	Clear Conversation
+Ctrl + K	Command Palette
+14.24 Animations
+
+Animations include:
+
+AI panel slide-in
+Streaming cursor
+Suggested prompt fade-in
+Action button reveal
+Typing indicator
+Conversation transitions
+
+Animation duration:
+
+180–220 milliseconds
+
+Animations should communicate progress without distracting the user.
+
+14.25 Accessibility
+
+The AI Assistant supports:
+
+Screen readers
+Keyboard-only operation
+High-contrast mode
+Zoom up to 200%
+Accessible message semantics
+Live region announcements for streamed responses
+
+All interactive controls must have descriptive labels.
+
+14.26 Performance Targets
+Metric	Target
+AI Panel Open	<200 ms
+Response Streaming Start	<500 ms
+Average AI Response	<2 seconds
+Search Conversation History	<150 ms
+Conversation Load	<500 ms
+Panel Resize	60 FPS
+14.27 Developer Component Structure
+AIAssistant
+├── FloatingButton
+├── ChatPanel
+├── ConversationHistory
+├── MessageList
+├── MessageBubble
+├── SuggestedPrompts
+├── PromptInput
+├── AttachmentUploader
+├── AIActionButtons
+├── ResponseRenderer
+├── SettingsDialog
+└── FullScreenWorkspace
+
+Each component should:
+
+Be independently testable.
+Support streaming responses.
+Handle loading, offline, and error states.
+Use Co-op design tokens.
+Integrate with the OpenAI Responses API, SQLite (conversation cache), and Supabase (cloud synchronization).
+14.28 Acceptance Criteria
+
+The AI Assistant experience is complete when:
+
+AI is accessible from every major module.
+Context-aware conversations work correctly.
+Streaming responses are smooth and responsive.
+Users can generate reports, explain charts, create invoices, and request forecasts through natural language.
+Conversation history synchronizes across devices.
+File attachments (PDF, CSV, Excel) are supported.
+Offline behavior is graceful and clearly communicated.
+Accessibility and performance requirements are met.
+All interactions align with Co-op's premium desktop experience.
+Chapter Summary
+
+The AI Assistant is the centerpiece of Co-op, transforming the application from a traditional business management tool into an intelligent business partner. Through contextual conversations, streaming responses, actionable recommendations, and deep integration with reports, orders, inventory, and customers, the assistant enables users to interact with their business naturally and efficiently. Its floating interface, dedicated workspace, and robust offline handling ensure a seamless AI experience that enhances productivity without disrupting existing workflows.

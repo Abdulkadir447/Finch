@@ -1,49 +1,85 @@
-import React from 'react';
-import { Space, Typography, theme as antdTheme } from 'antd';
-import { useUser } from '@clerk/react';
-import dayjs from 'dayjs';
-
-/** Time-of-day greeting (UXDS 9.5 Header — "Good Morning, {name}"). */
-function greetingForHour(hour: number): string {
-  if (hour < 12) return 'Good Morning';
-  if (hour < 17) return 'Good Afternoon';
-  return 'Good Evening';
-}
+import React, { useEffect, useState } from 'react';
+import { spacing, type } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
+import type { BusinessIdentity } from './useDashboardData';
 
 /**
- * Dashboard page header (UXDS 9.5): title, greeting, and date.
+ * Dashboard page header (Stitch finch_business_dashboard_qa_polished):
+ * "CURRENT BUSINESS DISPLAY" label-caps eyebrow, the business name +
+ * currency as the page title, and a live "Last updated" line.
  *
- * Reads the signed-in user's first name from the EXISTING Clerk setup
- * (read-only via useUser — no Clerk configuration is touched). The global
- * search / notifications / AI shortcut slots from the full spec are added
- * in later phases.
+ * Business name/currency come from /business/settings (fetched by the data
+ * hook); the updated stamp is the real finish time of the last successful
+ * load, re-evaluated on a 30s tick ("Just now" → "2 min ago" …).
  */
-const DashboardHeader: React.FC = () => {
-  const { token } = antdTheme.useToken();
-  const { user } = useUser();
-  const now = dayjs();
+const DashboardHeader: React.FC<{
+  business: BusinessIdentity | null;
+  lastUpdated: Date | null;
+}> = ({ business, lastUpdated }) => {
+  const { colors } = useCoopTheme();
+  const [now, setNow] = useState(() => Date.now());
 
-  const firstName = user?.firstName;
-  const greeting = greetingForHour(now.hour());
-  const dateLabel = now.format('dddd • MMM D');
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const updatedLabel = (() => {
+    if (!lastUpdated) return 'Loading…';
+    const mins = Math.floor((now - lastUpdated.getTime()) / 60_000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins} min ago`;
+    return lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  })();
 
   return (
-    <header aria-label="Dashboard header">
-      <Space direction="vertical" size={4}>
-        <Typography.Title
-          level={2}
-          style={{ margin: 0, color: token.colorText, fontWeight: 600 }}
+    <header
+      aria-label="Dashboard header"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+        marginBottom: spacing.lg,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            ...type.labelCaps,
+            color: colors.outline,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 6,
+          }}
         >
-          Dashboard
-        </Typography.Title>
-        <Typography.Text style={{ color: token.colorText, fontSize: token.fontSizeLG }}>
-          {greeting}
-          {firstName ? `, ${firstName}` : ''} 👋
-        </Typography.Text>
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          {dateLabel}
-        </Typography.Text>
-      </Space>
+          Current business display
+        </div>
+        <h1
+          style={{
+            margin: 0,
+            ...type.pageTitle,
+            fontSize: 30,
+            lineHeight: '38px',
+            color: colors.onBackground,
+            letterSpacing: '-0.02em',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {business ? business.name : 'Your business'}
+          {business && (
+            <span style={{ ...type.bodyDefault, fontSize: 18, fontWeight: 500, color: colors.onSurfaceVariant }}>
+              {' '}
+              ({business.currency})
+            </span>
+          )}
+        </h1>
+      </div>
+      <div style={{ ...type.bodyCompact, color: colors.outline, whiteSpace: 'nowrap' }}>
+        Last updated: {updatedLabel}
+      </div>
     </header>
   );
 };

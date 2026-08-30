@@ -1,5 +1,5 @@
 """
-Clerk authentication for the Finch backend.
+Clerk authentication for the Co-op backend.
 
 Verifies Clerk **session tokens** (JWTs, RS256) presented by the frontend as
 ``Authorization: Bearer <token>``. The frontend obtains the token from
@@ -100,7 +100,7 @@ async def fetch_jwks(frontend_api: str, force: bool = False) -> dict:
 
 @dataclass(frozen=True)
 class ClerkUser:
-    """Authenticated Finch user, identified by their Clerk user id (``sub``)."""
+    """Authenticated Co-op user, identified by their Clerk user id (``sub``)."""
 
     user_id: str
     session_id: Optional[str] = None
@@ -118,7 +118,23 @@ def _auth_error(detail: str = "Could not validate credentials") -> HTTPException
 async def verify_clerk_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> ClerkUser:
-    """FastAPI dependency: require a valid Clerk session token."""
+    """FastAPI dependency: require a valid Clerk session token.
+
+    E2E test seam (OFFLINE 6): in NON-production, when ``COOP_TEST_AUTH_USER``
+    is set, any bearer token authenticates as that fixed user. The unit-test
+    suite does the equivalent via a dependency override; this lets a
+    SPAWNED server process (the real-runtime E2E harness) run the real
+    request path without a live Clerk instance. In production this seam is
+    refused outright.
+    """
+    test_user = os.getenv("COOP_TEST_AUTH_USER")
+    if test_user:
+        if get_env() == "production":
+            raise RuntimeError("COOP_TEST_AUTH_USER is forbidden in production")
+        if credentials is None or credentials.scheme.lower() != "bearer":
+            raise _auth_error("Missing bearer token")
+        return ClerkUser(user_id=test_user, session_id="e2e-session", azp=None)
+
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _auth_error("Missing bearer token")
 

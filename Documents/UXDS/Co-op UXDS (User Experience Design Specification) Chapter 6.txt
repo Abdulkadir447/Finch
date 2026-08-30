@@ -1,0 +1,520 @@
+Co-op UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 6 — Layout System & Navigation
+6.1 Purpose
+
+This chapter defines the structural layout system and navigation framework used throughout Co-op.
+
+The goal is to create a desktop experience that is:
+
+Fast
+Predictable
+Consistent
+Space-efficient
+Keyboard-friendly
+Optimized for business productivity
+
+The layout system is designed specifically for Windows desktop environments while maintaining enough flexibility for future platform expansion.
+
+6.2 Design Goals
+
+The layout system should:
+
+Maximize available workspace.
+Keep navigation accessible at all times.
+Reduce unnecessary window changes.
+Support multitasking.
+Adapt to different monitor sizes.
+Provide a consistent experience across all modules.
+Minimize visual distractions.
+6.3 Overall Window Structure
+
+Co-op follows a five-layer window architecture.
+
+┌─────────────────────────────────────────────────────┐
+│                 Custom Title Bar                    │
+├────────────┬────────────────────────────────────────┤
+│            │                                        │
+│  Sidebar   │             Page Header                │
+│            ├────────────────────────────────────────┤
+│            │                                        │
+│            │                                        │
+│            │          Main Content Area             │
+│            │                                        │
+│            │                                        │
+│            ├────────────────────────────────────────┤
+│            │             Status Bar                 │
+└────────────┴────────────────────────────────────────┘
+
+This structure remains consistent across every module.
+
+6.4 Custom Title Bar
+
+Co-op replaces the standard Windows title bar with a custom implementation.
+
+The title bar contains:
+
+┌──────────────────────────────────────────────────────────────┐
+│ Logo │ Page │ Search │ Notifications │ Profile │ _ □ ✕ │
+└──────────────────────────────────────────────────────────────┘
+
+Components:
+
+Co-op Logo
+Current Page Name
+Global Search
+Notifications
+User Profile
+Window Controls
+
+The title bar remains fixed.
+
+6.5 Sidebar Layout
+
+The sidebar is permanently docked on the left side.
+
+Default State
+
+Collapsed
+
+🏠
+🤖
+📦
+📋
+👥
+📊
+⚙️
+
+Width:
+
+Approximately 72px
+
+Expanded State
+
+Expands on hover.
+
+🏠 Dashboard
+
+🤖 AI Assistant
+
+📦 Orders
+
+📋 Inventory
+
+👥 Customers
+
+📊 Reports
+
+⚙️ Settings
+
+Expanded width:
+
+Approximately 260px
+
+Expansion duration:
+
+180–220 ms
+
+6.6 Sidebar Behavior
+
+The sidebar:
+
+Expands on hover.
+Collapses when the pointer leaves.
+Highlights the active page.
+Displays tooltips while collapsed.
+Supports keyboard navigation.
+Maintains state during navigation.
+
+Future versions may allow users to pin the expanded state.
+
+6.7 Navigation Flow
+
+Navigation follows a hub-and-spoke model.
+
+          Dashboard
+         /    |    \
+ Orders  Inventory  Customers
+      \     |      /
+        Reports
+           |
+     AI Assistant
+
+Users can move between any module without returning to the dashboard.
+
+6.8 Page Layout Template
+
+Every module follows a consistent layout.
+
+Title Bar
+
+↓
+
+Page Header
+
+↓
+
+Toolbar
+
+↓
+
+Content Area
+
+↓
+
+Optional Side Panel
+
+↓
+
+Status Bar
+
+Consistency reduces the learning curve.
+
+6.9 Page Header
+
+The page header includes:
+
+Page title
+Breadcrumbs (when applicable)
+Quick actions
+Search/filter (module-specific)
+
+Example:
+
+Orders
+
+All Orders • 245 Records
+
+[New Order] [Export]
+6.10 Toolbar
+
+Each module contains a contextual toolbar.
+
+Examples:
+
+Orders:
+
+New Order
+Export
+Filter
+Search
+Print
+
+Inventory:
+
+Add Product
+Import
+Export
+Low Stock Filter
+
+Reports:
+
+Date Range
+Export PDF
+AI Summary
+6.11 Main Content Area
+
+The content area occupies the largest portion of the interface.
+
+It supports:
+
+Tables
+Charts
+Forms
+Cards
+Dashboards
+Reports
+Split views
+
+Scrolling should occur only within the content area, while navigation elements remain fixed.
+
+6.12 Status Bar
+
+Located at the bottom of the window.
+
+Displays:
+
+Sync status
+Offline indicator
+AI status
+Database status
+Version number
+Current workspace
+
+Example:
+
+✓ Synced
+
+SQLite Connected
+
+Cloud Connected
+
+v1.0.0
+6.13 Dashboard Layout
+
+The dashboard uses a modular card-based layout.
+
+┌────────────┬────────────┬────────────┐
+│ Profit     │ Revenue    │ Orders     │
+├────────────┼────────────┼────────────┤
+│ Inventory  │ Customers  │ Forecast   │
+├──────────────────────────────────────┤
+│ Revenue Chart                        │
+├──────────────────────────────────────┤
+│ AI Summary                           │
+├──────────────┬───────────────────────┤
+│ Tasks        │ Recent Activity       │
+└──────────────┴───────────────────────┘
+
+Users can scan key metrics within seconds.
+
+6.14 Orders Layout
+
+The Orders module uses a split-view layout.
+
+┌──────────────┬────────────────────────────┐
+│              │                            │
+│ Order List   │     Order Details          │
+│              │                            │
+│              │                            │
+└──────────────┴────────────────────────────┘
+
+The left panel supports filtering and searching.
+
+The right panel updates instantly when a new order is selected.
+
+6.15 Inventory Layout
+
+Inventory is optimized for data management.
+
+┌──────────────────────────────────────────┐
+│ Search  Filter  Export  Add Product      │
+├──────────────────────────────────────────┤
+│ Product Table                            │
+│ ▼ Expandable Row                         │
+│ ▼ Expandable Row                         │
+│ ▼ Expandable Row                         │
+└──────────────────────────────────────────┘
+
+Expandable rows reveal:
+
+Images
+Stock history
+Notes
+Supplier details (future)
+6.16 Customers Layout
+┌──────────────┬───────────────────────────┐
+│ Customer     │ Customer Profile          │
+│ List         │                           │
+│              │ Avatar                    │
+│              │ Contact Details           │
+│              │ Purchase History          │
+│              │ Notes                     │
+└──────────────┴───────────────────────────┘
+
+Selecting a customer updates the profile pane without navigating away.
+
+6.17 Reports Layout
+
+Reports support three viewing modes.
+
+Tabs
+
+Dashboard
+
+PDF Preview
+
+Export
+
+Interactive dashboards remain the default.
+
+Users can switch views instantly without reloading the report.
+
+6.18 Floating AI Assistant
+
+The AI Assistant is available from every screen.
+
+Default location:
+
+Bottom-right corner.
+
+┌─────────────────────┐
+│ AI Conversation     │
+│                     │
+│ User                │
+│ AI                  │
+│                     │
+└─────────────────────┘
+
+Features:
+
+Dockable
+Draggable
+Resizable
+Minimizable
+
+The assistant never obscures critical content.
+
+6.19 Notification Placement
+
+Toast notifications appear in the top-right corner.
+
+The Notification Center opens from the title bar.
+
+Notifications stack vertically and automatically dismiss after a configurable timeout unless user interaction is required.
+
+6.20 Modal Layout
+
+Modals are centered.
+
+┌───────────────────────────────┐
+│ Title                         │
+├───────────────────────────────┤
+│ Content                       │
+│                               │
+├───────────────────────────────┤
+│ Cancel         Confirm        │
+└───────────────────────────────┘
+
+Background content is dimmed but remains visible.
+
+6.21 Drawer Layout
+
+Drawers slide in from the right.
+
+Used for:
+
+Quick edits
+Filters
+Additional details
+
+Drawers allow users to continue referencing the main page while editing information.
+
+6.22 Window Resizing
+
+Co-op supports:
+
+Windowed mode
+Maximized mode
+Multi-monitor setups
+
+Minimum recommended size:
+
+1280 × 720
+
+Recommended size:
+
+1600 × 900 or higher
+
+The layout adapts dynamically to available space.
+
+6.23 Ultra-Wide Displays
+
+On larger displays, Co-op can display additional panels.
+
+Examples:
+
+AI Assistant alongside reports
+Customer details while browsing orders
+Expanded dashboards
+
+Unused space should never feel empty.
+
+6.24 Multi-Window Support
+
+Version 1.0 supports:
+
+Main application window
+Print preview window
+PDF preview window
+
+Future versions may introduce detachable workspaces and multiple document windows.
+
+6.25 Keyboard Navigation
+
+Navigation shortcuts include:
+
+Shortcut	Action
+Ctrl + K	Command Palette
+Ctrl + Shift + A	Open AI Assistant
+Ctrl + N	New Order
+Ctrl + P	Print
+Ctrl + S	Save
+Ctrl + /	Search
+Alt + Left	Back
+Alt + Right	Forward
+
+Focus order should always be logical and visible.
+
+6.26 Navigation Animations
+
+Navigation transitions should be subtle.
+
+Examples:
+
+Sidebar expansion: 200 ms
+Page fade/slide: 180–220 ms
+Drawer open/close: 220 ms
+Modal appearance: 180 ms
+Toast notification: 200 ms
+
+Animations should reinforce context without delaying user actions.
+
+6.27 Empty Workspace Behavior
+
+When no data exists:
+
+Display an illustration.
+Provide a brief explanation.
+Offer AI suggestions.
+Present a primary action button.
+
+For example, an empty Orders page might suggest creating the first order and offer an AI tip on setting up products.
+
+6.28 Layout Accessibility
+
+The layout must support:
+
+Full keyboard navigation.
+Clear focus indicators.
+Screen reader compatibility.
+High-contrast mode.
+Scalable interface elements.
+
+No essential function should depend solely on mouse interaction.
+
+6.29 Future Workspace Features
+
+Planned enhancements include:
+
+Dockable panels.
+Custom dashboard layouts.
+Saved workspaces.
+Multiple workspace profiles.
+Multi-window editing.
+Plugin panels.
+Workspace templates.
+
+These features should integrate with the existing layout architecture without requiring a redesign.
+
+6.30 Acceptance Criteria
+
+The layout and navigation system is complete when:
+
+Every module follows a consistent page structure.
+Navigation remains accessible from every screen.
+Sidebar behavior is smooth and predictable.
+Split-view layouts support efficient workflows.
+Floating AI integrates seamlessly without obstructing work.
+The application adapts gracefully to different window sizes.
+Keyboard navigation is fully supported.
+Layout rules are reusable across all current and future modules.
+Chapter Summary
+
+This chapter defines the structural foundation of Co-op's interface. A consistent window layout, expandable sidebar, modular page templates, and integrated navigation create a cohesive experience across the application. By emphasizing efficient workflows, responsive layouts, and accessibility, Co-op delivers a desktop interface that supports productivity while remaining scalable for future features.

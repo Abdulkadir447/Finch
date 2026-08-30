@@ -1,0 +1,505 @@
+Co-op Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 9 — Inventory Schema
+9.1 Purpose
+
+The Inventory module manages every product, service, stock movement, supplier, and inventory adjustment within Co-op. It provides real-time visibility into stock levels while supporting offline operation, AI-powered insights, automatic synchronization, and future multi-location inventory.
+
+The Inventory module integrates with:
+
+Orders
+Suppliers
+Customers
+Reports
+AI Assistant
+Notifications
+Purchasing (Future)
+Barcode Scanning (Future)
+
+Every inventory record belongs to a single registered business.
+
+9.2 Objectives
+
+The Inventory module must:
+
+Store products and services.
+Support product categories and variants.
+Track serial numbers.
+Track suppliers.
+Record every stock movement.
+Support stock adjustments.
+Generate low-stock alerts.
+Support barcode scanning.
+Provide AI inventory insights.
+Maintain complete inventory history.
+Work offline.
+Synchronize efficiently.
+9.3 Inventory Architecture
+Business
+    │
+    ▼
+Inventory
+    │
+ ┌──┼──────────┬─────────┐
+ ▼  ▼          ▼         ▼
+Products Categories Suppliers Stock History
+    │
+    ▼
+Orders
+    │
+    ▼
+Reports
+
+Inventory acts as the central source of truth for all stock-related operations.
+
+9.4 Core Tables
+
+The Inventory module consists of:
+
+Table	Purpose
+inventory_items	Products and services
+product_categories	Product categories
+product_variants	Product variants
+suppliers	Supplier information
+stock_movements	Stock history
+inventory_adjustments	Manual corrections
+inventory_serials	Serial number tracking
+inventory_images	Product images
+inventory_tags	Product labels
+inventory_alerts	Low-stock and system alerts
+9.5 Inventory Items Table
+Table: inventory_items
+Column	Type
+id	UUID
+business_id	UUID
+category_id	UUID
+supplier_id	UUID
+sku	TEXT
+barcode	TEXT
+serial_tracking	BOOLEAN
+product_name	TEXT
+description	TEXT
+unit	TEXT
+cost_price	NUMERIC
+selling_price	NUMERIC
+current_stock	NUMERIC
+reserved_stock	NUMERIC
+minimum_stock	NUMERIC
+maximum_stock	NUMERIC
+is_service	BOOLEAN
+created_at	TIMESTAMPTZ
+updated_at	TIMESTAMPTZ
+deleted_at	TIMESTAMPTZ
+version	INTEGER
+9.6 Product Categories
+Table: product_categories
+
+Supports unlimited category nesting.
+
+Example:
+
+Electronics
+    │
+    ├── Laptops
+    ├── Phones
+    └── Accessories
+
+Columns:
+
+id
+business_id
+parent_category_id
+category_name
+description
+created_at
+9.7 Product Variants
+
+Products may contain variants.
+
+Examples:
+
+T-Shirt
+
+Small
+
+Medium
+
+Large
+
+XL
+
+or
+
+Laptop
+
+8GB RAM
+
+16GB RAM
+
+32GB RAM
+
+Table:
+
+product_variants
+
+Stores:
+
+Variant Name
+SKU
+Barcode
+Selling Price
+Cost Price
+Stock
+9.8 Serial Number Tracking
+
+Since you requested serial number support, Co-op tracks every serialized item.
+
+Table: inventory_serials
+Column	Type
+id	UUID
+inventory_item_id	UUID
+serial_number	TEXT
+status	TEXT
+sold_order_id	UUID
+created_at	TIMESTAMPTZ
+
+Status:
+
+Available
+
+Reserved
+
+Sold
+
+Returned
+
+Damaged
+
+Each serial number is unique within a business.
+
+9.9 Suppliers
+Table: suppliers
+Column	Type
+id	UUID
+business_id	UUID
+supplier_name	TEXT
+email	TEXT
+phone	TEXT
+address	TEXT
+website	TEXT
+notes	TEXT
+created_at	TIMESTAMPTZ
+
+Products may optionally reference a supplier.
+
+9.10 Stock Movements
+
+Every inventory change creates a movement record.
+
+Table: stock_movements
+
+Stores:
+
+Product
+Previous Quantity
+New Quantity
+Difference
+Reason
+User
+Timestamp
+
+Movement reasons:
+
+Sale
+
+Purchase
+
+Return
+
+Manual Adjustment
+
+Damaged
+
+Restock
+
+Transfer
+
+AI Correction
+
+Nothing changes inventory without creating a stock movement.
+
+9.11 Inventory Adjustments
+
+Manual adjustments are stored separately.
+
+Examples:
+
+Damaged goods
+Counting errors
+Missing stock
+Initial stock entry
+
+Each adjustment records:
+
+Previous quantity
+New quantity
+Reason
+Approved by
+Notes
+9.12 Inventory Images
+
+Products may have multiple images.
+
+Table: inventory_images
+
+Stores:
+
+Product ID
+Image URL
+Display Order
+Thumbnail
+Uploaded By
+
+Images are stored in Supabase Storage.
+
+9.13 Barcode Support
+
+Products support:
+
+Manual barcode entry
+Barcode scanning (future)
+QR code support (future)
+
+Each barcode must be unique within a business.
+
+9.14 Stock Levels
+
+Stock fields:
+
+Current Stock
+
+Reserved Stock
+
+Available Stock
+
+Minimum Stock
+
+Maximum Stock
+
+Available stock is calculated as:
+
+Available = Current − Reserved
+9.15 Low Stock Alerts
+
+When:
+
+Current Stock
+
+≤
+
+Minimum Stock
+
+Co-op automatically creates an alert.
+
+Alerts appear:
+
+Dashboard
+Notification Center
+AI Assistant
+9.16 Inventory Alerts
+Table: inventory_alerts
+
+Stores:
+
+Alert Type
+Product
+Severity
+Message
+Read Status
+Created Time
+
+Alert types:
+
+Low Stock
+
+Out of Stock
+
+Overstock
+
+Negative Inventory
+
+Serial Conflict
+9.17 AI Inventory Features
+
+The AI Assistant can:
+
+Detect slow-moving inventory.
+Suggest restocking quantities.
+Recommend price adjustments.
+Predict future demand.
+Identify dead stock.
+Explain inventory trends.
+
+AI recommendations are generated from inventory and sales history.
+
+9.18 Inventory History
+
+Every product maintains a complete timeline.
+
+Product Created
+
+↓
+
+Stock Added
+
+↓
+
+Price Changed
+
+↓
+
+Sold
+
+↓
+
+Returned
+
+↓
+
+Adjusted
+
+↓
+
+Archived
+
+No inventory event is permanently lost unless explicitly purged according to retention policies.
+
+9.19 Relationships
+inventory_items
+      │
+      ├── product_categories
+      ├── product_variants
+      ├── inventory_serials
+      ├── inventory_images
+      ├── inventory_alerts
+      ├── stock_movements
+      ├── inventory_adjustments
+      └── suppliers
+
+Inventory items also relate directly to:
+
+Orders
+Reports
+AI Analytics
+Notifications
+9.20 Synchronization
+
+Inventory synchronizes:
+
+Product creation
+Product updates
+Stock changes
+Supplier changes
+Category changes
+Price updates
+Images
+Alerts
+
+Only modified records are synchronized to reduce bandwidth and keep sync files compact.
+
+9.21 Security
+
+Inventory data is protected using:
+
+Authentication
+Business ownership
+Role permissions
+Row Level Security (RLS)
+
+Only authorized users may modify inventory.
+
+9.22 Performance
+
+Indexes:
+
+business_id
+sku
+barcode
+category_id
+supplier_id
+current_stock
+serial_number
+created_at
+
+These indexes ensure fast searches, barcode lookups, dashboard widgets, and reporting.
+
+9.23 Audit Logging
+
+The following inventory events are recorded:
+
+Product created
+Product updated
+Product archived
+Supplier added
+Supplier updated
+Stock added
+Stock removed
+Manual adjustment
+Price changed
+Serial number assigned
+Low-stock alert generated
+AI inventory recommendation accepted
+
+All events include the acting user, timestamp, and affected business.
+
+9.24 Offline Behavior
+
+The Inventory module fully supports offline operation.
+
+Users can:
+
+Add products
+Edit products
+Update stock
+Create categories
+Add suppliers
+Assign serial numbers
+Record adjustments
+View inventory history
+
+All changes are written to the local SQLite database and queued for synchronization when connectivity is restored.
+
+9.25 Developer Implementation Notes
+
+Implementation guidelines:
+
+Use UUIDs for all inventory-related tables.
+Keep products, categories, suppliers, variants, and stock movements in separate normalized tables.
+Never modify stock directly; all quantity changes must create a corresponding stock_movements record.
+Enforce unique constraints on SKU, barcode, and serial numbers within each business.
+Generate low-stock alerts automatically when thresholds are reached.
+Store product images in Supabase Storage and reference them by URL.
+Cache frequently accessed inventory data locally to improve dashboard performance.
+Protect all inventory tables with Row Level Security (RLS).
+9.26 Acceptance Criteria
+
+The Inventory Schema is complete when:
+
+Products, categories, variants, and suppliers are fully supported.
+Serial number tracking functions correctly.
+Every stock change creates a movement record.
+Low-stock alerts are generated automatically.
+Barcode fields support future scanning capabilities.
+AI can analyze inventory and generate recommendations.
+Inventory operates fully offline and synchronizes correctly.
+SKU, barcode, and serial numbers remain unique within each business.
+All inventory operations are audited and secured by RLS.
+9.27 Chapter Summary
+
+The Inventory Schema forms the operational backbone of Co-op's product management system. It provides comprehensive support for products, categories, suppliers, serial numbers, stock movements, and intelligent inventory monitoring while maintaining historical accuracy through immutable stock movement records. Designed around an offline-first architecture and normalized data model, it scales from a single small business to future enterprise deployments with multi-location inventory, advanced purchasing, and AI-driven optimization.

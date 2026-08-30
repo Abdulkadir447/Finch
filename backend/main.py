@@ -1,5 +1,5 @@
 """
-Finch API — FastAPI application with Clerk authentication and tenant-scoped
+Co-op API — FastAPI application with Clerk authentication and tenant-scoped
 CRUD + Dashboard analytics.
 
 Authentication model (this phase):
@@ -14,9 +14,11 @@ Authentication model (this phase):
 import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from pydantic import BaseModel, Field
+
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import case, func, or_, select, text
 from sqlalchemy import update as sa_update
@@ -24,6 +26,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from . import briefing as briefing_mod
+from . import importer
+from .ai import service as ai_service
+from .ai import forecast as ai_forecast_mod
+from .ai import history as ai_history_mod
+from .exports import export_report, ExportError
+from .notifications import build_daily_summary
+from .notifications.schemas import DailySummary as DailySummarySchema
+from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
+from .sync import ALLOWED_ORDER_TRANSITIONS, apply_push
+from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
@@ -76,7 +89,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Finch",
+    title="Co-op",
     openapi_url="/docs/openapi.json",
     docs_url="/docs",
     lifespan=lifespan,
@@ -84,7 +97,7 @@ app = FastAPI(
 
 # CORS: Bearer-token auth (no cookies), so '*' without credentials is a safe
 # dev default. Set CORS_ORIGINS to a comma-separated allow-list to tighten it
-# (e.g. https://app.finch.example) (Task 12 polish).
+# (e.g. https://app.coop.example) (Task 12 polish).
 _cors_origins = [
     o.strip()
     for o in os.getenv("CORS_ORIGINS", "*").split(",")
@@ -174,7 +187,7 @@ async def healthcheck(db: AsyncSession = Depends(get_db)) -> dict:
 
 @app.get("/", tags=["Root"])
 async def read_root() -> dict:
-    return {"message": "Welcome to Finch API"}
+    return {"message": "Welcome to Co-op API"}
 
 
 # ---------------------------------------------------------------------------
@@ -635,15 +648,6 @@ async def delete_customer(
 
 # Legal status transitions (MVP): shipped cannot be cancelled; delivered and
 # cancelled are terminal.
-ALLOWED_ORDER_TRANSITIONS: dict[str, set[str]] = {
-    "pending": {"confirmed", "cancelled"},
-    "confirmed": {"shipped", "cancelled"},
-    "shipped": {"delivered"},
-    "delivered": set(),
-    "cancelled": set(),
-}
-
-
 async def _load_order(id: int, business: Business, db: AsyncSession) -> Order:
     """Tenant-scoped ORM fetch with relationships; 404 when absent."""
     stmt = (
@@ -1130,4 +1134,599 @@ async def top_products(
         for row in rows
     ]
 
+# ---------------------------------------------------------------------------
+# Intelligent Import (v1 Instant Onboarding)
+#
+# API design (spec item 14):
+#   GET  /imports/schema    — the strict Co-op schema (mapper + UI targets)
+#   POST /imports/preview   — parse + detect dataset (file)
+#   POST /imports/map       — SUGGEST mapping from headers + sample rows only
+#                             (never the full file; LLM seam, spec item 2)
+#   POST /imports/validate  — read-only validation pass (NO writes, item 6)
+#   POST /imports/commit    — the ONLY endpoint that mutates (one transaction,
+#                             stamped with an ImportBatch, spec items 7/9)
+#
+# Trust model: the mapper only suggests; the user reviews and confirms;
+# validate proves what would happen; commit executes.
+# ---------------------------------------------------------------------------
 
+MAX_IMPORT_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_SAMPLE_ROWS = 50
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    data = await file.read()
+    if len(data) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=400, detail="File is too large (max 5 MB).")
+    return data
+
+
+def _parsed_or_400(filename: str, data: bytes) -> importer.ParsedFile:
+    parsed = importer.parse_file(filename, data)
+    if parsed.error:
+        raise HTTPException(status_code=400, detail=parsed.error)
+    if not parsed.headers:
+        raise HTTPException(status_code=400, detail="No columns found in the file.")
+    return parsed
+
+
+@app.get("/imports/schema", tags=["Import"])
+async def imports_schema(
+    business: Business = Depends(get_current_business),
+) -> dict:
+    """The strict Co-op import schema — the only target fields the mapper
+    (human or LLM) may choose from (spec item 4)."""
+    return importer.mapping_schemas_payload()
+
+
+@app.post("/imports/preview", tags=["Import"])
+async def imports_preview(
+    file: UploadFile = File(...),
+    business: Business = Depends(get_current_business),
+) -> dict:
+    """Parse the file and detect its dataset. No mapping yet, no writes."""
+    data = await _read_upload(file)
+    parsed = _parsed_or_400(file.filename or "upload", data)
+    dataset_key, confidence = importer.detect_dataset(parsed)
+    return {
+        "filename": parsed.filename,
+        "fmt": parsed.fmt,
+        "row_count": len(parsed.rows),
+        "columns": parsed.headers,
+        "sample_rows": parsed.rows[:MAX_SAMPLE_ROWS],
+        "entity": dataset_key,
+        "entity_confidence": round(confidence, 2),
+    }
+
+
+class ImportMapRequest(BaseModel):
+    entity: str
+    headers: List[str]
+    sample_rows: List[List[Any]] = []
+
+
+@app.post("/imports/map", tags=["Import"])
+async def imports_map(
+    payload: ImportMapRequest,
+    business: Business = Depends(get_current_business),
+) -> dict:
+    """Suggest a column mapping from headers + sample rows ONLY.
+
+    This is the LLM seam: v1 runs a deterministic alias + sample-shape
+    engine; a model can be dropped in here with the identical input/output
+    contract and would only ever see headers + a 50-row sample (spec item 2).
+    It may only target fields from /imports/schema — it cannot invent them.
+    """
+    if payload.entity not in importer.DATASETS:
+        raise HTTPException(status_code=400, detail=f"Unknown entity: {payload.entity}")
+    parsed = importer.ParsedFile(
+        filename="upload",
+        fmt="csv",
+        headers=list(payload.headers),
+        rows=[list(r)[: len(payload.headers)] for r in payload.sample_rows[:MAX_SAMPLE_ROWS]],
+    )
+    suggested = importer.suggest_mapping(parsed, payload.entity)
+    return {
+        "entity": payload.entity,
+        "mappings": [
+            {
+                "column": m.column,
+                "field": m.target,
+                "confidence": m.confidence,
+                "label": m.label,
+                "hints": m.hints,
+            }
+            for m in suggested
+        ],
+    }
+
+
+class ImportRunRequest(BaseModel):
+    entity: str
+    mapping: Dict[str, Optional[str]]  # {source_column: field_key_or_null}
+
+
+async def _run_import_payload(
+    payload: ImportRunRequest,
+    data: bytes,
+    filename: str,
+    business: Business,
+    db: AsyncSession,
+):
+    if payload.entity not in importer.DATASETS:
+        raise HTTPException(status_code=400, detail=f"Unknown entity: {payload.entity}")
+    for col, target in payload.mapping.items():
+        if target is not None and target not in importer.DATASETS[payload.entity].fields:
+            raise HTTPException(status_code=400, detail=f"Unknown target field: {target}")
+    parsed = _parsed_or_400(filename, data)
+    if not parsed.rows:
+        raise HTTPException(status_code=400, detail="The file contains no data rows.")
+    return parsed
+
+
+@app.post("/imports/validate", tags=["Import"])
+async def imports_validate(
+    file: UploadFile = File(...),
+    entity: str = Form("products"),
+    mapping: str = Form("{}"),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Read-only validation pass BEFORE any database writes (spec item 6):
+    "1,248 rows received — 1,201 valid, 23 duplicates, 7 missing dates…"."""
+    import json as _json
+    try:
+        mapping_dict = _json.loads(mapping or "{}")
+    except _json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid mapping JSON.")
+    data = await _read_upload(file)
+    parsed = await _run_import_payload(
+        ImportRunRequest(entity=entity, mapping=mapping_dict), data, file.filename or "upload", business, db
+    )
+    v = await importer.validate_import(db, business.id, parsed, entity, mapping_dict)
+    return {
+        "entity": v.dataset,
+        "total_rows": v.total_rows,
+        "valid_rows": v.valid_rows,
+        "duplicates": v.duplicates,
+        "unknown_refs": v.unknown_refs,
+        "would_create": v.would_create,
+        "errors": v.errors,
+        "error_fields": v.error_fields,
+        "ambiguous": v.ambiguous,
+        "warnings": v.warnings,
+    }
+
+
+@app.post("/imports/commit", tags=["Import"])
+async def imports_commit(
+    file: UploadFile = File(...),
+    entity: str = Form("products"),
+    mapping: str = Form("{}"),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """The ONLY mutating import endpoint (spec item 7): one transaction,
+    all-or-nothing, every created row stamped with its ImportBatch (item 9)."""
+    import json as _json
+    try:
+        mapping_dict = _json.loads(mapping or "{}")
+    except _json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid mapping JSON.")
+    data = await _read_upload(file)
+    parsed = await _run_import_payload(
+        ImportRunRequest(entity=entity, mapping=mapping_dict), data, file.filename or "upload", business, db
+    )
+    try:
+        result = await importer.execute_import(db, business.id, parsed, entity, mapping_dict)
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="The import failed and was rolled back. No data was written.")
+    return {
+        "entity": result.dataset,
+        "batch_id": result.batch_id,
+        "total_rows": result.total_rows,
+        "created": result.created,
+        "skipped": result.skipped,
+        "errors": result.errors,
+        "warnings": result.warnings,
+    }
+
+
+@app.get("/dashboard/briefing", tags=["Dashboard"])
+async def dashboard_briefing(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Day 1 Morning Briefing — verified, deterministic business intelligence
+    over the business's real (imported + live) data (spec items 9/10/11)."""
+    return await briefing_mod.build_briefing(db, business.id)
+
+
+# ---------------------------------------------------------------------------
+# First-run onboarding (v1 Instant Onboarding)
+# ---------------------------------------------------------------------------
+
+@app.get("/onboarding/state", tags=["Onboarding"])
+async def onboarding_state(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Whether the tenant has any business data yet — drives the first-run
+    "Welcome to Co-op" screen. A tenant counts as onboarded when it has at
+    least one product, customer or order (imported or created live)."""
+    scope = lambda m: m.business_id == business.id, m.deleted_at.is_(None)  # noqa: E731
+    prod = (await db.execute(select(func.count()).select_from(Product).where(*scope(Product)))).scalar() or 0
+    cust = (await db.execute(select(func.count()).select_from(Customer).where(*scope(Customer)))).scalar() or 0
+    orders = (await db.execute(select(func.count()).select_from(Order).where(*scope(Order)))).scalar() or 0
+    return {
+        "has_data": (prod + cust + orders) > 0,
+        "products": prod,
+        "customers": cust,
+        "orders": orders,
+    }
+
+
+# ---------------------------------------------------------------------------
+# AI Platform (Pass 1) — grounded, verified, metered assistant
+#
+# Trust model: the model NEVER queries the database. /ai/chat builds a
+# verified context from the business's real data, asks the model to explain
+# it under a strict answer contract, validates any proposed actions against
+# the fixed registry, and records the metered usage in the ai_usage ledger.
+# AI is an enhancement and never blocks core operations (TRD Ch1.8): when the
+# model layer is unavailable, the client falls back to the deterministic
+# engine with an honest notice.
+# ---------------------------------------------------------------------------
+
+class AiReportRef(BaseModel):
+    """Which report the owner is looking at (filters only — the data is
+    rebuilt server-side by the reporting engine and never trusted from the
+    client)."""
+    key: str
+    from_date: Optional[str] = Field(None, alias="from")
+    to: Optional[str] = None
+    compare: Optional[str] = None
+    category: Optional[str] = None
+    product_id: Optional[int] = None
+    customer_id: Optional[int] = None
+
+
+class AiChatRequest(BaseModel):
+    question: str
+    history: Optional[List[Dict[str, str]]] = None
+    request_id: Optional[str] = None
+    report: Optional[AiReportRef] = None
+
+
+@app.post("/ai/chat", tags=["AI"])
+async def ai_chat(
+    req: AiChatRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """One grounded AI turn: verified context -> model -> structured answer.
+
+    Returns the answer contract {type, kind, title, message, basis,
+    follow_ups, links, actions, actions_rejected, source, model,
+    credits_used}. Proposed actions are resolved + business-validated; the
+    UI still requires explicit user confirmation before anything executes.
+    """
+    if not ai_service.ai_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="The AI assistant is not configured on this server (OPENAI_API_KEY).",
+        )
+    try:
+        result = await ai_service.handle_chat(
+            db,
+            business,
+            user_id=business.owner_id,
+            question=req.question,
+            history=req.history,
+            request_id=req.request_id,
+            report=req.report.model_dump(by_alias=True, exclude_none=True) if req.report else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except ai_service.InsufficientCredits as e:
+        raise HTTPException(status_code=402, detail=e.to_dict())
+    except ai_service.AiUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return result
+
+
+class AiUsageResponse(BaseModel):
+    month: str
+    requests: int
+    input_tokens: int
+    output_tokens: int
+    credits_used: int
+
+
+@app.get("/ai/usage", response_model=AiUsageResponse, tags=["AI"])
+async def ai_usage(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> AiUsageResponse:
+    """Real metered AI usage for the current calendar month (billing reads this)."""
+    today = date.today()
+    first = datetime.combine(today.replace(day=1), time.min)
+    nxt_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+    last = datetime.combine(nxt_month, time.min)
+    u = await ai_service.month_usage(db, business.id, first, last)
+    return AiUsageResponse(
+        month=today.strftime("%b %Y"),
+        requests=u["requests"],
+        input_tokens=u["input_tokens"],
+        output_tokens=u["output_tokens"],
+        credits_used=u["credits_used"],
+    )
+
+
+@app.get("/ai/forecast", tags=["AI"])
+async def ai_forecast(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Deterministic revenue forecast (PRD Phase 3 — "Forecasting").
+
+    A transparent least-squares trend over the business's real, verified
+    monthly order data — never a black-box ML prediction, always labelled
+    as an estimate. No model call, no credits: a pure calculation over
+    verified data, so it is free and instant.
+    """
+    return await ai_forecast_mod.build_forecast(db, business.id, currency=business.currency or "USD")
+
+
+class AiHistoryItem(BaseModel):
+    id: int
+    question: str
+    answer_kind: Optional[str] = None
+    answer_title: Optional[str] = None
+    answer_summary: Optional[str] = None
+    report_key: Optional[str] = None
+    model: Optional[str] = None
+    credits_used: int = 0
+    created_at: Optional[str] = None
+
+
+class AiHistoryResponse(BaseModel):
+    items: List[AiHistoryItem]
+    total: int
+
+
+@app.get("/ai/history", response_model=AiHistoryResponse, tags=["AI"])
+async def ai_history_list(
+    limit: int = Query(30, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> AiHistoryResponse:
+    """The owner's AI activity, newest first (PRD Phase 3 — "AI history").
+
+    One entry per completed /ai/chat turn: the question, what kind of
+    answer it got and a short summary. Failed requests are not listed —
+    the history shows only what Co-op actually answered.
+    """
+    items, total = await ai_history_mod.list_history(db, business.id, limit=limit, offset=offset)
+    return AiHistoryResponse(items=items, total=total)
+
+
+@app.delete("/ai/history", tags=["AI"])
+async def ai_history_clear(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Delete the business's AI activity (explicit owner action)."""
+    deleted = await ai_history_mod.clear_history(db, business.id)
+    return {"deleted": deleted}
+
+
+# ---------------------------------------------------------------------------
+# Billing + Credits (Real Billing phase) — plans and credit enforcement are
+# REAL server-side state; payment collection is a later phase (nothing is
+# charged yet, and the UI says so honestly).
+# ---------------------------------------------------------------------------
+
+class BillingPlanRequest(BaseModel):
+    plan: str
+
+
+@app.get("/billing/summary", tags=["Billing"])
+async def billing_summary_route(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Plan + real credit position + the month's metered AI usage.
+
+    Credits are computed (allowance − ledger), never stored — so this is
+    always the source of truth for "you have N credits remaining".
+    """
+    from . import billing as billing_mod
+
+    return await billing_mod.billing_summary(db, business)
+
+
+@app.post("/billing/plan", tags=["Billing"])
+async def billing_change_plan(
+    req: BillingPlanRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Switch plans. Real state (enforcement updates immediately); payment
+    is deliberately NOT taken in this phase."""
+    from . import billing as billing_mod
+    from .billing import InvalidPlan
+
+    try:
+        await billing_mod.change_plan(db, business, req.plan, actor=business.owner_id)
+    except InvalidPlan as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return await billing_mod.billing_summary(db, business)
+
+
+# ---------------------------------------------------------------------------
+# Notifications (v1: in-app daily business summary)
+#
+# Computed on demand from the existing reporting/briefing layer — no second
+# calculation path, no scheduler, no persistence (so repeated same-day
+# requests yield the same summary and nothing can duplicate). The LLM is not
+# involved; every number is deterministic.
+# ---------------------------------------------------------------------------
+
+@app.get("/notifications/daily-summary", response_model=DailySummarySchema, tags=["Notifications"])
+async def notifications_daily_summary(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> DailySummarySchema:
+    """Today's verified business summary for the in-app notification panel."""
+    return await build_daily_summary(db, business)
+
+
+# ---------------------------------------------------------------------------
+# Sync (offline-first, OFFLINE 3 — one-way push first, ADR-002)
+#
+# The desktop app pushes offline-originated operations here when
+# connectivity returns. Every op is idempotent on its client_id, so a retried
+# batch applies exactly once. Stock arrives as operations (signed movements),
+# never as final values, and the server re-validates (ADR-002 rule 7).
+# ---------------------------------------------------------------------------
+
+class SyncPushOperation(BaseModel):
+    entity: str  # customer | product | order | order_item | stock_movement
+    client_id: str  # client-generated ULID (idempotency key)
+    operation: str  # create | update | delete
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    # The local queue row id (OFFLINE 4): echoed back in the structured
+    # conflict entry so the queue can attribute the conflict to its op.
+    operation_id: Optional[str] = None
+
+
+class SyncPushRequest(BaseModel):
+    operations: List[SyncPushOperation] = Field(default_factory=list)
+
+
+@app.post("/sync/push", tags=["Sync"])
+async def sync_push(
+    req: SyncPushRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Apply a batch of offline operations idempotently. Returns applied /
+    skipped counts, a client_id -> server id map, and any per-op errors."""
+    ops = [o.model_dump() for o in req.operations]
+    return await apply_push(db, business.id, ops)
+
+
+@app.get("/sync/pull", tags=["Sync"])
+async def sync_pull(
+    since: Optional[datetime] = Query(None, description="Delta cursor (ISO). Omit for a full dump."),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Cloud -> local mirror payload (OFFLINE 3, Part 1).
+
+    No ``since`` -> full dump (initial pull, includes soft-deleted rows so the
+    mirror can reflect deletions). ``since`` set -> delta (rows changed since
+    the cursor). Each record carries ``id`` + ``client_id`` so the local/cloud
+    identity mapping stays stable. Returns a ``cursor`` for the next delta.
+    """
+    return await build_pull_payload(db, business, since=since)
+
+
+# ---------------------------------------------------------------------------
+# Reports (Reports phase) — one verified engine, many consumers
+#
+# The reporting engine (backend/reports) is the SINGLE source of truth: the
+# Reports UI, CSV/XLSX/PDF exports and the AI context all read the same
+# ReportData for the same filters, so the screen, the file and the
+# explanation can never disagree about a number.
+# ---------------------------------------------------------------------------
+
+def _report_filters(
+    from_: Optional[str],
+    to: Optional[str],
+    compare: Optional[str],
+    category: Optional[str],
+    product_id: Optional[int],
+    customer_id: Optional[int],
+) -> ReportFilters:
+    try:
+        return ReportFilters.from_query(
+            from_str=from_, to_str=to, compare=compare,
+            category=category, product_id=product_id, customer_id=customer_id,
+        )
+    except FilterError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@app.get("/reports/meta", tags=["Reports"])
+async def reports_meta(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Available reports + the tenant's product categories (for the filter UI)."""
+    cats = (await db.execute(
+        select(func.distinct(Product.category)).where(
+            Product.business_id == business.id,
+            Product.deleted_at.is_(None),
+            Product.category.is_not(None),
+        )
+    )).scalars().all()
+    return {
+        "reports": [{"key": k, "title": v} for k, v in REPORT_TITLES.items()],
+        "categories": sorted(c for c in cats if c),
+        "compare_options": ["none", "previous_period", "previous_month", "previous_year"],
+    }
+
+
+@app.get("/reports/{key}", tags=["Reports"])
+async def get_report(
+    key: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    compare: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    product_id: Optional[int] = Query(None),
+    customer_id: Optional[int] = Query(None),
+) -> dict:
+    """One verified report dataset for the given filters (deterministic)."""
+    if key not in REPORT_TITLES:
+        raise HTTPException(status_code=404, detail=f"Unknown report '{key}'.")
+    f = _report_filters(from_, to, compare, category, product_id, customer_id)
+    return (await build_report(db, business.id, key, f)).to_dict()
+
+
+@app.get("/reports/{key}/export", tags=["Reports"])
+async def export_report_route(
+    key: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    format: str = Query("csv", alias="format"),
+    from_: Optional[str] = Query(None, alias="from"),
+    to: Optional[str] = Query(None),
+    compare: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    product_id: Optional[int] = Query(None),
+    customer_id: Optional[int] = Query(None),
+) -> Response:
+    """Export EXACTLY what the screen shows: same engine, same filters."""
+    if key not in REPORT_TITLES:
+        raise HTTPException(status_code=404, detail=f"Unknown report '{key}'.")
+    f = _report_filters(from_, to, compare, category, product_id, customer_id)
+    data = await build_report(db, business.id, key, f)
+    try:
+        content, filename, media_type = export_report(data, format)
+    except ExportError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

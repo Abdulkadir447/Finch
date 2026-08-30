@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for Finch backend.
+"""SQLAlchemy ORM models for Co-op backend.
 
 Implements the BSD Chapter 1 backend foundation:
 
@@ -108,6 +108,8 @@ class Product(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     order_items = relationship(
         "OrderItem",
@@ -153,6 +155,8 @@ class Customer(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     orders = relationship(
         "Order",
@@ -174,10 +178,49 @@ class OrderStatus(str, Enum):
     cancelled = "cancelled"
 
 
+# ---------------------------------------------------------------------------
+# Import provenance (v1 Instant Onboarding, item 9)
+#
+# Every row created by the Intelligent Importer is stamped with the
+# ``ImportBatch`` that created it. ``import_batch_id IS NULL`` means the
+# record was created live in Co-op (manual/live); a set value means it came
+# from that import batch — giving a clean split between "imported history"
+# and "today's live sales", and making undoing an import a batch delete.
+# ---------------------------------------------------------------------------
+class ImportBatch(Base):
+    """One uploaded file that was imported (one dataset per batch)."""
+
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    dataset = Column(String(20), nullable=False)  # products | customers | orders
+    filename = Column(String(255))
+    row_count = Column(Integer, default=0)
+    created_count = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+
 class Order(Base):
     """Order entity (``orders`` table)."""
 
     __tablename__ = "orders"
+    # Imported orders carry the source system's order reference
+    # (``source_order_ref``) so a re-import of the same file is idempotent:
+    # the same external reference can never create a second order per
+    # business (partial unique index — mirrors the products SKU rule).
+    # Native (live) orders leave it NULL.
+    __table_args__ = (
+        Index(
+            "uq_orders_business_source_ref",
+            "business_id",
+            "source_order_ref",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL AND source_order_ref IS NOT NULL"),
+            sqlite_where=text("deleted_at IS NULL AND source_order_ref IS NOT NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True)            # tenant isolation
@@ -194,6 +237,9 @@ class Order(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
+    source_order_ref = Column(String(100), nullable=True)  # external order number from the old system (import idempotency)
 
     customer = relationship("Customer", back_populates="orders")
     items = relationship(
@@ -225,6 +271,8 @@ class OrderItem(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")
@@ -269,15 +317,100 @@ class StockMovement(Base):
     order_id = Column(Integer, nullable=True)                   # set for order-driven moves
     actor = Column(String(255))                                 # Clerk user id
     created_at = Column(DateTime, server_default=func.now())
+    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
 
     product = relationship("Product")
 
 
 # ---------------------------------------------------------------------------
 # Profile — local user profile, keyed to the Clerk identity (BSD Ch3.11).
-# Supabase is the storage layer for Finch; identity comes from Clerk, so the
+# Supabase is the storage layer for Co-op; identity comes from Clerk, so the
 # profile is keyed by the Clerk user id and lives in Supabase Postgres.
 # ---------------------------------------------------------------------------
+class AiUsage(Base):
+    """One metered AI request (AI Platform phase, Pass 4).
+
+    Every successful /ai/chat request writes exactly one row: model, tokens
+    and the credits charged under the current credit policy. Billing reads
+    this ledger — it never re-derives usage from anywhere else, and the
+    policy (credits per request / per 1k output tokens) lives in config,
+    not in the AI engine, so pricing can change without touching AI code.
+    """
+
+    __tablename__ = "ai_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(String(255))  # Clerk user id
+    request_id = Column(String(64), index=True)  # idempotency key (client-generated or server-assigned)
+    model = Column(String(64))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    credits_used = Column(Integer, default=0)
+    answer_kind = Column(String(20))  # fact | calculation | forecast | suggestion | draft | clarify
+    created_at = Column(DateTime, server_default=func.now())
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<AiUsage business={self.business_id} model={self.model!r} credits={self.credits_used}>"
+
+
+class AiHistory(Base):
+    """One answered AI turn (AI Platform phase — AI history deliverable).
+
+    ``ai_usage`` meters cost (tokens/credits); ``ai_history`` is what the
+    OWNER sees: the question, the answered kind/title and a short summary.
+    One row per completed /ai/chat turn (assistant answers and grounded
+    clarify answers). Failed/unanswered requests are NOT recorded — the
+    history shows what Co-op actually answered, tenant-scoped like
+    everything else.
+    """
+
+    __tablename__ = "ai_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    user_id = Column(String(255))  # Clerk user id of the asker
+    request_id = Column(String(64), index=True)
+    question = Column(Text, nullable=False)
+    answer_kind = Column(String(20))  # fact | calculation | forecast | suggestion | draft | clarify
+    answer_title = Column(String(255))
+    answer_summary = Column(Text)  # truncated message — full answers stay in the conversation
+    report_key = Column(String(20))  # which report the turn was about, if any
+    model = Column(String(64))
+    credits_used = Column(Integer, default=0)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class Subscription(Base):
+    """The business's active plan (Real Billing phase).
+
+    One row per business. Credits are NOT stored here — they are computed
+    from the plan's monthly allowance (config) minus the SUM of the
+    ``ai_usage`` ledger for the current calendar month, so the ledger stays
+    the single source of truth and there is no balance to drift.
+
+    Payments are deliberately out of scope for this phase: plan changes are
+    real server-side state (enforcement + remaining are real), but nothing
+    is charged until a payment provider is connected.
+    """
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index("uq_subscriptions_business", "business_id", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    plan = Column(String(20), nullable=False, default="free")  # free | starter | professional | enterprise
+    status = Column(String(20), nullable=False, default="active")
+    updated_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Subscription business={self.business_id} plan={self.plan!r}>"
+
+
 class Profile(Base):
     """Local user profile, linked to the Clerk identity.
 

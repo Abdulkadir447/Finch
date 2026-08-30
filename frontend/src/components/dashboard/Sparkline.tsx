@@ -2,12 +2,12 @@ import React from 'react';
 import Chart from './chart';
 import { theme as antdTheme } from 'antd';
 import type { ApexOptions } from 'apexcharts';
-import { brand } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
 
 export interface SparklineProps {
   /** Trend points for the KPI mini chart (UXDS 9.8 "Mini Chart"). */
   data: number[];
-  /** Line/fill accent. Defaults to the Finch brand primary. */
+  /** Line/fill accent. Defaults to the active theme's primary. */
   color?: string;
   /** Render height in px. */
   height?: number;
@@ -22,10 +22,12 @@ export interface SparklineProps {
  */
 const Sparkline: React.FC<SparklineProps> = ({
   data,
-  color = brand.primary,
+  color,
   height = 42,
 }) => {
   const { token } = antdTheme.useToken();
+  const { colors } = useCoopTheme();
+  const lineColor = color ?? colors.primary;
 
   if (!data || data.length === 0) {
     return (
@@ -53,7 +55,7 @@ const Sparkline: React.FC<SparklineProps> = ({
       type: 'gradient',
       gradient: { opacityFrom: 0.25, opacityTo: 0.02 },
     },
-    colors: [color],
+    colors: [lineColor],
     tooltip: { enabled: false },
     xaxis: { labels: { show: false }, axisBorder: { show: false } },
     yaxis: { labels: { show: false } },

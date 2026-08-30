@@ -1,0 +1,418 @@
+Co-op Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 18 — System Configuration & Developer Infrastructure Schema
+18.1 Purpose
+
+The System Configuration & Developer Infrastructure module serves as the operational backbone of Co-op. It manages application settings, business configurations, feature flags, developer tools, environment configuration, logging, monitoring, migrations, API versioning, and future extensibility.
+
+Unlike other modules, this chapter focuses on the infrastructure that allows Co-op to remain maintainable, scalable, secure, and easy to evolve over many years.
+
+This module integrates with every subsystem within Co-op.
+
+18.2 Objectives
+
+The System Infrastructure module must:
+
+Manage global application settings.
+Store business-specific configuration.
+Support feature flags.
+Support environment configuration.
+Monitor system health.
+Record application logs.
+Handle error reporting.
+Manage database migrations.
+Support API versioning.
+Support future plugins and extensions.
+Prepare Co-op for enterprise deployment.
+18.3 Architecture
+                Co-op Application
+                       │
+         ┌─────────────┼─────────────┐
+         ▼             ▼             ▼
+   Configuration   Infrastructure   Monitoring
+         │             │             │
+         └─────────────┼─────────────┘
+                       ▼
+                System Services
+                       │
+      ┌─────────┬──────────┬──────────┐
+      ▼         ▼          ▼          ▼
+ Logging   Migrations   API Layer   Plugins
+
+The infrastructure layer supports every feature without containing business logic itself.
+
+18.4 Core Tables
+Table	Purpose
+system_settings	Global application settings
+business_settings	Business-specific configuration
+feature_flags	Feature toggles
+environment_config	Environment variables metadata
+application_logs	Application logging
+error_reports	Error tracking
+migration_history	Database migrations
+api_versions	API version tracking
+system_health	Health monitoring
+plugins	Future extensions
+18.5 Global System Settings
+Table: system_settings
+Column	Type
+id	UUID
+setting_key	TEXT
+setting_value	JSONB
+description	TEXT
+editable	BOOLEAN
+updated_at	TIMESTAMPTZ
+
+Examples:
+
+Default Currency
+Default Language
+Time Zone
+AI Defaults
+Sync Interval
+Backup Frequency
+
+Only administrators can modify global settings.
+
+18.6 Business Settings
+Table: business_settings
+
+Stores configuration unique to each business.
+
+Examples:
+
+Company Name
+Address
+Logo
+Currency
+Tax Rate
+Invoice Prefix
+Receipt Prefix
+Numbering Format
+Default Payment Method
+Report Preferences
+
+These settings override system defaults where appropriate.
+
+18.7 Feature Flags
+Table: feature_flags
+
+Allows features to be enabled or disabled without deploying a new version.
+
+Fields:
+
+Feature Name
+Enabled
+Minimum Version
+Description
+Rollout Percentage
+
+Examples:
+
+AI Forecasting
+
+Inventory Scanner
+
+Mobile Sync
+
+Multi-Warehouse
+
+Plugin Support
+
+Experimental Reports
+
+Feature flags support staged rollouts and testing.
+
+18.8 Environment Configuration
+Table: environment_config
+
+Stores metadata (not secrets) for environment configuration.
+
+Fields:
+
+Variable Name
+Description
+Required
+Default Value
+Environment
+
+Examples:
+
+API Endpoint
+Storage Bucket
+AI Provider
+Sync Endpoint
+
+Sensitive values remain in secure environment variables and are never stored in the database.
+
+18.9 Application Logging
+Table: application_logs
+
+Stores non-business operational logs.
+
+Fields:
+
+Log ID
+Severity
+Module
+Message
+Stack Trace Reference
+User ID (optional)
+Timestamp
+
+Severity levels:
+
+Debug
+Information
+Warning
+Error
+Critical
+
+Old logs are archived automatically.
+
+18.10 Error Reporting
+Table: error_reports
+
+Stores application exceptions.
+
+Fields include:
+
+Error Code
+Exception Type
+Stack Trace
+Device
+Operating System
+App Version
+Module
+Timestamp
+Resolution Status
+
+Developers can use these reports to diagnose issues.
+
+18.11 Database Migrations
+Table: migration_history
+
+Tracks every schema change.
+
+Fields:
+
+Migration Name
+Version
+Applied By
+Applied At
+Status
+Rollback Available
+
+Example workflow:
+
+Create Migration
+
+↓
+
+Apply
+
+↓
+
+Verify
+
+↓
+
+Record History
+
+All migrations should be idempotent and version-controlled.
+
+18.12 API Versioning
+Table: api_versions
+
+Stores supported API versions.
+
+Fields:
+
+Version
+Release Date
+Deprecated
+End-of-Support Date
+
+Example:
+
+v1
+
+↓
+
+v2
+
+↓
+
+v3
+
+Backward compatibility should be maintained whenever practical.
+
+18.13 System Health Monitoring
+Table: system_health
+
+Tracks runtime health.
+
+Metrics include:
+
+Database Status
+Sync Queue Length
+API Response Time
+Memory Usage
+CPU Usage
+Storage Space
+Active Users
+AI Service Status
+
+These metrics power future administrator dashboards.
+
+18.14 Plugin Framework
+Table: plugins
+
+Prepared for future expansion.
+
+Fields:
+
+Plugin ID
+Name
+Version
+Enabled
+Author
+Permissions
+Installed Date
+
+Potential future plugins:
+
+Payroll
+Accounting
+CRM
+POS Hardware
+Barcode Scanner
+E-commerce Integration
+18.15 Logging Workflow
+Application Event
+
+↓
+
+Logger
+
+↓
+
+Store Log
+
+↓
+
+Severity Check
+
+↓
+
+Archive if Required
+
+Logging should never block normal application operation.
+
+18.16 Relationships
+system_settings
+       │
+       ├── business_settings
+       ├── feature_flags
+       ├── environment_config
+       ├── application_logs
+       ├── error_reports
+       ├── migration_history
+       ├── api_versions
+       ├── system_health
+       └── plugins
+
+This infrastructure layer supports all application modules without creating circular dependencies.
+
+18.17 Security
+
+Infrastructure components are protected using:
+
+Role-Based Access Control (RBAC)
+Row Level Security (RLS) where applicable
+Environment secret isolation
+Audit logging
+Encrypted communications
+
+Only authorized administrators and developers may access infrastructure settings.
+
+18.18 Performance
+
+Performance strategies include:
+
+Cache frequently read settings.
+Archive old logs.
+Batch health metric collection.
+Lazy-load plugin metadata.
+Compress archived logs.
+Optimize migration execution.
+
+These ensure infrastructure tasks have minimal impact on business operations.
+
+18.19 Synchronization
+
+The following synchronize between devices:
+
+Business settings
+Feature flags
+API version metadata
+Plugin configuration
+Selected application preferences
+
+Operational logs and health metrics remain primarily server-side unless required for diagnostics.
+
+18.20 Developer Guidelines
+
+Developers should:
+
+Never hardcode configuration values.
+Use feature flags for unfinished functionality.
+Keep migrations reversible where possible.
+Store secrets outside the database.
+Follow semantic versioning.
+Write structured logs with meaningful metadata.
+Monitor system health continuously.
+Design plugins with isolated interfaces.
+18.21 Acceptance Criteria
+
+The System Configuration & Developer Infrastructure Schema is complete when:
+
+Global and business-specific settings are configurable.
+Feature flags can enable or disable functionality safely.
+Environment configuration is centralized.
+Application logs and error reports are captured.
+Database migrations are tracked.
+API versioning supports future evolution.
+System health metrics are monitored.
+Plugin infrastructure is prepared.
+Infrastructure settings are secured appropriately.
+18.22 Final Backend Architecture Overview
+
+The completed backend architecture consists of the following modules:
+
+Business & Organization
+User & Role Management
+Product & Inventory
+Supplier Management
+Order Management
+Customer Management
+Payment Management
+Reporting & Analytics
+AI & Intelligence
+Notifications & Activity
+Synchronization & Offline
+Security, Authentication & Audit
+Backup, Recovery & Data Lifecycle
+System Configuration & Developer Infrastructure
+
+These modules work together to provide a scalable, secure, offline-first, AI-powered business management platform.
+
+18.23 Chapter Summary
+
+The System Configuration & Developer Infrastructure Schema completes Co-op's backend by providing the operational foundation required for long-term maintainability and scalability. Through centralized configuration management, feature flags, structured logging, health monitoring, migration tracking, API versioning, and plugin readiness, the system is designed to evolve without disrupting existing functionality. Combined with the previous seventeen chapters, this creates a comprehensive backend architecture capable of supporting startups, growing businesses, and future enterprise deployments.

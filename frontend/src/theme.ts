@@ -1,250 +1,349 @@
 /**
- * Finch Design System — Visual Tokens (UXDS Chapter 1: Design Vision & Principles)
+ * Co-op Design System — central theme (Stitch Stage R0 "Co-op Purple").
  *
- * Philosophy: "Your Business, Smarter."
- *   - Clarity First: information is easy to scan and understand.
- *   - Neutral surfaces dominate; a single accent color carries meaning.
- *   - Generous spacing, rounded corners, subtle shadows, clear hierarchy.
- *   - Light and dark themes provide equivalent usability (WCAG 2.1 AA contrast).
+ * This file is the single source of truth that maps the Co-op design tokens
+ * (`theme/*.ts`) onto Ant Design 5's ConfigProvider. Pages and components
+ * should never hard-code colors, radii or fonts — they consume either the
+ * raw tokens (from `theme/index`) or the antd token via
+ * `antdTheme.useToken()`, which is guaranteed to reflect this config.
  *
- * These tokens are the single source of truth for the Ant Design 5 ConfigProvider.
+ * Compatibility note: the legacy `brand`, `neutral` and `semantic` exports
+ * are kept (re-derived from the new palette) so existing modules keep
+ * working while they are migrated to the named tokens.
  */
 
 import type { ThemeConfig } from 'antd';
 import { theme as antdTheme } from 'antd';
+import { colors, tint } from './theme/colors';
+import { darkColors } from './theme/dark';
+import { fontFamily, type } from './theme/typography';
+import { radius, shadow, z } from './theme/tokens';
 
 // ---------------------------------------------------------------------------
-// Brand & Semantic Color Palette
+// Compatibility aliases (re-derived from the Co-op Purple palette)
 // ---------------------------------------------------------------------------
-// A calm, professional indigo/violet accent communicates "intelligent" and
-// "trustworthy" (UXDS 1.6 Brand Personality) without overwhelming neutral UI.
 export const brand = {
-  primary: '#5B5BD6', // accent — important actions & status only
-  primaryHover: '#6E6EE0',
-  primaryActive: '#4A4AC4',
-  primarySurface: '#EEEEFB', // tinted background for selected/hover states
+  primary: colors.primary,
+  primaryHover: colors.primaryContainer,
+  primaryActive: '#3335b8',
+  primarySurface: colors.surfaceContainerLow,
 };
 
-// Neutral scale (cool grays) keeps the interface quiet and content-forward.
-// Numeric keys require bracket access (e.g. neutral[0]).
 export const neutral: Record<number, string> = {
-  0: '#FFFFFF',
-  50: '#F7F8FA',
-  100: '#EEF0F4',
-  200: '#E2E5EB',
-  300: '#CAD0DA',
-  400: '#9AA3B2',
-  500: '#6B7484',
-  600: '#4B5260',
-  700: '#353B47',
-  800: '#23272F',
-  900: '#15181D',
-  950: '#0C0E12',
+  0: colors.surfaceContainerLowest,
+  50: colors.surfaceContainerLow,
+  100: colors.surfaceContainer,
+  200: colors.borderSubtle,
+  300: colors.outlineVariant,
+  400: colors.outline,
+  500: colors.onSurfaceVariant,
+  600: '#3a3949',
+  700: '#2a2937',
+  800: colors.inverseSurface,
+  900: colors.onSurface,
+  950: '#101017',
 };
 
-// Semantic colors carry status meaning independent of hue (UXDS 1.17 — color
-// independent status indicators). Used for badges, alerts, low-stock, etc.
 export const semantic = {
-  success: '#2E9E5B',
-  successBg: '#E7F6EC',
-  warning: '#E0A106',
-  warningBg: '#FDF3DA',
-  error: '#D64545',
-  errorBg: '#FBE9E9',
-  info: '#2D8FD5',
-  infoBg: '#E6F2FB',
+  success: colors.success,
+  successBg: tint(colors.success, 0.1),
+  warning: colors.warning,
+  warningBg: tint(colors.warning, 0.12),
+  error: colors.error,
+  errorBg: tint(colors.error, 0.08),
+  info: colors.info,
+  infoBg: tint(colors.info, 0.1),
 };
 
 // ---------------------------------------------------------------------------
-// Typography Scale (UXDS 1.12 — readability first, clear hierarchy)
+// Shared token block
 // ---------------------------------------------------------------------------
-export const fontFamily =
-  '"Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
-
-export const fontSize = {
-  caption: 12,
-  body: 14,
-  subhead: 16,
-  title: 20,
-  heading: 24,
-  display: 32,
+const baseTokens = {
+  fontFamily,
+  // Default UI size is body-compact (14); paragraphs use body-default (16).
+  fontSize: type.bodyCompact.fontSize,
+  lineHeight: type.bodyCompact.lineHeight / type.bodyCompact.fontSize,
+  colorText: colors.onSurface,
+  colorTextSecondary: colors.onSurfaceVariant,
+  colorTextTertiary: colors.outline,
+  colorTextQuaternary: tint(colors.outline, 0.45),
+  colorBorder: colors.outlineVariant,
+  colorBorderSecondary: colors.borderSubtle,
+  colorBgLayout: colors.surface,
+  colorFillQuaternary: colors.surfaceContainerLow,
+  borderRadius: radius.lg,
+  borderRadiusLG: radius.xl,
+  borderRadiusSM: radius.md,
+  controlHeight: 36,
+  controlHeightLG: 44,
+  controlHeightSM: 28,
+  motionDurationMid: '0.2s',
+  motionDurationSlow: '0.3s',
 };
 
 // ---------------------------------------------------------------------------
-// Spacing & Shape (UXDS 1.13 Layout — generous, consistent spacing)
+// Component-level mapping (Stitch Stage R1 patterns)
 // ---------------------------------------------------------------------------
-export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
+const baseComponents: ThemeConfig['components'] = {
+  Layout: {
+    headerBg: colors.surfaceContainerLowest,
+    bodyBg: colors.surface,
+    siderBg: colors.surfaceContainerLowest,
+    headerHeight: 64,
+    headerPadding: '0 24px',
+  },
+  Menu: {
+    itemBorderRadius: 10,
+    itemSelectedBg: colors.surfaceContainerLow,
+    itemSelectedColor: colors.primary,
+    itemHoverBg: colors.surfaceContainerLow,
+    itemHoverColor: colors.primary,
+    itemColor: colors.onSurfaceVariant,
+    iconSize: 18,
+  },
+  Button: {
+    borderRadius: radius.lg,
+    controlHeight: 36,
+    fontWeight: 600,
+    primaryShadow: 'none',
+    defaultBg: colors.surfaceContainerLowest,
+    defaultBorderColor: colors.outlineVariant,
+    defaultColor: colors.onSurfaceVariant,
+    defaultHoverBg: colors.surfaceContainerLow,
+    defaultHoverBorderColor: colors.outlineVariant,
+    defaultHoverColor: colors.primary,
+  },
+  Card: {
+    borderRadiusLG: radius.lg,
+    colorBorderSecondary: colors.borderSubtle,
+    paddingLG: 20,
+    headerFontSize: type.titleMd.fontSize,
+    headerBg: 'transparent',
+  },
+  Table: {
+    headerBg: 'transparent',
+    headerColor: colors.outline,
+    headerSplitColor: 'transparent',
+    borderColor: colors.borderSubtle,
+    rowHoverBg: colors.surfaceContainerLow,
+    cellPaddingBlock: 14,
+    cellPaddingBlockMD: 12,
+    headerBorderRadius: 0,
+    fontSize: 14,
+  },
+  Modal: {
+    borderRadiusLG: radius.xl,
+    headerBg: 'transparent',
+    titleFontSize: 18,
+    contentBg: colors.surfaceContainerLowest,
+    footerBg: 'transparent',
+  },
+  Input: {
+    borderRadius: radius.lg,
+    activeBorderColor: colors.primary,
+    hoverBorderColor: colors.primaryContainer,
+    activeShadow: `0 0 0 3px ${tint(colors.primary, 0.15)}`,
+  },
+  InputNumber: {
+    borderRadius: radius.lg,
+  },
+  Select: {
+    borderRadius: radius.lg,
+    optionSelectedBg: colors.surfaceContainerLow,
+    optionSelectedFontWeight: 600,
+  },
+  Alert: {
+    borderRadius: radius.lg,
+  },
+  Tag: {
+    borderRadiusSM: radius.md,
+  },
+  Pagination: {
+    itemActiveBg: 'transparent',
+    colorPrimary: colors.primary,
+    borderRadius: radius.md,
+  },
+  Spin: {
+    colorPrimary: colors.primary,
+  },
+  Segmented: {
+    itemSelectedBg: colors.surfaceContainerLowest,
+    trackBg: colors.surfaceContainerLow,
+  },
+  Radio: {
+    buttonBg: colors.surfaceContainerLowest,
+    buttonCheckedBg: colors.primary,
+    buttonSolidCheckedColor: colors.onPrimary,
+  },
+  Divider: {
+    colorSplit: colors.borderSubtle,
+  },
+  Empty: {
+    colorText: colors.outline,
+  },
+  Drawer: {
+    paddingLG: radius.lg,
+  },
+  Dropdown: {
+    borderRadiusLG: radius.lg,
+  },
+  Tooltip: {
+    borderRadius: radius.md,
+  },
+  Skeleton: {
+    gradientFromColor: colors.surfaceContainer,
+    gradientToColor: colors.surfaceContainerLow,
+  },
 };
 
-export const shadow = {
-  sm: '0 1px 2px rgba(21, 24, 29, 0.06)',
-  md: '0 4px 16px rgba(21, 24, 29, 0.08)',
-  lg: '0 12px 32px rgba(21, 24, 29, 0.12)',
-};
-
 // ---------------------------------------------------------------------------
-// Light Theme
+// Light theme — the Co-op design system (Stitch Stage R0)
 // ---------------------------------------------------------------------------
 export const light: ThemeConfig = {
   algorithm: antdTheme.defaultAlgorithm,
   token: {
-    colorPrimary: brand.primary,
-    colorPrimaryHover: brand.primaryHover,
+    ...baseTokens,
+    colorPrimary: colors.primary,
+    colorPrimaryHover: colors.primaryContainer,
     colorPrimaryActive: brand.primaryActive,
-    colorInfo: brand.primary,
-    colorSuccess: semantic.success,
-    colorWarning: semantic.warning,
-    colorError: semantic.error,
-    colorLink: brand.primary,
-
-    colorBgBase: neutral[0],
-    colorBgLayout: neutral[50],
-    colorBgContainer: neutral[0],
-    colorBgElevated: neutral[0],
-    colorBorder: neutral[200],
-    colorBorderSecondary: neutral[100],
-    colorTextBase: neutral[800],
-    colorText: neutral[800],
-    colorTextSecondary: neutral[500],
-    colorTextTertiary: neutral[400],
-
-    fontFamily,
-    fontSize: fontSize.body,
-    fontSizeHeading1: fontSize.display,
-    fontSizeHeading2: fontSize.heading,
-    fontSizeHeading3: fontSize.title,
-    fontSizeHeading4: fontSize.subhead,
-    lineHeight: 1.6,
-
-    borderRadius: radius.md,
-    borderRadiusLG: radius.lg,
-    borderRadiusSM: radius.sm,
-
-    controlHeight: 38,
-    controlHeightLG: 44,
-    controlHeightSM: 30,
-
-    boxShadow: shadow.md,
-    boxShadowSecondary: shadow.sm,
-    boxShadowTertiary: shadow.lg,
-
-    motionDurationMid: '0.2s',
-    motionDurationSlow: '0.3s',
+    colorPrimaryBg: tint(colors.primary, 0.1),
+    colorInfo: colors.info,
+    colorSuccess: colors.success,
+    colorWarning: colors.warning,
+    colorError: colors.error,
+    colorLink: colors.primary,
+    colorLinkHover: colors.primaryContainer,
+    colorLinkActive: brand.primaryActive,
+    colorBgBase: colors.surfaceContainerLowest,
+    colorBgContainer: colors.surfaceContainerLowest,
+    colorBgElevated: colors.surfaceContainerLowest,
+    colorErrorBg: tint(colors.error, 0.08),
+    colorSuccessBg: tint(colors.success, 0.1),
+    colorWarningBg: tint(colors.warning, 0.12),
+    colorInfoBg: tint(colors.info, 0.1),
+    borderRadiusOuter: radius.lg,
+    boxShadow: shadow.overlay,
+    boxShadowSecondary: shadow.lift,
+    boxShadowTertiary: shadow.soft,
+    zIndexPopupBase: z.topBar + 10,
+    fontSizeHeading1: type.pageTitle.fontSize,
+    fontSizeHeading2: type.pageTitleMobile.fontSize,
+    fontSizeHeading3: type.sectionHeading.fontSize,
+    fontSizeHeading4: type.titleMd.fontSize,
+    colorBgTextHover: colors.surfaceContainerLow,
   },
-  components: {
-    Layout: {
-      headerBg: neutral[0],
-      bodyBg: neutral[50],
-      siderBg: neutral[0],
-      headerHeight: 64,
-      headerPadding: '0 24px',
-    },
-    Menu: {
-      itemSelectedBg: brand.primarySurface,
-      itemSelectedColor: brand.primaryActive,
-      itemHoverBg: neutral[100],
-      itemBorderRadius: radius.sm,
-    },
-    Card: {
-      borderRadiusLG: radius.lg,
-      boxShadowTertiary: shadow.sm,
-    },
-    Button: {
-      controlHeight: 38,
-      primaryShadow: 'none',
-      borderRadius: radius.sm,
-    },
-    Table: {
-      headerBg: neutral[50],
-      headerColor: neutral[600],
-      rowHoverBg: neutral[50],
-      borderRadiusLG: radius.md,
-    },
-  },
+  components: baseComponents,
 };
 
 // ---------------------------------------------------------------------------
-// Dark Theme — equivalent usability, not just inverted colors (UXDS 1.11)
+// Dark theme (Stage 2) — built from the dark palette; the app ships with
+// light as the default and honors the OS preference.
 // ---------------------------------------------------------------------------
 export const dark: ThemeConfig = {
   algorithm: antdTheme.darkAlgorithm,
   token: {
-    colorPrimary: brand.primaryHover,
-    colorPrimaryHover: '#8585E8',
-    colorPrimaryActive: brand.primary,
-    colorInfo: brand.primaryHover,
-    colorSuccess: semantic.success,
-    colorWarning: semantic.warning,
-    colorError: '#E86161',
-    colorLink: brand.primaryHover,
-
-    colorBgBase: neutral[950],
-    colorBgLayout: neutral[900],
-    colorBgContainer: neutral[900],
-    colorBgElevated: neutral[800],
-    colorBorder: neutral[800],
-    colorBorderSecondary: neutral[800],
-    colorTextBase: neutral[100],
-    colorText: neutral[100],
-    colorTextSecondary: neutral[400],
-    colorTextTertiary: neutral[500],
-
-    fontFamily,
-    fontSize: fontSize.body,
-    fontSizeHeading1: fontSize.display,
-    fontSizeHeading2: fontSize.heading,
-    fontSizeHeading3: fontSize.title,
-    fontSizeHeading4: fontSize.subhead,
-    lineHeight: 1.6,
-
-    borderRadius: radius.md,
-    borderRadiusLG: radius.lg,
-    borderRadiusSM: radius.sm,
-
-    controlHeight: 38,
-    controlHeightLG: 44,
-    controlHeightSM: 30,
-
-    boxShadow: shadow.lg,
-    boxShadowSecondary: shadow.md,
-
-    motionDurationMid: '0.2s',
-    motionDurationSlow: '0.3s',
+    ...baseTokens,
+    colorPrimary: darkColors.primaryContainer,
+    colorPrimaryHover: darkColors.secondaryContainer,
+    colorPrimaryActive: darkColors.primary,
+    colorPrimaryBg: tint('#5b5fef', 0.16),
+    colorInfo: darkColors.info,
+    colorSuccess: darkColors.success,
+    colorWarning: darkColors.warning,
+    colorError: darkColors.error,
+    colorLink: darkColors.primary,
+    colorLinkHover: darkColors.secondary,
+    colorLinkActive: darkColors.primaryContainer,
+    colorBgBase: darkColors.surfaceContainerLowest,
+    colorBgLayout: darkColors.surface,
+    colorBgContainer: darkColors.surfaceContainerLowest,
+    colorBgElevated: darkColors.surfaceContainerLow,
+    colorErrorBg: tint(darkColors.error, 0.14),
+    colorSuccessBg: tint(darkColors.success, 0.14),
+    colorWarningBg: tint(darkColors.warning, 0.14),
+    colorInfoBg: tint(darkColors.info, 0.14),
+    colorText: darkColors.onSurface,
+    colorTextSecondary: darkColors.onSurfaceVariant,
+    colorTextTertiary: darkColors.outline,
+    colorBorder: darkColors.outlineVariant,
+    colorBorderSecondary: darkColors.borderSubtle,
+    colorFillQuaternary: darkColors.surfaceContainerLow,
+    colorBgTextHover: darkColors.surfaceContainerLow,
+    colorBgSpotlight: 'rgba(123, 125, 240, 0.28)',
+    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+    boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.4)',
+    fontSizeHeading1: type.pageTitle.fontSize,
+    fontSizeHeading2: type.pageTitleMobile.fontSize,
+    fontSizeHeading3: type.sectionHeading.fontSize,
+    fontSizeHeading4: type.titleMd.fontSize,
   },
   components: {
+    ...baseComponents,
     Layout: {
-      headerBg: neutral[950],
-      bodyBg: neutral[900],
-      siderBg: neutral[950],
-      headerHeight: 64,
-      headerPadding: '0 24px',
+      headerBg: darkColors.surfaceContainerLowest,
+      bodyBg: darkColors.surface,
+      siderBg: darkColors.surfaceContainerLowest,
     },
     Menu: {
-      itemSelectedBg: 'rgba(91, 91, 214, 0.18)',
-      itemSelectedColor: '#A9A9F2',
-      itemHoverBg: neutral[800],
-      itemBorderRadius: radius.sm,
-    },
-    Card: {
-      borderRadiusLG: radius.lg,
+      itemSelectedBg: darkColors.surfaceContainerLow,
+      itemSelectedColor: darkColors.primary,
+      itemHoverBg: darkColors.surfaceContainerLow,
+      itemHoverColor: darkColors.primary,
+      itemColor: darkColors.onSurfaceVariant,
     },
     Button: {
-      controlHeight: 38,
-      primaryShadow: 'none',
-      borderRadius: radius.sm,
+      defaultBg: darkColors.surfaceContainerLow,
+      defaultBorderColor: darkColors.outlineVariant,
+      defaultColor: darkColors.onSurfaceVariant,
+      defaultHoverBg: darkColors.surfaceContainer,
+      defaultHoverColor: darkColors.primary,
+    },
+    Card: {
+      colorBorderSecondary: darkColors.borderSubtle,
+      headerBg: 'transparent',
     },
     Table: {
-      headerBg: neutral[900],
-      headerColor: neutral[400],
-      rowHoverBg: neutral[800],
-      borderRadiusLG: radius.md,
+      borderColor: darkColors.borderSubtle,
+      rowHoverBg: darkColors.surfaceContainerLow,
+    },
+    Modal: {
+      contentBg: darkColors.surfaceContainerLowest,
+    },
+    Segmented: {
+      itemSelectedBg: darkColors.surfaceContainerLowest,
+      trackBg: darkColors.surfaceContainerLow,
+    },
+    Radio: {
+      buttonBg: darkColors.surfaceContainerLow,
+      buttonCheckedBg: darkColors.primaryContainer,
+      buttonSolidCheckedColor: darkColors.onPrimary,
+    },
+    Divider: {
+      colorSplit: darkColors.borderSubtle,
+    },
+    Empty: {
+      colorText: darkColors.outline,
+    },
+    Dropdown: {
+      colorBgElevated: darkColors.surfaceContainerLow,
+    },
+    Tooltip: {
+      colorBgSpotlight: darkColors.surfaceContainerHigh,
+    },
+    Skeleton: {
+      gradientFromColor: darkColors.surfaceContainer,
+      gradientToColor: darkColors.surfaceContainerLow,
     },
   },
 };
 
-export const theme = { light, dark };
+export const coopTheme = { light, dark };
 export type ThemeMode = 'light' | 'dark';
+
+// ---------------------------------------------------------------------------
+// Token re-exports — `src/theme.ts` (this file) is the module that shadows
+// the `src/theme/` directory in resolution, so every consumer keeps the
+// familiar `import { colors, type, radius } from '../../theme'` shape while
+// the raw tokens themselves live in `theme/*.ts`.
+// ---------------------------------------------------------------------------
+export * from './theme/index';

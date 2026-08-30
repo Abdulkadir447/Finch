@@ -1,5 +1,5 @@
 /**
- * Tree-shaken ApexCharts bootstrap for Finch (ApexCharts v6).
+ * Tree-shaken ApexCharts bootstrap for Co-op (ApexCharts v6).
  *
  * Per the ApexCharts tree-shaking reference, the full `apexcharts` bundle is
  * replaced by the core wrapper variant plus only the chart-type entries and
@@ -7,6 +7,7 @@
  *
  *   - `react-apexcharts/core`  wrapper (same reactive props / lifecycle)
  *   - `apexcharts/area`        registers line, area, scatter, bubble, rangeArea
+ *   - `apexcharts/bar`         registers bar, column, horizontalBar (Reports)
  *   - `apexcharts/pie`         registers pie, donut, polarArea
  *   - `features/legend`        interactive legend (donut)
  *   - `features/keyboard`      keyboard navigation (UXDS 9.27 / 9.28
@@ -23,6 +24,7 @@
  */
 import Chart from 'react-apexcharts/core';
 import 'apexcharts/area';
+import 'apexcharts/bar';
 import 'apexcharts/pie';
 import 'apexcharts/features/legend';
 import 'apexcharts/features/keyboard';

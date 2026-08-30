@@ -1,0 +1,616 @@
+Co-op UXDS (User Experience Design Specification)
+
+Document: User Experience Design Specification (UXDS)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 9 — Dashboard Screen Specification
+9.1 Purpose
+
+This chapter provides the complete screen specification for Co-op's Dashboard.
+
+Unlike the previous chapter, which described the dashboard experience conceptually, this chapter serves as the implementation blueprint for designers and developers.
+
+It defines:
+
+Exact layout
+Component placement
+Widget sizing
+Responsive behavior
+Interactions
+Animations
+Accessibility
+Developer implementation rules
+
+This specification should be sufficient for creating production-ready Figma designs and implementing the Dashboard in Electron + React.
+
+9.2 Design Goals
+
+The Dashboard must:
+
+Display business health immediately.
+Require minimal scrolling.
+Prioritize high-value information.
+Feel premium and modern.
+Scale from 1280px to ultra-wide monitors.
+Maintain visual balance in both themes.
+9.3 Screen Anatomy
+
+The Dashboard consists of six major sections.
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Custom Title Bar                                                            │
+├───────────────┬──────────────────────────────────────────────────────────────┤
+│               │ Dashboard Header                                             │
+│               ├──────────────────────────────────────────────────────────────┤
+│               │ KPI Cards                                                    │
+│               ├──────────────────────────────────────────────────────────────┤
+│ Sidebar       │ Charts                                                      │
+│               ├──────────────────────────────────────────────────────────────┤
+│               │ AI Summary + AI Recommendations                             │
+│               ├──────────────────────────────────────────────────────────────┤
+│               │ Activity • Tasks • Calendar • Quick Actions                 │
+│               ├──────────────────────────────────────────────────────────────┤
+│               │ Status Bar                                                  │
+└───────────────┴──────────────────────────────────────────────────────────────┘
+9.4 Desktop Grid
+
+Dashboard uses a:
+
+12-column responsive grid
+
+Recommended layout:
+
+Outer margin: 24px
+Grid gutter: 16px
+Card spacing: 16px
+Section spacing: 24px
+
+No content should touch screen edges.
+
+9.5 Header Specification
+
+Header contains:
+
+Left
+Dashboard title
+Greeting
+Date
+Center
+Global Search
+Right
+Notifications
+AI Shortcut
+User Profile
+
+Example:
+
+Dashboard
+
+Good Morning, Abdulkadir
+
+Friday • July 10
+
+──────────────────────────────
+
+Search...
+
+🔔
+
+🤖
+
+👤
+
+Header height:
+
+72px
+
+9.6 Welcome Card
+
+Located beneath the page header.
+
+Displays:
+
+Greeting
+Company Name
+Current Time
+Sync Status
+AI Daily Summary
+
+Example:
+
+Good Morning 👋
+
+Welcome back to Co-op.
+
+Today's sales are ahead of yesterday.
+
+✓ Cloud Synced
+9.7 KPI Card Layout
+
+Six KPI cards occupy the first dashboard row.
+
+┌─────┬─────┬─────┬─────┬─────┬─────┐
+│ P   │ R   │ O   │ I   │ C   │ F   │
+└─────┴─────┴─────┴─────┴─────┴─────┘
+
+P = Profit
+
+R = Revenue
+
+O = Orders
+
+I = Inventory
+
+C = Customer Growth
+
+F = Forecast
+
+9.8 KPI Card Anatomy
+
+Each KPI card contains:
+
+Icon
+
+Title
+
+Current Value
+
+Trend %
+
+Mini Chart
+
+Comparison Label
+
+Example:
+
+💰
+
+Profit
+
+₦4,850,000
+
+▲18.4%
+
+Compared to last month
+
+╱╲╱╲
+9.9 KPI Card Interactions
+
+Hover:
+
+Slight elevation
+Border highlight
+Shadow increase
+
+Click:
+
+Navigates directly to the associated module.
+
+Examples:
+
+Revenue → Reports
+
+Inventory → Inventory Module
+
+Orders → Orders Page
+
+9.10 Charts Section
+
+Charts occupy the second row.
+
+Layout:
+
+┌───────────────────────┬─────────────────────┐
+│ Revenue               │ Inventory Value     │
+│                       │                     │
+└───────────────────────┴─────────────────────┘
+
+Charts resize automatically.
+
+9.11 Revenue Chart
+
+Supported views:
+
+7 Days
+30 Days
+90 Days
+Year
+Custom
+
+Features:
+
+Hover tooltips
+Zoom
+Pan
+Export
+Compare
+9.12 Inventory Value Chart
+
+Displays:
+
+Total inventory value
+Category distribution
+Restocking impact
+
+Switchable chart types:
+
+Line
+Area
+Bar
+Pie
+9.13 AI Business Summary
+
+Position:
+
+Directly below charts.
+
+Layout:
+
+Today's AI Summary
+
+Revenue increased 12%
+
+Profit margins remain healthy.
+
+Stock is low for two products.
+
+Weekend demand is expected to rise.
+
+AI responses use Markdown formatting where appropriate.
+
+9.14 AI Recommendations Card
+
+Separate from summary.
+
+Contains:
+
+Recommended Actions
+
+• Restock Product A
+
+[Restock]
+
+• Generate Sales Report
+
+[Generate]
+
+• Contact Customer
+
+[Open]
+
+Buttons perform actions immediately.
+
+9.15 Recent Activity
+
+Displays latest business events.
+
+Each item contains:
+
+Icon
+Title
+Timestamp
+
+Example:
+
+📦
+
+Order #1045 Created
+
+5 minutes ago
+
+Maximum visible entries:
+
+10
+
+View All opens Activity History.
+
+9.16 Tasks Widget
+
+Displays:
+
+Today's Tasks
+
+Example:
+
+☐ Backup Database
+
+☐ Generate Report
+
+☑ Restock Product
+
+☐ Call Supplier
+
+Supports:
+
+Checkboxes
+Due dates
+AI-generated reminders
+9.17 Calendar Widget
+
+Small monthly calendar.
+
+Displays:
+
+Today's date
+Scheduled reminders
+Backup reminders
+Report deadlines
+
+Clicking a day opens related events.
+
+9.18 Quick Actions Panel
+
+Buttons:
+
+New Order
+
+Add Product
+
+Add Customer
+
+Generate Report
+
+Ask AI
+
+Backup
+
+Icons appear above labels.
+
+Large click targets improve usability.
+
+9.19 Floating AI Button
+
+Default location:
+
+Bottom-right.
+
+Collapsed:
+
+🤖
+
+Expanded:
+
+────────────────────────
+
+AI Conversation
+
+Ask anything...
+
+────────────────────────
+
+The panel remembers:
+
+Position
+Size
+Conversation history
+9.20 Search Experience
+
+Global Search opens with:
+
+Ctrl + K
+
+Search categories:
+
+Orders
+Customers
+Inventory
+Reports
+AI History
+Settings
+
+Results update as users type.
+
+9.21 Dashboard Loading
+
+Loading order:
+
+Header
+KPI Cards
+Charts
+AI Summary
+Activity
+Calendar
+Tasks
+
+Skeleton placeholders preserve layout.
+
+9.22 Empty Dashboard
+
+If no business data exists:
+
+Display:
+
+Illustration
+
+Title:
+
+Welcome to Co-op
+
+Subtitle:
+
+Let's build your business dashboard.
+
+Checklist:
+
+✓ Add Company
+
+⬜ Add Product
+
+⬜ Add Customer
+
+⬜ Create Order
+
+AI suggests next steps.
+
+9.23 Error State
+
+Example:
+
+Unable to load dashboard.
+
+[Retry]
+
+Continue Offline
+
+Errors never replace the entire dashboard.
+
+Previously loaded widgets remain visible.
+
+9.24 Offline Dashboard
+
+Offline banner:
+
+Offline Mode
+
+Changes will sync automatically.
+
+Unavailable features:
+
+AI
+Gmail
+Cloud Reports
+
+Everything else remains functional using SQLite.
+
+9.25 Animation Specification
+Component	Animation
+KPI Hover	Lift + Shadow
+Charts	Fade + Draw
+Sidebar	Expand
+Cards	Fade Up
+AI Panel	Slide Up
+Notifications	Slide Down
+
+Animation duration:
+
+180–220 ms
+
+9.26 Responsive Layout
+Small Desktop
+KPIs
+
+2 columns
+
+Charts
+
+Stacked
+
+Widgets
+
+Vertical
+Standard Desktop
+KPIs
+
+6 columns
+
+Charts
+
+2 columns
+
+Widgets
+
+2 columns
+Ultra-wide
+KPIs
+
+6 columns
+
+Charts
+
+3 columns
+
+Widgets
+
+3 columns
+
+Extra space is used to display more information instead of increasing whitespace.
+
+9.27 Keyboard Navigation
+
+Supported shortcuts:
+
+Shortcut	Action
+Ctrl + K	Search
+Ctrl + Shift + A	AI Assistant
+Ctrl + N	New Order
+Tab	Navigate Widgets
+Arrow Keys	Navigate Lists
+Enter	Open Selected
+Esc	Close Panels
+
+Focus indicators must always be visible.
+
+9.28 Accessibility
+
+Dashboard must support:
+
+Screen readers
+High contrast mode
+Zoom up to 200%
+Keyboard-only usage
+Accessible chart descriptions
+Semantic headings
+Large interactive targets
+
+Charts must provide textual summaries for users relying on assistive technologies.
+
+9.29 Performance Targets
+Metric	Target
+Dashboard Load	<2 s
+Widget Refresh	<500 ms
+Chart Render	<1 s
+AI Summary	<2 s
+Search Results	<150 ms
+Navigation	<100 ms
+
+Animations should never block user interaction.
+
+9.30 Developer Notes
+
+The Dashboard should be implemented using reusable components from the Co-op design system.
+
+Recommended structure:
+
+Dashboard
+├── DashboardHeader
+├── WelcomeCard
+├── KPIGrid
+│   ├── ProfitCard
+│   ├── RevenueCard
+│   ├── OrdersCard
+│   ├── InventoryCard
+│   ├── CustomerGrowthCard
+│   └── ForecastCard
+├── RevenueChart
+├── InventoryChart
+├── AISummaryCard
+├── AIRecommendationsCard
+├── RecentActivityCard
+├── TasksCard
+├── CalendarCard
+├── QuickActionsCard
+└── FloatingAI
+
+Each widget should:
+
+Be independently testable.
+Load asynchronously where appropriate.
+Support loading, empty, and error states.
+Respect the global theme and design tokens.
+9.31 Acceptance Criteria
+
+The Dashboard screen specification is complete when:
+
+All dashboard components have defined placement and behavior.
+Widget interactions are documented.
+Responsive layouts are specified.
+Keyboard navigation is fully supported.
+Loading, empty, offline, and error states are covered.
+Performance targets are achievable.
+Developers can implement the Dashboard directly from this specification.
+Chapter Summary
+
+This chapter provides the implementation blueprint for Co-op's Dashboard, translating high-level concepts into a concrete screen specification. It defines the structure, positioning, interactions, and behavior of every dashboard element, ensuring consistency between design and development. The result is a responsive, AI-powered workspace that gives business owners immediate visibility into their operations while enabling quick action with minimal navigation.

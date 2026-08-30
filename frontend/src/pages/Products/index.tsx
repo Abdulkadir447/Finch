@@ -1,59 +1,54 @@
 /**
- * Products module screen — structure adapted from the Finch Flowbite
- * reference templates (Table with products, CRUD layout, header with CTA,
- * delete confirmation modal, table footer pagination) onto Ant Design +
- * Finch theme tokens. All interactions are native antd (Modal.confirm for
- * delete, Table pagination for the footer). No sample/invented data.
+ * Products module screen (Stitch finch_products_catalog_refactored +
+ * finch_products_mobile_refactored + finch_product_management_states).
+ *
+ * Presentation refactor only — same endpoints, same business rules:
+ *   desktop : catalog table (SKU · Product · Category · Prices · Stock ·
+ *             Status) with the All/Low/Out tabs (backend `stock` filter)
+ *   mobile  : card list + gradient FAB (finch_products_mobile)
+ *   create  : "Create New Product" modal (Pricing Details group, AI
+ *             description placeholder)
+ *   edit    : "Update Product" modal with the Delete Product action
+ *   delete  : destructive confirmation card (red top border + details box)
  */
 import React, { useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  Modal,
-  Space,
-  Table,
-  Tag,
-  Typography,
-  message,
-  theme as antdTheme,
-} from 'antd';
+import { Pagination, Segmented, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   DeleteOutlined,
   EditOutlined,
-  ExclamationCircleFilled,
   PlusOutlined,
-  SearchOutlined,
+  ShoppingOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import { brand, semantic } from '../../theme';
+import { radius, type } from '../../theme';
+import { useCoopTheme } from '../../theme-provider';
+import { STOCK_STATUS_BADGE, STOCK_STATUS_LABEL, stockStatusOf } from '../../lib/stock';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { formatCurrency } from '../Dashboard/kpiConfig';
 import ProductFormModal from './ProductFormModal';
-import { Product, ProductFormValues, useProducts } from './useProducts';
-
-type StockTone = 'ok' | 'warning' | 'low';
-
-function stockTone(p: Product): StockTone {
-  if (p.current_stock <= p.reorder_level) return 'low';
-  if (p.current_stock <= p.reorder_level * 1.5) return 'warning';
-  return 'ok';
-}
-
-const TONE_COLOR: Record<StockTone, string> = {
-  ok: semantic.success,
-  warning: semantic.warning,
-  low: semantic.error,
-};
+import { Product, ProductFormValues, ProductStockFilter, useProducts } from './useProducts';
+import {
+  CoopBadge,
+  CoopButton,
+  CoopCard,
+  CoopErrorState,
+  CoopInput,
+  CoopModal,
+  CoopTable,
+} from '../../components/ui';
+import ProductCardList from '../../components/ui/ProductCardList';
+import PageHeader from '../../components/layout/PageHeader';
 
 const ProductsPage: React.FC = () => {
-  const { token } = antdTheme.useToken();
+  const { colors, isDark } = useCoopTheme();
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [messageApi, messageCtx] = message.useMessage();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState<Product | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const {
     items,
@@ -62,6 +57,8 @@ const ProductsPage: React.FC = () => {
     pageSize,
     search,
     setSearch,
+    stockFilter,
+    setStockFilter,
     loading,
     error,
     reload,
@@ -85,10 +82,8 @@ const ProductsPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editing) {
-        // SKU and stock are immutable on update (Task 12 / M6). current_stock
-        // is deliberately excluded so an edit can never zero or change stock —
-        // stock moves only via Inventory -> Adjust Stock. The backend ignores
-        // both fields too, but not sending them keeps the contract explicit.
+        // SKU and stock are immutable on update (Task 12 / M6): stock moves
+        // only via Inventory -> Adjust Stock.
         const { sku: _sku, current_stock: _stock, ...rest } = values;
         await updateProduct(editing.id, rest);
         messageApi.success('Product updated');
@@ -105,250 +100,347 @@ const ProductsPage: React.FC = () => {
     }
   };
 
-  // Delete confirmation — adaptation of the "Default delete confirmation
-  // modal" template (centered, warning icon, Yes I'm sure / No cancel).
-  // Deletion is PERMANENT from the user's perspective (Task 12 / M11): there
-  // is no trash/restore UI. The backend soft-deletes for ledger integrity.
-  const confirmDelete = (product: Product) => {
-    Modal.confirm({
-      title: 'Delete product',
-      icon: <ExclamationCircleFilled />,
-      content: `Are you sure you want to delete "${product.name}" (${product.sku})? This is permanent and cannot be undone.`,
-      centered: true,
-      okText: "Yes, I'm sure",
-      okButtonProps: { danger: true },
-      cancelText: 'No, cancel',
-      onOk: async () => {
-        try {
-          await deleteProduct(product.id);
-          messageApi.success('Product deleted');
-          reload();
-        } catch (e) {
-          messageApi.error(e instanceof Error ? e.message : 'Delete failed');
-        }
-      },
-    });
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    try {
+      await deleteProduct(deleting.id);
+      messageApi.success('Product deleted');
+      setDeleting(null);
+      reload();
+    } catch (e) {
+      messageApi.error(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const columns: ColumnsType<Product> = [
+    {
+      title: 'SKU',
+      dataIndex: 'sku',
+      key: 'sku',
+      width: 120,
+      render: (v: string) => (
+        <span style={{ color: colors.primary, fontWeight: 600, fontSize: 13 }}>{v}</span>
+      ),
+    },
     {
       title: 'Product',
       dataIndex: 'name',
       key: 'name',
       render: (_: string, p) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong style={{ color: token.colorText }}>
-            {p.name}
-          </Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-            {p.sku}
-          </Typography.Text>
-        </Space>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            aria-hidden
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: radius.md,
+              background: colors.surfaceContainer,
+              color: colors.outline,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 15,
+              flexShrink: 0,
+            }}
+          >
+            <ShoppingOutlined />
+          </span>
+          <span style={{ fontWeight: 600, color: colors.onSurface }}>{p.name}</span>
+        </div>
       ),
     },
     {
       title: 'Category',
       dataIndex: 'category',
       key: 'category',
-      width: 140,
+      width: 130,
       render: (category: string | null) =>
         category ? (
-          <Tag
-            style={{
-              color: brand.primaryActive,
-              background: brand.primarySurface,
-              border: 'none',
-              borderRadius: 6,
-              fontWeight: 500,
-            }}
-          >
-            {category}
-          </Tag>
+          <span style={{ color: colors.onSurfaceVariant }}>{category}</span>
         ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
+          <span style={{ color: colors.outline }}>—</span>
         ),
     },
     {
-      title: 'Unit Price',
+      title: 'Selling Price',
       dataIndex: 'unit_price',
       key: 'unit_price',
-      width: 130,
+      width: 120,
       align: 'right',
       render: (v: number) => (
-        <Typography.Text style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontVariantNumeric: 'tabular-nums', color: colors.onSurface }}>
           {formatCurrency(v)}
-        </Typography.Text>
+        </span>
       ),
     },
     {
-      title: 'Stock',
-      dataIndex: 'current_stock',
-      key: 'current_stock',
+      title: 'Cost Price',
+      dataIndex: 'cost_price',
+      key: 'cost_price',
+      width: 120,
+      align: 'right',
+      render: (v: number | null) => (
+        <span style={{ fontVariantNumeric: 'tabular-nums', color: colors.onSurfaceVariant }}>
+          {v != null ? formatCurrency(v) : '—'}
+        </span>
+      ),
+    },
+    {
+      title: 'Current Stock',
+      key: 'stock',
       width: 130,
-      render: (_: number, p) => {
-        const tone = stockTone(p);
+      render: (_: unknown, p) => {
+        const status = stockStatusOf(p.current_stock, p.reorder_level);
+        const countColor =
+          status === 'out' ? colors.error : status === 'low' ? colors.warning : isDark ? colors.primaryContainer : colors.primary;
         return (
-          <Space size={8}>
-            <span
-              aria-hidden
-              style={{
-                display: 'inline-block',
-                width: 10,
-                height: 10,
-                borderRadius: '50%',
-                background: TONE_COLOR[tone],
-              }}
-            />
-            <Typography.Text strong style={{ color: token.colorText, fontVariantNumeric: 'tabular-nums' }}>
+          <div>
+            <div style={{ fontWeight: 700, color: countColor, fontVariantNumeric: 'tabular-nums' }}>
               {p.current_stock}
-            </Typography.Text>
-            {tone === 'low' && (
-              <Tag style={{ color: semantic.error, background: semantic.errorBg, border: 'none', borderRadius: 6 }}>
-                Low
-              </Tag>
-            )}
-          </Space>
+            </div>
+            <div style={{ ...type.bodyCompact, fontSize: 12, color: colors.outline, marginTop: 2 }}>
+              Reorder: {p.reorder_level}
+            </div>
+          </div>
         );
+      },
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 130,
+      render: (_: unknown, p) => {
+        const status = stockStatusOf(p.current_stock, p.reorder_level);
+        return <CoopBadge variant={STOCK_STATUS_BADGE[status]}>{STOCK_STATUS_LABEL[status]}</CoopBadge>;
       },
     },
     {
       title: '',
       key: 'actions',
-      width: 150,
+      width: 110,
       align: 'right',
       render: (_: unknown, p) => (
-        <Space size={4}>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(p)}>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <CoopButton size="sm" variant="secondary" icon={<EditOutlined />} onClick={() => openEdit(p)}>
             Edit
-          </Button>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => confirmDelete(p)} aria-label={`Delete ${p.name}`} />
-        </Space>
+          </CoopButton>
+          <CoopButton
+            size="sm"
+            variant="ghost"
+            danger
+            icon={<DeleteOutlined style={{ color: colors.error }} />}
+            onClick={() => setDeleting(p)}
+            aria-label={`Delete ${p.name}`}
+            style={{ color: colors.error }}
+          />
+        </div>
       ),
     },
   ];
 
   const showEmptyCta = !loading && !error && total === 0 && !search;
+  const priceLabel = (p: Product) => formatCurrency(p.unit_price);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div>
       {messageCtx}
 
-      {/* Page header */}
-      <Space direction="vertical" size={2}>
-        <Typography.Title level={2} style={{ margin: 0, color: token.colorText, fontWeight: 600 }}>
-          Products
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-          Manage your catalog, stock levels and pricing.
-        </Typography.Text>
-      </Space>
+      <PageHeader
+        title="Products"
+        subtitle="Manage your catalog, stock levels and pricing."
+        actions={
+          isMobile ? undefined : (
+            <CoopButton icon={<PlusOutlined />} onClick={openCreate}>
+              Add product
+            </CoopButton>
+          )
+        }
+      />
 
-      {/* Error banner (UXDS-style: widgets stay visible underneath) */}
       {error && (
-        <Alert
-          type="error"
-          showIcon
-          message={error.isAuthError ? 'Authentication required' : 'Unable to load products'}
-          description={error.message}
-          action={
-            <Button size="small" danger onClick={reload}>
-              Retry
-            </Button>
-          }
-        />
+        <div style={{ marginBottom: 16 }}>
+          <CoopErrorState
+            title={error.isAuthError ? 'Authentication required' : 'Unable to load products'}
+            detail={error.message}
+            onRetry={reload}
+          />
+        </div>
       )}
 
-      {/* Table card: header row (count + CTA), search toolbar, table, footer */}
-      <Card styles={{ body: { padding: 0 } }}>
-        {/* Header with CTA (adapted from header-withcta template) */}
+      <CoopCard flush bodyPadding={0}>
+        {/* Toolbar: stock tabs + search (Stitch catalog pattern) */}
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: 12,
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: 16,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+            gap: 12,
+            padding: '12px 16px',
+            borderBottom: `1px solid ${colors.borderSubtle}`,
           }}
         >
-          <Typography.Text>
-            <span style={{ color: token.colorTextSecondary }}>All Products: </span>
-            <strong style={{ color: token.colorText }}>{loading ? '…' : total}</strong>
-          </Typography.Text>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Add product
-          </Button>
-        </div>
-
-        {/* Search toolbar (adapted from CRUD layout template) */}
-        <div style={{ padding: 16, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
-          <Input
-            allowClear
-            prefix={<SearchOutlined style={{ color: token.colorTextTertiary }} />}
-            placeholder="Search for products by name, SKU or category"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ maxWidth: 420 }}
-            aria-label="Search products"
+          <Segmented
+            size="small"
+            value={stockFilter}
+            onChange={(v) => setStockFilter(v as ProductStockFilter)}
+            options={[
+              { label: 'All Products', value: 'all' },
+              { label: 'Low Stock', value: 'low' },
+              { label: 'Out of Stock', value: 'out' },
+            ]}
           />
+          <div style={{ width: '100%', maxWidth: 380, flex: 1 }}>
+            <CoopInput
+              search
+              placeholder="Search for products by name, SKU or category"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search products"
+              style={{ width: '100%' }}
+            />
+          </div>
         </div>
 
-        <Table<Product>
-          rowKey="id"
-          size="middle"
-          columns={columns}
-          dataSource={items}
-          loading={loading}
-          scroll={{ x: 640 }}
-          expandable={{
-            expandedRowRender: (p) => (
-              <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                <Typography.Text type="secondary">
-                  {p.description || 'No description provided.'}
-                </Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                  Cost price: {p.cost_price != null ? formatCurrency(p.cost_price) : '—'} · Reorder at{' '}
-                  {p.reorder_level} · Created {dayjs(p.created_at).format('MMM D, YYYY HH:mm')}
-                  {p.updated_at ? ` · Updated ${dayjs(p.updated_at).format('MMM D, YYYY HH:mm')}` : ''}
-                </Typography.Text>
-              </Space>
-            ),
-          }}
-          locale={{
-            emptyText: showEmptyCta ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <Space direction="vertical" size={2}>
-                    <Typography.Text>No products yet</Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      Add your first product to start building your catalog.
-                    </Typography.Text>
-                  </Space>
-                }
-              >
-                <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-                  Add product
-                </Button>
-              </Empty>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<Typography.Text>No products match your search.</Typography.Text>}
+        {/* Desktop: table · Mobile: card list */}
+        {!isMobile && (
+          <CoopTable<Product>
+            rowKey="id"
+            columns={columns}
+            dataSource={items}
+            loading={loading}
+            scroll={{ x: 860 }}
+            empty={
+              showEmptyCta
+                ? {
+                    title: 'No products yet',
+                    description: 'Add your first product to start building your catalog.',
+                    action: (
+                      <CoopButton size="sm" icon={<PlusOutlined />} onClick={openCreate}>
+                        Add product
+                      </CoopButton>
+                    ),
+                    compact: true,
+                  }
+                : {
+                    title: stockFilter === 'all' ? 'No results found' : `No ${stockFilter === 'low' ? 'low-stock' : 'out-of-stock'} products`,
+                    description: 'No products match your search or filter.',
+                    compact: true,
+                  }
+            }
+            pagination={{
+              current: page,
+              pageSize,
+              total,
+              showSizeChanger: false,
+              showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
+              onChange: goToPage,
+            }}
+          />
+        )}
+
+        {isMobile && (
+          <div style={{ padding: 16 }}>
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      height: 120,
+                      borderRadius: radius.lg,
+                      background: colors.surfaceContainer,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : items.length > 0 ? (
+              <ProductCardList
+                items={items.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  sku: p.sku,
+                  unit_price: p.unit_price,
+                  current_stock: p.current_stock,
+                  reorder_level: p.reorder_level,
+                  priceLabel: priceLabel(p),
+                }))}
+                onEdit={(id) => {
+                  const p = items.find((x) => x.id === id);
+                  if (p) openEdit(p);
+                }}
               />
-            ),
+            ) : (
+              <div
+                style={{
+                  border: `1px solid ${colors.borderSubtle}`,
+                  borderRadius: radius.lg,
+                  padding: '40px 16px',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ ...type.titleMd, color: colors.onSurface, marginBottom: 6 }}>
+                  {showEmptyCta ? 'No products yet' : 'No results found'}
+                </div>
+                <div style={{ ...type.bodyCompact, color: colors.onSurfaceVariant, marginBottom: showEmptyCta ? 16 : 0 }}>
+                  {showEmptyCta
+                    ? 'Add your first product to start building your catalog.'
+                    : 'No products match your search or filter.'}
+                </div>
+                {showEmptyCta && (
+                  <CoopButton size="sm" icon={<PlusOutlined />} onClick={openCreate}>
+                    Add product
+                  </CoopButton>
+                )}
+              </div>
+            )}
+            {items.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                <Pagination
+                  current={page}
+                  pageSize={pageSize}
+                  total={total}
+                  size="small"
+                  showSizeChanger={false}
+                  onChange={goToPage}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </CoopCard>
+
+      {/* Mobile FAB (finch_products_mobile) */}
+      {isMobile && (
+        <button
+          type="button"
+          onClick={openCreate}
+          aria-label="Add product"
+          style={{
+            position: 'fixed',
+            right: 20,
+            bottom: 24,
+            width: 54,
+            height: 54,
+            borderRadius: radius.xl,
+            border: 'none',
+            background: `linear-gradient(135deg, ${colors.primaryContainer} 0%, ${colors.secondaryContainer} 100%)`,
+            color: colors.onPrimary,
+            fontSize: 22,
+            cursor: 'pointer',
+            zIndex: 60,
+            boxShadow: '0 8px 24px rgba(91, 95, 239, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: false,
-            showTotal: (t, range) => `Showing ${range[0]}–${range[1]} of ${t}`,
-            onChange: goToPage,
-          }}
-        />
-      </Card>
+        >
+          <PlusOutlined />
+        </button>
+      )}
 
       <ProductFormModal
         open={modalOpen}
@@ -356,7 +448,65 @@ const ProductsPage: React.FC = () => {
         submitting={submitting}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleSubmit}
+        onDelete={editing ? () => {
+          setModalOpen(false);
+          setDeleting(editing);
+        } : undefined}
       />
+
+      {/* Destructive delete confirmation (Stitch management states) */}
+      <CoopModal
+        tone="danger"
+        title={`Delete ${deleting?.name ?? 'product'}?`}
+        open={deleting !== null}
+        onCancel={() => setDeleting(null)}
+        onOk={confirmDelete}
+        confirmLoading={deleteBusy}
+        cancelText="Keep Product"
+        okText="Delete Product"
+        danger
+        width={460}
+      >
+        {deleting && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 4 }}>
+            <div
+              aria-hidden
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: '50%',
+                background: `rgba(186, 26, 26, 0.1)`,
+                color: colors.error,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20,
+              }}
+            >
+              <WarningOutlined />
+            </div>
+            <p style={{ margin: 0, ...type.bodyCompact, color: colors.onSurfaceVariant }}>
+              Are you sure you want to delete this product? This is permanent and cannot be
+              undone. Historical orders are retained for reporting.
+            </p>
+            <div
+              style={{
+                borderRadius: radius.lg,
+                border: `1px solid ${colors.borderSubtle}`,
+                background: colors.surfaceContainerLow,
+                padding: '12px 14px',
+              }}
+            >
+              <div style={{ ...type.labelCaps, color: colors.outline, marginBottom: 4 }}>
+                Product Details
+              </div>
+              <div style={{ ...type.bodyCompact, fontWeight: 600, color: colors.onSurface }}>
+                {deleting.name} ({deleting.sku})
+              </div>
+            </div>
+          </div>
+        )}
+      </CoopModal>
     </div>
   );
 };

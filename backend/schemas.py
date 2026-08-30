@@ -372,7 +372,7 @@ class BusinessSettingsOut(BaseModel):
 
 
 class AuthMeResponse(BaseModel):
-    """Identity + tenant info for the signed-in Finch user."""
+    """Identity + tenant info for the signed-in Co-op user."""
 
     user_id: str
     business_id: int

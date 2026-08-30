@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Finch",
+    "name": "Co-op",
     "tagline": "Your Business, Smarter.",
     "environment": "development",
     "version": "1.0.0",
@@ -14,7 +14,7 @@
     "driver": "postgresql+asyncpg",
     "host": "localhost",
     "port": 5432,
-    "name": "finch"
+    "name": "coop"
   },
   "sync": {
     "enabled": false,
@@ -22,9 +22,11 @@
     "intervalSeconds": 30
   },
   "ai": {
-    "provider": "openai",
-    "model": "gpt-5.5",
-    "assistEnabled": true
+    "enabled": true,
+    "model": "gpt-4o-mini",
+    "credits_per_request": 1,
+    "free_output_tokens": 500,
+    "credits_per_1k_output_tokens": 1
   },
   "features": {
     "dashboard": true,
@@ -42,5 +44,25 @@
   },
   "logging": {
     "level": "debug"
+  },
+  "billing": {
+    "plans": {
+      "free": {
+        "label": "Free",
+        "credits_per_month": 25
+      },
+      "starter": {
+        "label": "Starter",
+        "credits_per_month": 200
+      },
+      "professional": {
+        "label": "Professional",
+        "credits_per_month": 1000
+      },
+      "enterprise": {
+        "label": "Enterprise",
+        "credits_per_month": null
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
 # Branch Protection Rules
 
-This document describes the branch protection rules for the Finch repository.
+This document describes the branch protection rules for the Co-op repository.
 
 ## Protected Branches
 

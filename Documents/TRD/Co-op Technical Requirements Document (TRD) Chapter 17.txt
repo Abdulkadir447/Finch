@@ -1,0 +1,424 @@
+Co-op Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 17 — Security Architecture & Compliance
+17.1 Purpose
+
+This chapter defines the complete security architecture for Co-op Version 1.0. It establishes the security principles, controls, and best practices used to protect user accounts, business data, AI interactions, and application infrastructure.
+
+Security is designed into every layer of the application rather than added after development.
+
+17.2 Security Objectives
+
+The primary security objectives are to:
+
+Protect business data from unauthorized access.
+Secure user authentication and sessions.
+Ensure the integrity of financial records.
+Protect AI requests and responses.
+Safeguard local and cloud databases.
+Prevent common application attacks.
+Support secure offline operation.
+Maintain user trust through strong security practices.
+17.3 Security Principles
+
+Co-op follows the following security principles:
+
+Defense in Depth: Multiple layers of security controls.
+Least Privilege: Components and users receive only the permissions they require.
+Secure by Default: Secure settings are enabled out of the box.
+Fail Securely: Errors should not expose sensitive information.
+Zero Trust: Every request is validated regardless of origin.
+Privacy by Design: Collect and process only the data necessary for application functionality.
+17.4 Security Architecture
+                 Co-op Desktop
+                        │
+        ┌───────────────┴───────────────┐
+        │                               │
+ Electron Main Process         Electron Renderer
+        │                               │
+        │ Secure IPC (Context Bridge)   │
+        └───────────────┬───────────────┘
+                        │
+                  SQLite Database
+                        │
+                  Sync Engine
+                        │
+                  Supabase Backend
+                        │
+      Authentication • Storage • PostgreSQL
+                        │
+                 OpenAI Responses API
+
+Every communication path is authenticated and encrypted where applicable.
+
+17.5 Authentication
+
+Co-op uses Supabase Authentication.
+
+Supported authentication methods:
+
+Email and Password
+Magic Link (Future)
+OAuth Providers (Future)
+
+Authentication requirements:
+
+Secure password hashing (managed by Supabase)
+Email verification
+Session expiration
+Session refresh
+Secure logout
+Multi-device session support
+17.6 Two-Factor Authentication (2FA)
+
+Version 1.0 includes optional Two-Factor Authentication.
+
+Supported methods:
+
+Time-based One-Time Password (TOTP)
+Authenticator applications (Google Authenticator, Microsoft Authenticator, Authy)
+
+Future support:
+
+Passkeys
+Hardware security keys (FIDO2/WebAuthn)
+17.7 Authorization
+
+Version 1.0 supports a single role:
+
+Role	Permissions
+Business Owner	Full access to all modules
+
+Future versions will introduce:
+
+Manager
+Sales Staff
+Inventory Staff
+Accountant
+Read-only Viewer
+
+Authorization should be enforced at both the client and backend (Supabase Row-Level Security).
+
+17.8 Password Security
+
+Password policy:
+
+Requirement	Value
+Minimum Length	12 characters
+Uppercase Letters	Required
+Lowercase Letters	Required
+Numbers	Required
+Special Characters	Required
+
+Additional protections:
+
+Password reset via email
+Password change confirmation
+Rate-limited login attempts
+Temporary account lockout after repeated failures
+17.9 Session Management
+
+Sessions should:
+
+Expire after configurable inactivity.
+Refresh securely using Supabase.
+Be invalidated on logout.
+Be invalidated after password changes.
+Never expose tokens to the renderer process.
+
+Sensitive session data should remain protected.
+
+17.10 Electron Security
+
+Electron applications require additional protections.
+
+The following settings are mandatory:
+
+contextIsolation: true
+nodeIntegration: false
+sandbox: true (where supported)
+enableRemoteModule: false
+webSecurity: true
+
+The renderer process must never have direct access to Node.js APIs.
+
+17.11 Secure IPC Communication
+
+Communication between the renderer and main processes must use a secure IPC layer.
+
+Guidelines:
+
+Expose only approved APIs through the Context Bridge.
+Validate all IPC messages.
+Reject unknown channels.
+Sanitize all incoming data.
+Return structured error messages.
+
+Direct access to Electron internals is prohibited.
+
+17.12 Data Encryption
+Data in Transit
+
+All communication with:
+
+Supabase
+OpenAI
+Gmail APIs
+
+must use HTTPS/TLS 1.2 or higher.
+
+Data at Rest
+
+Sensitive local data should be encrypted where practical.
+
+Examples:
+
+License information
+Refresh tokens
+Cached credentials
+
+Encryption should use modern industry-standard algorithms (e.g., AES-256 where implemented).
+
+17.13 Secure Storage
+
+Sensitive local information should not be stored in plain text.
+
+Examples include:
+
+Authentication tokens
+API credentials
+License activation details
+
+Where possible, use the operating system's secure credential storage (e.g., Windows Credential Manager) instead of storing secrets directly in SQLite.
+
+17.14 Database Security
+
+SQLite:
+
+Restrict file permissions.
+Prevent unauthorized modification.
+Validate all SQL inputs.
+Use prepared statements.
+
+Supabase PostgreSQL:
+
+Enable Row-Level Security (RLS).
+Apply least-privilege access.
+Enforce authentication on all protected tables.
+Restrict service-role credentials to backend operations only.
+17.15 API Security
+
+All API interactions should:
+
+Require authenticated sessions.
+Validate request payloads.
+Validate response schemas.
+Apply rate limiting where appropriate.
+Log failures securely.
+
+No API keys should be embedded in client-side source code.
+
+17.16 AI Security
+
+AI requests should follow these rules:
+
+Send only the minimum required business data.
+Exclude passwords, tokens, and secrets.
+Exclude unnecessary personally identifiable information (PII).
+Validate AI responses before displaying or storing them.
+Clearly distinguish AI-generated insights from system-calculated values.
+
+AI must never have direct access to the database.
+
+17.17 File Security
+
+Supported file types:
+
+PDF
+CSV
+Excel
+
+Requirements:
+
+Validate MIME type.
+Validate file extension.
+Enforce maximum file size.
+Scan uploaded files where feasible.
+Reject malformed or unsupported files.
+
+Temporary files should be deleted after processing.
+
+17.18 Input Validation
+
+All user input must be validated.
+
+Validation includes:
+
+Required fields
+Maximum lengths
+Numeric ranges
+Date validation
+Email format
+Currency validation
+
+Validation must occur on both the client and backend.
+
+17.19 Protection Against Common Threats
+
+Co-op should mitigate:
+
+SQL Injection
+Cross-Site Scripting (XSS)
+Cross-Site Request Forgery (CSRF) where applicable
+Command Injection
+Path Traversal
+Malicious file uploads
+Brute-force login attacks
+Session fixation
+Clickjacking (for any web-based components)
+17.20 Audit Logging
+
+Security-related events should be logged, including:
+
+Successful logins
+Failed logins
+Password changes
+License activation
+Data exports
+Backup creation
+Restore operations
+Synchronization failures
+Permission errors
+
+Audit logs should be tamper-resistant and timestamped.
+
+17.21 Error Handling
+
+Error messages should:
+
+Be user-friendly.
+Avoid exposing stack traces.
+Avoid revealing database structure.
+Avoid exposing API keys or tokens.
+
+Detailed technical information should be written only to secure application logs.
+
+17.22 Backup Security
+
+Manual backups should:
+
+Include integrity verification.
+Support optional encryption (recommended for future versions).
+Be restorable only by authorized users.
+Preserve metadata such as creation date and application version.
+
+Users are responsible for storing backup files securely.
+
+17.23 Dependency Security
+
+All third-party dependencies should:
+
+Be sourced from trusted repositories.
+Be reviewed before adoption.
+Be updated regularly.
+Be scanned for known vulnerabilities.
+
+Critical security advisories should be addressed before release.
+
+17.24 Logging Security
+
+Application logs must never contain:
+
+Passwords
+Authentication tokens
+API keys
+Encryption keys
+Full payment information
+
+Sensitive values should be masked or omitted.
+
+17.25 Privacy
+
+Co-op follows the principle of data minimization.
+
+The application should:
+
+Collect only necessary information.
+Allow users to delete business data.
+Provide clear data ownership.
+Respect user privacy settings.
+
+Business data belongs to the customer and is never used to train AI models unless the user explicitly opts into such a program in a future version.
+
+17.26 Incident Response
+
+If a security incident occurs:
+
+Detect the issue.
+Isolate affected systems or accounts.
+Preserve relevant logs.
+Investigate the root cause.
+Apply fixes.
+Verify system integrity.
+Notify affected users if required.
+Conduct a post-incident review.
+17.27 Compliance Considerations
+
+Co-op should be designed with the following in mind:
+
+GDPR principles (for applicable users)
+General data protection best practices
+Secure software development lifecycle (SSDLC)
+Industry-standard encryption and authentication
+
+Future versions may include additional compliance support depending on customer requirements.
+
+17.28 Security Testing
+
+Security validation should include:
+
+Static code analysis
+Dependency vulnerability scanning
+Authentication testing
+Authorization testing
+Penetration testing
+Secure IPC testing
+AI prompt security testing
+File upload testing
+
+Critical vulnerabilities must be resolved before release.
+
+17.29 Future Security Enhancements
+
+Potential future improvements include:
+
+Passkey authentication
+Hardware security key support
+End-to-end encrypted backups
+Device trust management
+Security dashboard
+Real-time threat detection
+Anomaly detection using AI
+Enterprise identity providers (SAML/OIDC)
+17.30 Acceptance Criteria
+
+The security architecture is considered complete when:
+
+Authentication and authorization are securely implemented.
+Electron follows recommended security practices.
+Sensitive data is protected in transit and at rest.
+Secure IPC is enforced.
+Database access is controlled with Row-Level Security.
+Common attack vectors are mitigated.
+Security events are logged.
+Security testing passes without unresolved critical vulnerabilities.
+Privacy principles are incorporated into the application's design.
+Chapter Summary
+
+This chapter defines the complete security architecture for Co-op. It covers authentication, authorization, Electron security, secure IPC communication, encryption, secure storage, API protection, AI data handling, database security, audit logging, privacy, incident response, and compliance considerations. Together, these measures provide a robust security foundation that protects business data while supporting Co-op's offline-first desktop architecture.

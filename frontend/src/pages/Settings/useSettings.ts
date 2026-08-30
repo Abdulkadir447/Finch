@@ -58,7 +58,7 @@ export function useSettings() {
       setSettings(data);
       setCurrency(data.currency);
     } catch (e) {
-      setError(e instanceof ApiError ? e : new ApiError('Unable to reach the Finch API.'));
+      setError(e instanceof ApiError ? e : new ApiError('Unable to reach the Co-op API.'));
     } finally {
       setLoading(false);
     }

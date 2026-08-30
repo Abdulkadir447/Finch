@@ -6,7 +6,7 @@ repository root. Secrets (DB passwords, JWT secret, API keys) are NEVER stored
 in those files — they are resolved from environment variables at runtime.
 
 Selection order:
-    1. ``FINCH_ENV`` env var (development | testing | production)
+    1. ``COOP_ENV`` env var (development | testing | production)
     2. ``APP_ENV`` env var
     3. default: ``development``
 """
@@ -27,8 +27,44 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CONFIG_DIR = _REPO_ROOT / "config"
 
 
+def _load_dotenv_once() -> None:
+    """Load ``.env`` from the repository root, IF PRESENT (dependency-free).
+
+    Standard 12-factor semantics: values already in the real environment
+    ALWAYS win — ``.env`` only fills gaps, so it can never override a
+    deployment's settings. The file is gitignored; only non-secret
+    placeholders (``.env.example``) are committed. This is what makes a
+    local ``OPENAI_API_KEY`` in ``.env`` work without extra tooling.
+    """
+    if getattr(_load_dotenv_once, "_done", False):
+        return
+    _load_dotenv_once._done = True  # type: ignore[attr-defined]
+    env_file = _REPO_ROOT / ".env"
+    if not env_file.exists():
+        return
+    try:
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):]
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("'\"")
+            if key:
+                os.environ.setdefault(key, value)
+    except OSError:
+        # A broken .env must never prevent the API from starting.
+        pass
+
+
+_load_dotenv_once()
+
+
 def _resolve_env() -> str:
-    env = os.getenv("FINCH_ENV") or os.getenv("APP_ENV") or DEFAULT_ENV
+    env = os.getenv("COOP_ENV") or os.getenv("FINCH_ENV") or os.getenv("APP_ENV") or DEFAULT_ENV
+    # COOP_ENV is the renamed variable; FINCH_ENV is kept as a compatibility fallback for existing .env files.
     return env if env in VALID_ENVS else DEFAULT_ENV
 
 
@@ -72,7 +108,7 @@ def get(key: str, default: Any = None) -> Any:
 def database_url() -> str:
     """Resolve the SQLAlchemy database URL.
 
-    Finch targets Supabase/Postgres. Production and development both require an
+    Co-op targets Supabase/Postgres. Production and development both require an
     explicit ``DATABASE_URL`` (or ``SUPABASE_DB_URL``); SQLite is available ONLY
     in the ``testing`` environment. There is no silent fallback that could mask
     a missing or misconfigured production database (Task 11 / audit H3).
@@ -87,10 +123,10 @@ def database_url() -> str:
         return explicit
 
     if get_env() == "testing":
-        return "sqlite+aiosqlite:///./finch_test.db"
+        return "sqlite+aiosqlite:///./coop_test.db"
 
     raise RuntimeError(
-        "DATABASE_URL is not set. Finch requires a Postgres/Supabase connection "
-        "string (e.g. postgresql://user:pass@host:5432/finch). SQLite is only "
+        "DATABASE_URL is not set. Co-op requires a Postgres/Supabase connection "
+        "string (e.g. postgresql://user:pass@host:5432/coop). SQLite is only "
         "available in the testing environment."
     )

@@ -1,0 +1,410 @@
+Co-op Application Flow Document (AFD)
+
+Document: Application Flow Document (AFD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 14 — Settings, Preferences & Personalization Flow
+14.1 Purpose
+
+The Settings module serves as the central control panel for Co-op. It allows users to configure the application to match their business needs, personalize the user experience, manage company information, configure AI behavior, control notifications, manage backups, and customize the overall workspace.
+
+Settings are synchronized across devices where appropriate, while device-specific preferences remain local.
+
+14.2 Objectives
+
+The Settings module must:
+
+Provide centralized application configuration.
+Separate business settings from device settings.
+Automatically save changes where appropriate.
+Ask for confirmation before applying destructive changes.
+Support synchronization across devices.
+Maintain offline functionality.
+Prepare for future enterprise settings.
+Be organized, searchable, and easy to navigate.
+14.3 Settings Architecture
+Settings
+│
+├── General
+├── Company Profile
+├── Appearance
+├── Dashboard
+├── AI Assistant
+├── Notifications
+├── Keyboard Shortcuts
+├── Backup & Restore
+├── Synchronization
+├── Updates
+├── Privacy & Security
+├── Advanced
+└── About
+
+The Settings page uses a sidebar navigation with category-based sections.
+
+14.4 Settings Navigation Flow
+Dashboard
+     │
+     ▼
+Settings
+     │
+     ▼
+Select Category
+     │
+     ▼
+Modify Settings
+     │
+     ▼
+Save Changes
+     │
+     ▼
+Apply Immediately
+
+Most settings apply instantly without requiring an application restart.
+
+14.5 General Settings
+
+The General section contains:
+
+Business Name
+Currency
+Time Zone
+Date Format
+Number Format
+Default Tax Rate
+Language (future)
+Startup Behavior
+
+Users can restore default values if desired.
+
+14.6 Company Profile
+
+The Company Profile section manages business identity.
+
+Available fields:
+
+Company Name
+Company Logo
+Email Address
+Phone Number
+Business Address
+Tax ID
+Website
+Business Description
+
+This information automatically appears on:
+
+Invoices
+Reports
+Exported PDFs
+Emails
+
+Changes synchronize across all devices.
+
+14.7 Appearance Settings
+
+Following the UI/UX Design Document:
+
+Theme options:
+
+Light
+Dark
+Follow Windows Theme (Default)
+
+Additional appearance options:
+
+Accent Color (defined by design system)
+Font Size
+Interface Density
+Sidebar Default State
+Animation Level
+
+Flow:
+
+Change Theme
+      │
+      ▼
+Apply Theme
+      │
+      ▼
+Refresh UI
+
+Theme changes occur instantly.
+
+14.8 Dashboard Preferences
+
+Users can customize:
+
+Visible widgets
+Widget order
+Widget size
+Default date range
+Dashboard layout
+
+Available widgets:
+
+Revenue
+Profit
+Orders
+Inventory
+Customer Growth
+Forecast
+AI Insights
+Recent Activity
+Tasks
+Calendar
+
+Future versions may support drag-and-drop layouts.
+
+14.9 AI Assistant Settings
+
+Users can configure:
+
+AI enabled/disabled
+Conversation history
+AI response style
+Automatic AI suggestions
+Business insight frequency
+
+Privacy controls include:
+
+Clear AI history
+Export AI history
+Disable context sharing for selected modules
+
+Changes apply immediately.
+
+14.10 Notification Preferences
+
+Users can enable or disable:
+
+In-app notifications
+Desktop notifications
+Daily summaries
+AI insights
+Inventory alerts
+Sync notifications
+Report notifications
+
+Future options:
+
+Quiet Hours
+Custom notification sounds
+14.11 Keyboard Shortcuts
+
+Following the UI specification, users can:
+
+View available shortcuts.
+Customize supported shortcuts.
+Restore defaults.
+
+Examples:
+
+Shortcut	Action
+Ctrl + Space	Open AI Assistant
+Ctrl + N	New Order
+Ctrl + S	Save
+Ctrl + F	Search
+Ctrl + R	Generate Report
+Ctrl + ,	Open Settings
+14.12 Backup & Restore Settings
+
+Users can configure:
+
+Default backup folder
+Backup compression
+Backup verification
+Restore backups
+
+Flow:
+
+Backup Settings
+       │
+       ▼
+Choose Folder
+       │
+       ▼
+Save
+
+Users can also initiate manual backups directly from this section.
+
+14.13 Synchronization Settings
+
+Options include:
+
+Enable cloud synchronization
+Manual sync
+View sync status
+Retry failed syncs
+Clear completed sync logs
+
+These settings control background synchronization behavior without affecting local data.
+
+14.14 Update Settings
+
+Users can configure:
+
+Automatic update checks
+Download updates automatically
+Install updates manually
+View release notes
+
+Update mechanism:
+
+Electron Updater
+GitHub Releases (Version 1.0)
+
+Users are notified when updates are available but remain in control of installation.
+
+14.15 Privacy & Security
+
+Available options:
+
+Change Password
+Manage Two-Factor Authentication
+View registered devices
+Logout from current device
+Clear cached data
+Clear AI conversation history
+
+Sensitive actions require confirmation before proceeding.
+
+14.16 Advanced Settings
+
+Designed primarily for power users.
+
+Options include:
+
+Enable Debug Logging
+Developer Mode
+Database Maintenance
+Export Logs
+Reset Local Cache
+Reset Application Settings
+
+These settings are hidden behind an "Advanced" section to prevent accidental use.
+
+14.17 About Page
+
+Displays:
+
+Co-op version
+Build number
+License status
+Device ID
+Database version
+Electron version
+React version
+Update status
+
+Links:
+
+Documentation
+Privacy Policy
+Terms of Service
+Support
+14.18 Search Settings
+
+A global search bar allows users to quickly locate settings.
+
+Example searches:
+
+Theme
+Backup
+AI
+Notifications
+Sync
+Tax
+Dashboard
+
+Search results update instantly while typing.
+
+14.19 Offline Behavior
+
+Settings available offline:
+
+Appearance
+Dashboard
+Keyboard Shortcuts
+Backup
+Local Preferences
+Advanced Settings
+
+Unavailable until online:
+
+License verification
+Device management
+Cloud synchronization settings requiring server communication
+
+Changes made offline synchronize automatically when connectivity returns.
+
+14.20 Error Handling
+Error	Recovery
+Failed to save settings	Retry and keep previous values
+Invalid company information	Highlight incorrect fields
+Backup folder unavailable	Ask user to choose another location
+Theme application failed	Revert to previous theme
+Sync configuration error	Display troubleshooting guidance
+Update check failed	Retry later
+
+Errors should never leave the application in an inconsistent state.
+
+14.21 Settings State Machine
+Open Settings
+      │
+      ▼
+Viewing
+      │
+      ▼
+Editing
+      │
+      ▼
+Saving
+      │
+ ┌────┴─────┐
+ │          │
+Success   Failure
+ │          │
+ ▼          ▼
+Applied   Retry
+
+This state machine ensures all settings changes are handled consistently.
+
+14.22 Performance Targets
+Operation	Target
+Open Settings	<300 ms
+Apply Theme	<200 ms
+Save Settings	<500 ms
+Search Settings	<100 ms
+Open Backup Settings	<300 ms
+Open About Page	<200 ms
+14.23 Developer Implementation Notes
+
+Implementation guidelines:
+
+Separate user-specific, company-wide, and device-specific settings.
+Store local preferences in SQLite or secure local configuration files.
+Synchronize company-wide settings through Supabase.
+Apply appearance changes immediately without restarting the application.
+Use a centralized Settings Service to avoid duplicated logic.
+Version the settings schema to support future migrations.
+Design all settings pages to accommodate additional categories without major UI changes.
+14.24 Acceptance Criteria
+
+The Settings, Preferences & Personalization Flow is complete when:
+
+All settings categories are accessible.
+Company information updates correctly across the application.
+Theme changes apply instantly.
+Dashboard customization works as expected.
+AI and notification preferences are configurable.
+Keyboard shortcuts can be viewed and customized.
+Backup settings function correctly.
+Synchronization settings reflect current status.
+Offline settings changes synchronize when online.
+Performance targets are consistently achieved.
+14.25 Chapter Summary
+
+The Settings, Preferences & Personalization Flow gives users complete control over how Co-op looks, behaves, and integrates with their business. By separating company-wide configuration from device-specific preferences, supporting instant changes, and maintaining offline functionality, the Settings module creates a flexible, scalable, and user-friendly configuration experience that is ready for future enterprise capabilities.

@@ -1,0 +1,348 @@
+Co-op Backend Schema Document (BSD)
+
+Document: Backend Schema Document (BSD)
+Product: Co-op – Better business, together
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 4 — User Management Schema
+4.1 Purpose
+
+This chapter defines the User Management architecture for Co-op. While Chapter 3 focused on authentication and identity verification, this chapter describes how authenticated users are represented within the application, how they interact with businesses, devices, preferences, permissions, and future organizational roles.
+
+The User Management system is designed to support both Version 1 (primarily business owners) and future enterprise deployments with multiple users, departments, and role-based access control (RBAC).
+
+4.2 Objectives
+
+The User Management system must:
+
+Store extended user information beyond authentication.
+Support multiple businesses per account.
+Prepare for multiple users per business.
+Maintain user preferences and personalization.
+Track user devices and sessions.
+Record user activity.
+Support future roles and permissions.
+Integrate with audit logging and security.
+Scale without schema redesign.
+4.3 User Management Architecture
+              Supabase Auth
+                    │
+                    ▼
+               User Profile
+                    │
+       ┌────────────┼────────────┐
+       ▼            ▼            ▼
+ Businesses    Preferences    Devices
+       │            │            │
+       ▼            ▼            ▼
+ Roles       Notifications   Sessions
+                    │
+                    ▼
+              Audit Logs
+
+The authentication system provides identity, while the User Management layer stores business-specific and application-specific information.
+
+4.4 Core Tables
+
+The User Management module consists of the following tables:
+
+Table	Purpose
+profiles	User profile information
+user_businesses	Business memberships
+user_roles	Role assignments
+user_preferences	Personal settings
+user_devices	Registered devices
+user_sessions	Session history
+user_activity	Activity timeline
+
+Each table is described in later sections.
+
+4.5 Profiles Table
+Table: profiles
+
+Stores personal information for every authenticated user.
+
+Column	Type	Description
+id	UUID	Primary key (Supabase Auth ID)
+full_name	TEXT	Full legal or preferred name
+email	TEXT	Primary email
+avatar_url	TEXT	Profile image
+phone_number	TEXT	Optional phone number
+preferred_language	TEXT	Language preference
+timezone	TEXT	Preferred timezone
+created_at	TIMESTAMPTZ	Creation timestamp
+updated_at	TIMESTAMPTZ	Last update timestamp
+
+A profile exists for every authenticated account.
+
+4.6 User–Business Relationship
+
+A single user may belong to multiple businesses.
+
+Likewise, a business may contain multiple users.
+
+Relationship:
+
+User
+ │
+ ├── Business A
+ ├── Business B
+ └── Business C
+
+This many-to-many relationship is managed through the user_businesses table.
+
+4.7 User Businesses Table
+Table: user_businesses
+Column	Type	Description
+id	UUID	Primary key
+user_id	UUID	References profiles.id
+business_id	UUID	References businesses.id
+role_id	UUID	References roles.id
+joined_at	TIMESTAMPTZ	Date joined
+is_default	BOOLEAN	Default business on login
+created_at	TIMESTAMPTZ	Creation time
+
+This table enables users to switch between businesses without signing out.
+
+4.8 Default Business
+
+When a user belongs to multiple businesses, one may be marked as the default.
+
+Startup flow:
+
+Login
+   │
+   ▼
+Default Business Exists?
+   │
+ ┌─┴──────────┐
+ │            │
+Yes          No
+ │            │
+ ▼            ▼
+Open      Ask User
+Dashboard  to Select
+
+Users can change their default business in Settings.
+
+4.9 Future Role-Based Access Control (RBAC)
+
+Although Version 1 focuses on business owners, Co-op is designed for future role expansion.
+
+Planned roles include:
+
+Owner
+Administrator
+Manager
+Accountant
+Cashier
+Inventory Manager
+Sales Representative
+Customer Support
+Custom Roles (future)
+
+Roles determine permissions but are managed separately from authentication.
+
+4.10 User Preferences Table
+Table: user_preferences
+
+Stores personalized application settings.
+
+Column	Type	Description
+id	UUID	Primary key
+user_id	UUID	User reference
+theme	TEXT	Light, Dark, System
+accent_color	TEXT	Selected accent color
+language	TEXT	Preferred language
+dashboard_layout	JSONB	Widget arrangement
+notification_settings	JSONB	Notification preferences
+keyboard_shortcuts	JSONB	Custom shortcuts
+created_at	TIMESTAMPTZ	Creation time
+updated_at	TIMESTAMPTZ	Last update
+
+Flexible preferences are stored using JSONB where appropriate.
+
+4.11 User Devices Table
+Table: user_devices
+
+Tracks devices used to access Co-op.
+
+Column	Type	Description
+id	UUID	Primary key
+user_id	UUID	User reference
+device_name	TEXT	Computer name
+operating_system	TEXT	Windows version
+app_version	TEXT	Installed Co-op version
+last_login	TIMESTAMPTZ	Last successful login
+trusted	BOOLEAN	Trusted device
+created_at	TIMESTAMPTZ	Registration time
+
+Future versions may allow users to revoke trusted devices remotely.
+
+4.12 User Sessions Table
+Table: user_sessions
+
+Maintains session history.
+
+Column	Type	Description
+id	UUID	Primary key
+user_id	UUID	User reference
+device_id	UUID	Registered device
+login_time	TIMESTAMPTZ	Session start
+logout_time	TIMESTAMPTZ	Session end
+ip_address	TEXT	Last known IP (cloud sessions)
+status	TEXT	Active, Expired, Revoked
+
+This table supports security auditing and session management.
+
+4.13 User Activity Table
+Table: user_activity
+
+Stores significant user actions.
+
+Examples:
+
+Logged in
+Created order
+Added customer
+Imported inventory
+Generated report
+Changed settings
+Column	Type	Description
+id	UUID	Primary key
+user_id	UUID	User reference
+business_id	UUID	Business reference
+activity_type	TEXT	Event type
+description	TEXT	Human-readable summary
+created_at	TIMESTAMPTZ	Event timestamp
+
+Activity records complement the system-wide audit log.
+
+4.14 User Switching Flow
+User Menu
+    │
+    ▼
+Select Business
+    │
+    ▼
+Load Business Context
+    │
+    ▼
+Refresh Dashboard
+
+Switching businesses reloads only business-specific data while preserving the authenticated session.
+
+4.15 Profile Updates
+
+Users may update:
+
+Full name
+Profile picture
+Phone number
+Timezone
+Language
+Preferences
+
+Changes synchronize automatically when an internet connection is available.
+
+4.16 Account Lifecycle
+Account Created
+       │
+       ▼
+Email Verified
+       │
+       ▼
+Business Registered
+       │
+       ▼
+Active
+       │
+       ▼
+Suspended / Deleted
+
+Each stage determines available application functionality.
+
+4.17 Data Privacy
+
+User management must comply with privacy best practices.
+
+Sensitive information:
+
+Passwords
+Tokens
+API keys
+
+must never be stored within the User Management schema.
+
+Only Supabase Authentication manages credentials.
+
+4.18 Security Policies
+
+Every user-related table must enforce:
+
+Row Level Security (RLS)
+Ownership validation
+Business membership checks
+Permission verification
+Audit logging
+
+No user may view or modify another user's information without authorization.
+
+4.19 Relationships
+profiles
+    │
+    ├── user_preferences
+    ├── user_devices
+    ├── user_sessions
+    ├── user_activity
+    └── user_businesses
+              │
+              ▼
+         businesses
+              │
+              ▼
+            roles
+
+This structure keeps user identity, business membership, and preferences modular and extensible.
+
+4.20 Performance Considerations
+
+User-related queries should be optimized using indexes on:
+
+user_id
+business_id
+email
+last_login
+role_id
+
+Frequently accessed user preferences should be cached locally to reduce cloud requests.
+
+4.21 Developer Implementation Notes
+
+Implementation guidelines:
+
+Keep authentication and user profile data logically separate.
+Use UUIDs consistently across all user-related tables.
+Cache user preferences locally for faster startup.
+Record significant user actions in the activity log.
+Design the schema to support future RBAC without structural changes.
+Ensure all user tables enforce RLS and business isolation.
+Avoid storing authentication secrets outside Supabase Auth.
+4.22 Acceptance Criteria
+
+The User Management Schema is complete when:
+
+Every authenticated user has a profile.
+Users can belong to multiple businesses.
+Default business selection works correctly.
+Preferences are stored and synchronized.
+Devices and sessions are tracked.
+User activity is recorded.
+Future RBAC is supported.
+RLS protects all user data.
+Performance targets for user queries are met.
+4.23 Chapter Summary
+
+The User Management Schema extends Co-op's authentication system by managing user profiles, business memberships, preferences, devices, sessions, and activity history. Its modular design supports the current owner-focused workflow while providing a scalable foundation for future multi-user organizations, role-based permissions, and enterprise collaboration. By separating identity, preferences, and business context, the system remains secure, maintainable, and ready for long-term growth.

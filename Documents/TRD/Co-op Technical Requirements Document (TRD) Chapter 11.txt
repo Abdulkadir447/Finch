@@ -1,0 +1,555 @@
+Co-op Technical Requirements Document (TRD)
+
+Document: Technical Requirements Document (TRD)
+Product: Co-op
+Version: 1.0
+Status: Draft
+Last Updated: July 2026
+
+Chapter 11 — API Specification
+11.1 Purpose
+
+This chapter defines the API architecture, standards, endpoints, request/response formats, authentication, versioning, and communication protocols used by Co-op.
+
+Unlike traditional web applications, Co-op is an offline-first desktop application, meaning APIs are used primarily for:
+
+User authentication
+Cloud synchronization
+AI services
+License activation
+File uploads
+Email integration
+Future mobile support
+
+All APIs are implemented as Supabase Edge Functions or Supabase REST endpoints.
+
+11.2 API Design Goals
+
+The API must be:
+
+Fast
+Secure
+Stateless
+Versioned
+Easy to maintain
+Strongly typed
+Well documented
+Backward compatible
+11.3 API Architecture
+React Desktop App
+
+↓
+
+Application Services
+
+↓
+
+Repository Layer
+
+↓
+
+Supabase Client
+
+↓
+
+REST / Edge Functions
+
+↓
+
+Supabase Backend
+
+↓
+
+OpenAI / Storage / PostgreSQL
+11.4 Base URL
+
+Development
+
+https://<project>.supabase.co
+
+Production
+
+https://api.coopapp.com
+
+Future versions may use a dedicated API gateway.
+
+11.5 API Versioning
+
+Every endpoint begins with an API version.
+
+Example
+
+/api/v1/
+
+Future
+
+/api/v2/
+
+Versioning prevents breaking existing clients.
+
+11.6 Authentication
+
+Every protected endpoint requires
+
+Authorization: Bearer <access_token>
+
+The token is issued by Supabase Authentication.
+
+Unauthenticated requests return
+
+401 Unauthorized
+11.7 Standard Headers
+
+Request
+
+Content-Type: application/json
+
+Authorization: Bearer <token>
+
+Accept: application/json
+11.8 Standard Response
+
+Every endpoint returns the same format.
+
+Success
+
+{
+    "success": true,
+    "data": {},
+    "error": null
+}
+
+Failure
+
+{
+    "success": false,
+    "data": null,
+    "error": {
+        "code": "INVALID_INPUT",
+        "message": "The provided data is invalid."
+    }
+}
+11.9 HTTP Status Codes
+Code	Meaning
+200	Success
+201	Created
+204	No Content
+400	Bad Request
+401	Unauthorized
+403	Forbidden
+404	Not Found
+409	Conflict
+422	Validation Failed
+429	Rate Limited
+500	Server Error
+11.10 API Categories
+
+Co-op APIs are grouped into:
+
+Authentication
+
+Orders
+
+Customers
+
+Inventory
+
+Reports
+
+Forecasts
+
+AI
+
+Synchronization
+
+Storage
+
+License
+
+Notifications
+
+Settings
+
+Backup
+
+11.11 Authentication APIs
+Login
+POST /api/v1/auth/login
+
+Request
+
+{
+    "email":"user@example.com",
+    "password":"********"
+}
+
+Response
+
+{
+    "success":true,
+    "data":{
+        "accessToken":"",
+        "refreshToken":"",
+        "user":{}
+    }
+}
+Register
+POST /api/v1/auth/register
+Logout
+POST /api/v1/auth/logout
+Refresh Token
+POST /api/v1/auth/refresh
+Forgot Password
+POST /api/v1/auth/forgot-password
+Reset Password
+POST /api/v1/auth/reset-password
+11.12 Orders API
+List Orders
+GET /api/v1/orders
+
+Supports
+
+Pagination
+Search
+Date filters
+Status filters
+Get Order
+GET /api/v1/orders/{id}
+Create Order
+POST /api/v1/orders
+Update Order
+PUT /api/v1/orders/{id}
+Delete Order
+DELETE /api/v1/orders/{id}
+
+Uses soft delete.
+
+Export Orders
+POST /api/v1/orders/export
+
+Supported formats
+
+CSV
+Excel
+PDF
+11.13 Customer API
+
+Endpoints
+
+GET /customers
+
+GET /customers/{id}
+
+POST /customers
+
+PUT /customers/{id}
+
+DELETE /customers/{id}
+
+Additional endpoints
+
+GET /customers/search
+
+GET /customers/top
+11.14 Inventory API
+
+Endpoints
+
+GET /inventory
+
+POST /inventory
+
+PUT /inventory/{id}
+
+DELETE /inventory/{id}
+
+Additional
+
+GET /inventory/low-stock
+
+GET /inventory/history
+11.15 Reports API
+GET /reports
+
+Generate Report
+
+POST /reports/generate
+
+Export
+
+POST /reports/export
+
+Types
+
+Profit & Loss
+Sales
+Inventory
+Forecast
+11.16 Forecast API
+
+Generate Forecast
+
+POST /forecast
+
+Retrieve Forecast
+
+GET /forecast/{id}
+
+Delete
+
+DELETE /forecast/{id}
+11.17 AI APIs
+
+Ask AI
+
+POST /ai/chat
+
+Request
+
+{
+  "message":"Why are my sales dropping?"
+}
+
+Response
+
+{
+    "response":"..."
+}
+
+Generate Report Summary
+
+POST /ai/report-summary
+
+Explain Chart
+
+POST /ai/chart-analysis
+
+Generate Invoice
+
+POST /ai/invoice
+
+Generate Forecast
+
+POST /ai/forecast
+11.18 File APIs
+
+Upload
+
+POST /storage/upload
+
+Download
+
+GET /storage/{id}
+
+Delete
+
+DELETE /storage/{id}
+11.19 Backup APIs
+
+Create Backup
+
+POST /backup/create
+
+Restore
+
+POST /backup/restore
+
+History
+
+GET /backup/history
+11.20 Synchronization APIs
+
+Push Changes
+
+POST /sync/push
+
+Pull Changes
+
+POST /sync/pull
+
+Status
+
+GET /sync/status
+
+Resolve Conflict
+
+POST /sync/conflict
+11.21 License APIs
+
+Activate
+
+POST /license/activate
+
+Check Status
+
+GET /license/status
+
+Deactivate
+
+POST /license/deactivate
+
+Renew
+
+POST /license/renew
+11.22 Notification APIs
+GET /notifications
+
+Mark Read
+
+PUT /notifications/{id}
+
+Delete
+
+DELETE /notifications/{id}
+11.23 Settings APIs
+GET /settings
+PUT /settings
+11.24 Gmail Integration APIs
+
+Send Invoice
+
+POST /gmail/send-invoice
+
+Send Report
+
+POST /gmail/send-report
+
+Test Connection
+
+POST /gmail/test
+11.25 Pagination
+
+Request
+
+?page=1
+
+&limit=50
+
+Response
+
+{
+    "page":1,
+    "limit":50,
+    "total":1245,
+    "pages":25
+}
+11.26 Filtering
+
+Example
+
+GET /orders
+
+?status=completed
+
+&startDate=2026-01-01
+
+&endDate=2026-01-31
+11.27 Searching
+?q=laptop
+
+Should support:
+
+Customer names
+Product names
+Invoice numbers
+Order IDs
+11.28 Sorting
+?sort=created_at
+
+&direction=desc
+11.29 Rate Limiting
+
+Default limits
+
+Authentication
+
+10 requests/minute
+
+AI
+
+30 requests/hour
+
+Reports
+
+20/hour
+
+Sync
+
+Unlimited for authenticated desktop clients, subject to backend abuse detection.
+
+11.30 Error Codes
+
+Examples
+
+AUTH_INVALID
+
+AUTH_EXPIRED
+
+ORDER_NOT_FOUND
+
+CUSTOMER_NOT_FOUND
+
+LOW_STOCK
+
+SYNC_FAILED
+
+LICENSE_INVALID
+
+AI_TIMEOUT
+
+VALIDATION_ERROR
+
+FILE_TOO_LARGE
+
+RATE_LIMIT_EXCEEDED
+11.31 API Security
+
+Every endpoint must
+
+Require HTTPS
+Validate JWT
+Validate request body
+Validate permissions
+Return standardized errors
+Log failures
+Apply rate limiting where appropriate
+11.32 Performance Targets
+Endpoint	Target
+Authentication	<1 second
+Orders	<300 ms
+Inventory	<300 ms
+Customers	<300 ms
+Reports	<2 seconds
+Forecast	<3 seconds
+AI	<10 seconds
+Sync	<5 seconds
+11.33 OpenAPI Documentation
+
+Every endpoint must be documented using the OpenAPI 3.1 specification.
+
+Documentation should include:
+
+Endpoint description
+Request schema
+Response schema
+Authentication requirements
+Error responses
+Example requests and responses
+
+The API documentation should be automatically generated and version-controlled.
+
+11.34 Acceptance Criteria
+
+The API layer is considered complete when:
+
+All endpoints follow RESTful conventions.
+Authentication is required for protected resources.
+Responses follow the standardized format.
+Endpoints are versioned.
+OpenAPI documentation is complete.
+Rate limiting and validation are implemented.
+Performance targets are met.
+Security requirements are enforced.
+Chapter Summary
+
+This chapter defines Co-op's API architecture, covering REST endpoints, authentication, versioning, request/response standards, and integrations with Supabase, OpenAI, storage, synchronization, and Gmail. The API is designed to be secure, scalable, and maintainable while supporting Co-op's offline-first desktop architecture and future expansion.
