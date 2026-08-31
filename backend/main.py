@@ -17,7 +17,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from fastapi import (
     Depends,
@@ -38,6 +38,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 from . import briefing as briefing_mod
 from . import importer
@@ -47,9 +48,10 @@ from .ai import service as ai_service
 from .ai import forecast as ai_forecast_mod
 from .ai import history as ai_history_mod
 from .ai import prompts as ai_prompts_mod
-from .ai.ratelimit import enforce_ai_rate_limit
+from .ai.ratelimit import SlidingWindowRateLimiter, enforce_ai_rate_limit
 from .exports import export_report, ExportError
 from .notifications import build_daily_summary
+from .notifications import delivery as delivery_mod
 from .notifications.schemas import DailySummary as DailySummarySchema
 from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
 from .sync import ALLOWED_ORDER_TRANSITIONS, apply_push
@@ -165,6 +167,10 @@ app.add_middleware(
 
 # Order statuses that count toward revenue/profit (not pending/cancelled).
 _ACTIVE_STATUSES = ["shipped", "delivered"]
+
+# Daily-summary email: 3 sends per 15 minutes per business. The summary is
+# one identical message; this only stops accidental spam/refresh loops.
+_SUMMARY_EMAIL_LIMITER = SlidingWindowRateLimiter(requests=3, window_seconds=900)
 
 
 # ---------------------------------------------------------------------------
@@ -2303,6 +2309,52 @@ async def notifications_daily_summary(
 ) -> DailySummarySchema:
     """Today's verified business summary for the in-app notification panel."""
     return await build_daily_summary(db, business)
+
+
+class SummarySendRequest(BaseModel):
+    email: Optional[EmailStr] = None
+
+
+@app.post("/notifications/summary/send", tags=["Notifications"])
+async def send_daily_summary_email(
+    payload: SummarySendRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+) -> dict:
+    """Email today's verified summary to the owner/manager (or the address
+    they give). SMTP settings come from notifications.smtp + env overrides;
+    unconfigured deployments answer 503 — the in-app summary still works."""
+    recipient = payload.email or user.email or business.owner_email
+    if not recipient:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide an email address to deliver to",
+        )
+    _SUMMARY_EMAIL_LIMITER.check(f"summary:{business.id}:{user.user_id}")
+    summary = await build_daily_summary(db, business)
+    try:
+        await run_in_threadpool(delivery_mod.send_daily_summary_email, summary, recipient)
+    except delivery_mod.EmailNotConfiguredError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email delivery is not configured for this deployment",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The email provider rejected the message — try again later",
+        )
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "notifications",
+        None,
+        "SUMMARY_EMAIL",
+        {"email": recipient, "date": summary.date},
+        actor=user.user_id,
+    )
+    return {"ok": True, "email": recipient, "date": summary.date}
 
 
 # ---------------------------------------------------------------------------

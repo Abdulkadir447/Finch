@@ -74,5 +74,15 @@
     "origins": [
       "https://app.coop.example"
     ]
+  },
+  "notifications": {
+    "smtp": {
+      "host": "",
+      "port": 587,
+      "username": "",
+      "password": "",
+      "from": "Co-op <no-reply@coop.app>",
+      "tls": true
+    }
   }
 }
