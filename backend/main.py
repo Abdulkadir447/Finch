@@ -12,13 +12,25 @@ Authentication model (this phase):
 """
 
 import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, or_, select, text
@@ -44,9 +56,12 @@ from .sync import ALLOWED_ORDER_TRANSITIONS, apply_push
 from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .config import get_env, load_config
+from . import team as team_mod
 from .database import dispose_db, get_db, init_db
 from .models import (
     Business,
+    BusinessInvitation,
+    BusinessMember,
     Customer,
     Order,
     OrderItem,
@@ -83,6 +98,12 @@ from .schemas import (
     RevenueTodayResponse,
     TimeseriesPoint,
     TopProductItem,
+    TeamInviteAccept,
+    TeamInviteCreate,
+    TeamInviteOut,
+    TeamMemberOut,
+    TeamResponse,
+    TeamRoleUpdate,
 )
 
 # ---------------------------------------------------------------------------
@@ -171,26 +192,61 @@ def _out_of_stock_case():
 # ---------------------------------------------------------------------------
 
 async def get_current_business(
+    request: Request,
     user: ClerkUser = Depends(verify_clerk_token),
     db: AsyncSession = Depends(get_db),
 ) -> Business:
-    """Resolve the caller's business, creating it on first use."""
+    """Resolve the caller's business and role (TRD Ch17 §17.7).
+
+    Owners match on owner_id (auto-provisioned on first use). Non-owners
+    resolve through their team membership. The resolved role is stored on
+    request.state and every mutation is checked against the role matrix
+    here — the single choke point all business endpoints pass through.
+    """
     stmt = select(Business).where(
         Business.owner_id == user.user_id,
         Business.deleted_at.is_(None),
     ).order_by(Business.id).limit(1)
     business = (await db.execute(stmt)).scalars().first()
 
+    role = "owner"
     if business is None:
-        business = Business(
-            name="My Business",
-            owner_id=user.user_id,
-            currency="USD",
-            created_by=user.user_id,
-        )
-        db.add(business)
-        await db.flush()
+        member = (
+            await db.execute(
+                select(BusinessMember)
+                .where(BusinessMember.user_id == user.user_id)
+                .order_by(BusinessMember.id)
+                .limit(1)
+            )
+        ).scalars().first()
+        if member is not None:
+            business = (
+                await db.execute(
+                    select(Business).where(
+                        Business.id == member.business_id,
+                        Business.deleted_at.is_(None),
+                    )
+                )
+            ).scalars().first()
+            if business is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Your team's business no longer exists",
+                )
+            role = member.role
+        else:
+            business = Business(
+                name="My Business",
+                owner_id=user.user_id,
+                currency="USD",
+                created_by=user.user_id,
+            )
+            db.add(business)
+            await db.flush()
 
+    request.state.team_role = role
+    request.state.is_owner = role == "owner"
+    team_mod.assert_can_write(role, request.method, request.url.path)
     return business
 
 
@@ -226,14 +282,392 @@ async def read_root() -> dict:
 # ---------------------------------------------------------------------------
 
 @app.get("/auth/me", response_model=AuthMeResponse, tags=["Authentication"])
-async def auth_me(business: Business = Depends(get_current_business)) -> AuthMeResponse:
-    """Identity + tenant for the signed-in user (Clerk-verified)."""
+async def auth_me(
+    user: ClerkUser = Depends(verify_clerk_token),
+    db: AsyncSession = Depends(get_db),
+) -> AuthMeResponse:
+    """Identity + tenant for the signed-in user (Clerk-verified).
+
+    Resolution order: owned business -> team membership -> pending
+    invitation (the invitee must accept before a business is provisioned).
+    A brand-new owner gets the auto-provisioned "My Business".
+    """
+    business = (
+        await db.execute(
+            select(Business)
+            .where(Business.owner_id == user.user_id, Business.deleted_at.is_(None))
+            .order_by(Business.id)
+            .limit(1)
+        )
+    ).scalars().first()
+
+    if business is not None:
+        return AuthMeResponse(
+            user_id=user.user_id,
+            business_id=business.id,
+            business_name=business.name,
+            currency=business.currency or "USD",
+            role="owner",
+            email=user.email,
+        )
+
+    member = (
+        await db.execute(
+            select(BusinessMember)
+            .where(BusinessMember.user_id == user.user_id)
+            .order_by(BusinessMember.id)
+            .limit(1)
+        )
+    ).scalars().first()
+    if member is not None:
+        team_business = (
+            await db.execute(
+                select(Business).where(
+                    Business.id == member.business_id, Business.deleted_at.is_(None)
+                )
+            )
+        ).scalars().first()
+        if team_business is not None:
+            return AuthMeResponse(
+                user_id=user.user_id,
+                business_id=team_business.id,
+                business_name=team_business.name,
+                currency=team_business.currency or "USD",
+                role=member.role,
+                email=member.email or user.email,
+            )
+
+    if user.email:
+        invite = (
+            await db.execute(
+                select(BusinessInvitation)
+                .where(
+                    BusinessInvitation.email == user.email.lower(),
+                    BusinessInvitation.status == "pending",
+                )
+                .order_by(BusinessInvitation.id.desc())
+                .limit(1)
+            )
+        ).scalars().first()
+        if invite is not None:
+            invite_business = (
+                await db.execute(
+                    select(Business).where(
+                        Business.id == invite.business_id, Business.deleted_at.is_(None)
+                    )
+                )
+            ).scalars().first()
+            return AuthMeResponse(
+                user_id=user.user_id,
+                business_id=None,
+                business_name=invite_business.name if invite_business else "",
+                currency="USD",
+                role="viewer",
+                email=user.email,
+                pending_invitation=TeamInviteOut(
+                    token=invite.token,
+                    email=invite.email,
+                    role=invite.role,
+                    status=invite.status,
+                    business_name=invite_business.name if invite_business else "",
+                    created_at=invite.created_at,
+                ),
+            )
+
+    # Brand-new owner: auto-provision on first contact.
+    business = Business(
+        name="My Business",
+        owner_id=user.user_id,
+        currency="USD",
+        created_by=user.user_id,
+    )
+    db.add(business)
+    await db.flush()
     return AuthMeResponse(
-        user_id=business.owner_id or "",
+        user_id=user.user_id,
         business_id=business.id,
         business_name=business.name,
-        currency=business.currency or "USD",
+        currency="USD",
+        role="owner",
+        email=user.email,
     )
+
+
+# ---------------------------------------------------------------------------
+# Team (TRD Ch17 §17.7) — memberships, roles, invitations
+# ---------------------------------------------------------------------------
+
+def _invite_out(invite, business_name: str) -> TeamInviteOut:
+    return TeamInviteOut(
+        token=invite.token,
+        email=invite.email,
+        role=invite.role,
+        status=invite.status,
+        business_name=business_name,
+        created_at=invite.created_at,
+    )
+
+
+@app.get("/team", response_model=TeamResponse, tags=["Team"])
+async def get_team(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> TeamResponse:
+    """Members + invitations for the tenant. Any member may read the roster;
+    management endpoints below are owner-only."""
+    members = (
+        (
+            await db.execute(
+                select(BusinessMember)
+                .where(BusinessMember.business_id == business.id)
+                .order_by(BusinessMember.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    invites = (
+        (
+            await db.execute(
+                select(BusinessInvitation)
+                .where(BusinessInvitation.business_id == business.id)
+                .order_by(BusinessInvitation.id.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return TeamResponse(
+        members=[
+            TeamMemberOut(
+                user_id=m.user_id,
+                email=m.email,
+                role=m.role,
+                joined_at=m.created_at,
+            )
+            for m in members
+        ],
+        invitations=[_invite_out(i, business.name) for i in invites],
+    )
+
+
+@app.post(
+    "/team/invites",
+    response_model=TeamInviteOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Team"],
+)
+async def create_team_invite(
+    payload: TeamInviteCreate,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> TeamInviteOut:
+    """Owner invites someone by email with one of the five future roles."""
+    email = payload.email.lower()
+    if business.owner_email and business.owner_email.lower() == email:
+        raise HTTPException(status_code=400, detail="That is the owner's email")
+    existing_member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == business.id,
+                BusinessMember.email == email,
+            )
+        )
+    ).scalars().first()
+    if existing_member is not None:
+        raise HTTPException(status_code=400, detail="That person is already a member")
+
+    token = secrets.token_urlsafe(24)
+    invite = BusinessInvitation(
+        business_id=business.id,
+        email=email,
+        role=payload.role,
+        token=token,
+        status="pending",
+        created_by=user.user_id,
+    )
+    db.add(invite)
+    await db.flush()
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "team",
+        invite.id,
+        "INVITE",
+        {"email": email, "role": payload.role},
+        actor=user.user_id,
+    )
+    return _invite_out(invite, business.name)
+
+
+@app.post("/team/invites/accept", response_model=TeamMemberOut, tags=["Team"])
+async def accept_team_invite(
+    payload: TeamInviteAccept,
+    user: ClerkUser = Depends(verify_clerk_token),
+    db: AsyncSession = Depends(get_db),
+) -> TeamMemberOut:
+    """The invited person claims the invite. Deliberately independent of
+    get_current_business: the invitee has no business yet."""
+    invite = (
+        await db.execute(
+            select(BusinessInvitation).where(BusinessInvitation.token == payload.token)
+        )
+    ).scalars().first()
+    if invite is None or invite.status != "pending":
+        raise HTTPException(status_code=400, detail="Invitation not found or no longer pending")
+    if user.email and invite.email != user.email.lower():
+        raise HTTPException(
+            status_code=403, detail="This invitation was sent to a different email"
+        )
+
+    business = (
+        await db.execute(
+            select(Business).where(
+                Business.id == invite.business_id, Business.deleted_at.is_(None)
+            )
+        )
+    ).scalars().first()
+    if business is None:
+        raise HTTPException(status_code=404, detail="The inviting business no longer exists")
+
+    member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == invite.business_id,
+                BusinessMember.user_id == user.user_id,
+            )
+        )
+    ).scalars().first()
+    if member is None:
+        member = BusinessMember(
+            business_id=invite.business_id,
+            user_id=user.user_id,
+            email=invite.email,
+            role=invite.role,
+            invited_by=invite.created_by,
+        )
+        db.add(member)
+        await db.flush()
+
+    invite.status = "accepted"
+    invite.accepted_by = user.user_id
+    await audit_mod.record_audit(
+        db,
+        invite.business_id,
+        "team",
+        invite.id,
+        "INVITE_ACCEPT",
+        {"email": invite.email, "role": invite.role},
+        actor=user.user_id,
+    )
+    return TeamMemberOut(
+        user_id=member.user_id,
+        email=member.email,
+        role=member.role,
+        joined_at=member.created_at,
+    )
+
+
+@app.delete("/team/invites/{token}", tags=["Team"])
+async def revoke_team_invite(
+    token: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> dict:
+    invite = (
+        await db.execute(
+            select(BusinessInvitation).where(
+                BusinessInvitation.token == token,
+                BusinessInvitation.business_id == business.id,
+            )
+        )
+    ).scalars().first()
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if invite.status == "pending":
+        invite.status = "revoked"
+        await audit_mod.record_audit(
+            db,
+            business.id,
+            "team",
+            invite.id,
+            "INVITE_REVOKE",
+            {"email": invite.email},
+            actor=user.user_id,
+        )
+    return {"ok": True}
+
+
+@app.patch("/team/members/{member_user_id}", response_model=TeamMemberOut, tags=["Team"])
+async def update_team_member_role(
+    member_user_id: str,
+    payload: TeamRoleUpdate,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> TeamMemberOut:
+    member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == business.id,
+                BusinessMember.user_id == member_user_id,
+            )
+        )
+    ).scalars().first()
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    member.role = payload.role
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "team",
+        member.id,
+        "MEMBER_ROLE",
+        {"user_id": member.user_id, "role": payload.role},
+        actor=user.user_id,
+    )
+    return TeamMemberOut(
+        user_id=member.user_id,
+        email=member.email,
+        role=member.role,
+        joined_at=member.created_at,
+    )
+
+
+@app.delete("/team/members/{member_user_id}", tags=["Team"])
+async def remove_team_member(
+    member_user_id: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> dict:
+    member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == business.id,
+                BusinessMember.user_id == member_user_id,
+            )
+        )
+    ).scalars().first()
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    await db.delete(member)
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "team",
+        member.id,
+        "MEMBER_REMOVE",
+        {"user_id": member.user_id, "role": member.role},
+        actor=user.user_id,
+    )
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

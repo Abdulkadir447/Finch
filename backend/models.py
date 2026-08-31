@@ -30,6 +30,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -513,3 +514,40 @@ class AnalyticsSnapshot(Base):
     metric_key = Column(String(50), nullable=False)
     metric_value = Column(Float)
     dimensions_json = Column(Text)
+
+
+# ---------------------------------------------------------------------------
+# Team model (TRD Ch17 §17.7) — memberships + invitations. The owner is the
+# businesses.owner_id row; these tables grant the five future roles.
+# ---------------------------------------------------------------------------
+class BusinessMember(Base):
+    """A non-owner user with a role inside one business."""
+
+    __tablename__ = "business_members"
+    __table_args__ = (UniqueConstraint("business_id", "user_id", name="uq_member_business_user"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, ForeignKey("businesses.id"), index=True, nullable=False)
+    user_id = Column(String(255), index=True, nullable=False)  # Clerk user id (sub)
+    email = Column(String(255), nullable=True)  # claimed at invitation accept
+    role = Column(String(20), nullable=False)   # manager|sales|inventory|accountant|viewer
+    invited_by = Column(String(255))            # Clerk user id of the inviter
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class BusinessInvitation(Base):
+    """A pending (or revoked) invite. Accepted invites become members."""
+
+    __tablename__ = "business_invitations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, ForeignKey("businesses.id"), index=True, nullable=False)
+    email = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False)
+    token = Column(String(64), unique=True, index=True, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending|accepted|revoked
+    created_by = Column(String(255))          # Clerk user id of the inviter
+    accepted_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    expires_at = Column(DateTime, nullable=True)
