@@ -47,3 +47,7 @@ Thumbs.db
 
 # OFFLINE 6 E2E build artifact (compiled renderer sync stack)
 electron/e2e/renderer/
+
+# Electron packaging
+/electron/renderer-dist/
+/electron/dist/

@@ -23,7 +23,7 @@ down.
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
 | Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
-| Tests | 122 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests) + 15 local-analytics port tests + a server↔local cross-check harness + 29 Electron data-layer/sync Node tests (incl. 4 OFFLINE 5 resolution primitives) + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
+| Tests | 155 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests, 6 rate-limit, 4 CORS, 6 audit, 7 backup, 5 AI-style) + 15 local-analytics port tests + 34 Electron data-layer/sync/backup Node tests + the OFFLINE 6 real-runtime E2E harness (46 scenarios: SIGKILL survival, exactly-once sync, conflict resolution, cold offline start) + tsc/build gates, all green locally. **CI fixed and committed on the working branch — activates once merged to `master` (see §4.1)** | `backend/tests/`, `frontend/test/`, `electron/test/`, `electron/e2e/`, `.github/workflows/ci.yml` |
 
 ## 2. The five parked areas — status and recommendation
 
@@ -286,21 +286,51 @@ acts copy in the AI composer. Residual ERP-feel:
 
 ## 4. Hardening backlog (before open launch)
 
-- [ ] **Apply the corrected CI workflow (Appendix A)** — needs repo-owner
-      push; until then no CI enforcement on `master`
+**Done in the v1-completion pass (2026-08-31):**
+
+- [x] **Apply the corrected CI workflow (Appendix A)** — the corrected
+      workflow is committed on the working branch as its final commit
+      (backend pytest + frontend tsc/build on push/PR to `master`). This
+      session's GitHub token cannot push workflow files (no `workflows`
+      permission — same finding as the original Appendix A note), so the
+      repo owner applies that commit (or the file in Appendix A) when
+      merging
+- [x] Per-tenant rate limiting on `/ai/chat` — sliding window per Clerk
+      user, `ai.rate_limit {requests, window_seconds}` in
+      `config/<env>.json`, 429 + Retry-After; disabled in testing
+- [x] `CORS_ORIGINS` explicit in production — production refuses to start
+      with an open CORS policy (env or `config/production.json`
+      `cors.origins` required); dev/testing keep `*`
+- [x] Audit log persistence + read view — every mutation (API + offline
+      sync push) writes a tenant-scoped row (migration 0008); `GET /audit`
+      + Settings → Audit Log
+- [x] Backup system (PRD Phase 4) — cloud JSON export/restore
+      (restore only into an empty business, 409 otherwise) + desktop local
+      SQLite backup/restore (refused while anything is unsynced) + Settings
+      → Backup & Restore
+- [x] Settings: implemented every "coming soon" section — Appearance
+      (light/dark/system), AI (answer style wired into the real prompt),
+      Notifications (in-app prefs), Security (Clerk account management),
+      Sync (live engine status), Audit Log, About (version/env)
+- [x] Desktop packaging configured — electron-builder (AppImage/NSIS/DMG),
+      `npm run dist`/`pack` in `electron/`; installers still need
+      verification on each real platform
+- [x] Decide + document offline-first scope (ADR-002, done in the previous
+      pass)
+
+**Still open:**
+
 - [ ] Lint tooling wired into CI (flake8/black/mypy for backend, eslint for
       frontend) — only after the codebase passes, or with an explicit
       grandfathering strategy
 - [ ] commitlint in CI (repo already has commitlint config locally)
-- [ ] Per-tenant rate limiting on `/ai/chat`
-- [ ] `CORS_ORIGINS` set explicitly in production config
-- [ ] Audit log persistence + read view
 - [ ] Team model (memberships, roles, invitations) before multi-seat sales
-- [ ] Daily business summary notification
-- [ ] Settings: implement or trim the "coming soon" sections
-- [ ] Decide + document offline-first scope (or adjust copy to "online web
-      app with desktop wrapper")
-- [ ] Payment provider integration (after the charging decision)
+- [ ] Daily business summary *delivery* (email/push) — the in-app summary
+      is live; real delivery channels are beyond v1 scope
+- [ ] Payment provider integration (after the charging decision — still
+      parked, nothing is charged)
+- [ ] Licensing decision — Settings → About states the project is
+      unlicensed (version/environment info is shown)
 
 ## 5. Pre-release checklist
 

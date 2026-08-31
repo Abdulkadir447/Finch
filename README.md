@@ -63,8 +63,22 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
 - **Real billing + credits** — plans and monthly AI-credit allowances are
   real server-side state; credits are computed from the `ai_usage` ledger
   (nothing mutable to drift) and enforced on every AI request (402 when
-  exhausted). Payment collection is the one deliberately unplugged part —
-  the UI says so.
+  exhausted, 429 when the per-tenant rate limit is exceeded). Payment
+  collection is the one deliberately unplugged part — the UI says so.
+- **Audit log** — every mutation (create/update/delete, stock adjustments,
+  order status changes, imports, plan changes, restores, and offline-synced
+  operations) writes an append-only, tenant-scoped audit row; Settings →
+  Audit Log shows the trail, newest first.
+- **Backup & Restore** — download a JSON snapshot of your business data
+  from the cloud (restore allowed only into an empty business — never a
+  merge), and in the desktop app back up / restore the device's local
+  SQLite database (refused while anything is unsynced, so nothing can be
+  lost).
+- **Complete Settings** — every section is real: Company, Appearance
+  (light/dark/system theme), AI (answer style: concise/standard/detailed —
+  read by the real system prompt), Notifications (in-app prefs), Security
+  (Clerk account management), Backup & Restore, Sync (live engine status),
+  Audit Log, About (version + environment).
 - **Multi-tenant** — Clerk authentication; every query is scoped to the
   caller's auto-provisioned business.
 - **Offline-first sync (OFFLINE 3 → 5)** — the desktop app mirrors your
@@ -121,7 +135,7 @@ Copy `.env.example` to `.env` and fill in real values. The important ones:
 | `DATABASE_URL` (or `SUPABASE_DB_URL`) | backend (prod + dev) | Supabase/Postgres connection string |
 | `CLERK_FRONTEND_API` | backend (prod) | Clerk Frontend API host used to verify session tokens |
 | `CLERK_ALLOWED_ORIGINS` | optional | Comma-separated `azp` allow-list |
-| `CORS_ORIGINS` | optional | Comma-separated CORS allow-list (defaults to `*`) |
+| `CORS_ORIGINS` | required in prod | Comma-separated CORS allow-list. Development/testing default to `*`; **production refuses to start** if neither this nor `cors.origins` in `config/production.json` is set |
 | `COOP_ENV` | optional | `development` (default) \| `testing` \| `production` |
 | `OPENAI_API_KEY` | optional | Enables the real AI assistant |
 | `OPENAI_MODEL` | optional | Model override (default from `config/*.json`) |
@@ -154,6 +168,15 @@ npm run dev
 
 Desktop wrapper (optional): `npm run start` from the repo root.
 
+Packaged desktop builds (electron-builder, produces AppImage / NSIS / DMG
+per platform):
+
+```bash
+cd electron
+npm install
+npm run dist      # or `npm run pack` for an unpacked build
+```
+
 ## Key API surface
 
 ```
@@ -165,8 +188,12 @@ Import      GET /imports/schema  POST /imports/preview /imports/map
 Reports     GET /reports/meta  GET /reports/{sales|profit-loss|inventory|customers}
             GET /reports/{key}/export?format=csv|xlsx|pdf
 AI          POST /ai/chat   (verified context, structured answer, 402 when out
-                             of credits)   GET /ai/usage
+                             of credits, 429 over the per-tenant rate limit)
+            GET /ai/usage
 Billing     GET /billing/summary   POST /billing/plan
+Backup      GET /backups/export (download JSON snapshot)
+            POST /backups/restore (into an EMPTY business only — 409 otherwise)
+Audit       GET /audit   (append-only activity trail, tenant-scoped)
 Onboarding  GET /onboarding/state
 Auth        /auth/me  /business/settings  /healthcheck
 ```
