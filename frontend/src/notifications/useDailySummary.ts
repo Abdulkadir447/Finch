@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useApiClient } from '../services/api/client';
+import { getNotificationPrefs, subscribeNotificationPrefs } from './prefs';
 
 export interface DailySummaryInsight {
   severity: 'info' | 'warning' | 'critical';
@@ -53,11 +54,19 @@ export interface DailySummaryState {
   data: DailySummary | null;
 }
 
-export function useDailySummary(): DailySummaryState & { reload: () => void } {
+export function useDailySummary(): DailySummaryState & { reload: () => void; enabled: boolean } {
   const api = useApiClient();
   const [state, setState] = useState<DailySummaryState>({ status: 'loading', data: null });
+  const [enabled, setEnabled] = useState<boolean>(() => getNotificationPrefs().dailySummary);
+
+  // The Settings → Notifications toggle gates the fetch itself.
+  useEffect(() => subscribeNotificationPrefs(() => setEnabled(getNotificationPrefs().dailySummary)), []);
 
   const reload = useCallback(async () => {
+    if (!getNotificationPrefs().dailySummary) {
+      setState({ status: 'loading', data: null });
+      return;
+    }
     try {
       const { data } = await api.get<DailySummary>('/notifications/daily-summary');
       setState({ status: 'ready', data });
@@ -69,7 +78,7 @@ export function useDailySummary(): DailySummaryState & { reload: () => void } {
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, enabled]);
 
-  return { ...state, reload };
+  return { ...state, reload, enabled };
 }

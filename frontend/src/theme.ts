@@ -338,7 +338,7 @@ export const dark: ThemeConfig = {
 };
 
 export const coopTheme = { light, dark };
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 // ---------------------------------------------------------------------------
 // Token re-exports — `src/theme.ts` (this file) is the module that shadows

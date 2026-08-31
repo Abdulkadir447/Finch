@@ -28,6 +28,7 @@ import { useCoopTheme } from '../../theme-provider';
 import { useApiClient } from '../../services/api/client';
 import { formatCurrency } from '../../pages/Dashboard/kpiConfig';
 import { useDailySummary, type DailySummary, type DailySummaryState } from '../../notifications/useDailySummary';
+import { getNotificationPrefs, subscribeNotificationPrefs } from '../../notifications/prefs';
 
 interface AlertItem {
   id: number;
@@ -48,7 +49,10 @@ type PanelState = AlertsData | 'loading' | 'error';
 // Daily summary section
 // ---------------------------------------------------------------------------
 
-const DailySummarySection: React.FC<{ summary: DailySummaryState }> = ({ summary }) => {
+const DailySummarySection: React.FC<{ summary: DailySummaryState; enabled: boolean }> = ({
+  summary,
+  enabled,
+}) => {
   const { colors } = useCoopTheme();
 
   const dateLabel = new Date().toLocaleDateString(undefined, {
@@ -64,13 +68,21 @@ const DailySummarySection: React.FC<{ summary: DailySummaryState }> = ({ summary
         <span style={{ ...type.labelCaps, color: colors.outline }}>{dateLabel}</span>
       </div>
 
-      {summary.status === 'loading' && (
-        <div style={{ padding: '10px 0 4px' }}>
-          <Skeleton active paragraph={{ rows: 2 }} title={false} />
+      {!enabled ? (
+        <div style={{ padding: '10px 0 2px', ...type.bodyCompact, color: colors.onSurfaceVariant }}>
+          Daily summary is paused — turn it back on in Settings → Notifications.
         </div>
-      )}
+      ) : (
+        <>
+          {summary.status === 'loading' && (
+            <div style={{ padding: '10px 0 4px' }}>
+              <Skeleton active paragraph={{ rows: 2 }} title={false} />
+            </div>
+          )}
 
-      {summary.status === 'ready' && summary.data && <DailySummaryBody summary={summary.data} />}
+          {summary.status === 'ready' && summary.data && <DailySummaryBody summary={summary.data} />}
+        </>
+      )}
       {/* A summary error is silent here — inventory alerts below remain the
           working notification surface; we don't stack error states. */}
       <div aria-hidden style={{ height: 8 }} />
@@ -268,7 +280,7 @@ const DailySummaryBody: React.FC<{ summary: DailySummary }> = ({ summary: s }) =
 // Inventory alerts section (unchanged behaviour)
 // ---------------------------------------------------------------------------
 
-const AlertsSection: React.FC<{ data: PanelState }> = ({ data }) => {
+const AlertsSection: React.FC<{ data: PanelState; paused?: boolean }> = ({ data, paused }) => {
   const { colors } = useCoopTheme();
   const navigate = useNavigate();
 
@@ -295,10 +307,12 @@ const AlertsSection: React.FC<{ data: PanelState }> = ({ data }) => {
     );
   }
 
-  const rows: Array<{ key: string; item: AlertItem; kind: 'low' | 'out' }> = [
-    ...data.out.map((item) => ({ key: `out-${item.id}`, item, kind: 'out' as const })),
-    ...data.low.map((item) => ({ key: `low-${item.id}`, item, kind: 'low' as const })),
-  ];
+  const rows: Array<{ key: string; item: AlertItem; kind: 'low' | 'out' }> = paused
+    ? []
+    : [
+        ...data.out.map((item) => ({ key: `out-${item.id}`, item, kind: 'out' as const })),
+        ...data.low.map((item) => ({ key: `low-${item.id}`, item, kind: 'low' as const })),
+      ];
 
   return (
     <div>
@@ -316,10 +330,14 @@ const AlertsSection: React.FC<{ data: PanelState }> = ({ data }) => {
 
       {rows.length === 0 ? (
         <div style={{ padding: `${spacing.lg}px ${spacing.md}px`, textAlign: 'center' }}>
-          <CheckCircleFilled style={{ fontSize: 26, color: colors.success }} />
-          <div style={{ ...type.titleMd, color: colors.onSurface, marginTop: 8 }}>You're all caught up</div>
+          <CheckCircleFilled style={{ fontSize: 26, color: paused ? colors.outline : colors.success }} />
+          <div style={{ ...type.titleMd, color: colors.onSurface, marginTop: 8 }}>
+            {paused ? 'Stock alerts are paused' : "You're all caught up"}
+          </div>
           <div style={{ ...type.bodyCompact, fontSize: 12, color: colors.onSurfaceVariant, marginTop: 4 }}>
-            No low-stock or out-of-stock items right now.
+            {paused
+              ? 'Turn stock alerts back on in Settings → Notifications.'
+              : 'No low-stock or out-of-stock items right now.'}
           </div>
         </div>
       ) : (
@@ -421,8 +439,16 @@ const NotificationsPopover: React.FC = () => {
   const [data, setData] = useState<PanelState>('loading');
   const [seen, setSeen] = useState(false);
   const [hover, setHover] = useState(false);
+  const [lowStockEnabled, setLowStockEnabled] = useState<boolean>(() => getNotificationPrefs().lowStock);
+
+  // Settings → Notifications toggle gates the stock-alert fetch itself.
+  useEffect(() => subscribeNotificationPrefs(() => setLowStockEnabled(getNotificationPrefs().lowStock)), []);
 
   const load = useCallback(async () => {
+    if (!getNotificationPrefs().lowStock) {
+      setData({ low: [], out: [] });
+      return;
+    }
     try {
       const [low, out] = await Promise.all([
         api.get('/products', { params: { stock: 'low', limit: 4 } }).then((r) => r.data.items as AlertItem[]),
@@ -445,7 +471,8 @@ const NotificationsPopover: React.FC = () => {
 
   // The unread dot reflects ALERTS only — the daily summary is an
   // informational digest and must not create fake urgency.
-  const hasAlerts = data !== 'loading' && data !== 'error' && (data.low.length > 0 || data.out.length > 0);
+  const hasAlerts =
+    lowStockEnabled && data !== 'loading' && data !== 'error' && (data.low.length > 0 || data.out.length > 0);
   const showDot = hasAlerts && !seen;
 
   return (
@@ -461,8 +488,8 @@ const NotificationsPopover: React.FC = () => {
       overlayInnerStyle={{ padding: 0, borderRadius: radius.lg }}
       content={
         <div style={{ width: 360 }}>
-          <DailySummarySection summary={summary} />
-          <AlertsSection data={data} />
+          <DailySummarySection summary={summary} enabled={summary.enabled} />
+          <AlertsSection data={data} paused={!lowStockEnabled} />
         </div>
       }
     >

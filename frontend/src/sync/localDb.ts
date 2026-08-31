@@ -86,8 +86,19 @@ export interface PushOutcome {
   failed: number;
 }
 
+export interface BackupBridgeResult {
+  ok: boolean;
+  canceled?: boolean;
+  path?: string;
+  error?: string;
+}
+
 interface CoopBridge {
   db?: LocalDb;
+  backup?: {
+    create: () => Promise<BackupBridgeResult>;
+    restore: () => Promise<BackupBridgeResult>;
+  };
   sync?: {
     status: () => Promise<LocalSyncStatus>;
     pendingOps: () => Promise<Array<SyncOp & { id?: number }>>;
@@ -185,3 +196,8 @@ export function onSyncStatus(cb: (s: LocalSyncStatus) => void): () => void {
 }
 
 export type { SyncOp, PullPayload, SyncPushResult, SyncConflictEntry };
+
+/** The desktop backup bridge, when running inside Electron. */
+export function getCoopBackup(): CoopBridge['backup'] {
+  return getCoop()?.backup;
+}

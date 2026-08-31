@@ -38,7 +38,7 @@ export interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPalette }) => {
-  const { colors, mode, toggle } = useCoopTheme();
+  const { colors, isDark, toggle } = useCoopTheme();
   const [searchHover, setSearchHover] = useState(false);
   const navigate = useNavigate();
   const name = user?.fullName || user?.firstName || 'Account';
@@ -54,7 +54,7 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
         alignItems: 'center',
         gap: spacing.md,
         padding: `0 ${spacing.lg}px`,
-        background: mode === 'dark' ? 'rgba(28, 28, 38, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+        background: isDark ? 'rgba(28, 28, 38, 0.85)' : 'rgba(255, 255, 255, 0.85)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderBottom: `1px solid ${colors.borderSubtle}`,
@@ -99,7 +99,7 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
           padding: `0 ${spacing.md}px`,
           borderRadius: radius.lg,
           border: `1px solid ${searchHover ? colors.outlineVariant : colors.borderSubtle}`,
-          background: mode === 'dark' ? colors.surfaceContainerLow : colors.surface,
+          background: isDark ? colors.surfaceContainerLow : colors.surface,
           cursor: 'text',
           transition: 'border-color 150ms, background-color 300ms',
           textAlign: 'left',
@@ -156,16 +156,16 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
           height: 34,
           padding: `0 ${spacing.md - 2}px`,
           borderRadius: radius.full,
-          border: `1px solid ${mode === 'dark' ? colors.primaryFixed : colors.primaryFixed}`,
-          background: mode === 'dark' ? 'rgba(122, 127, 255, 0.14)' : 'rgba(225, 224, 255, 0.45)',
+          border: `1px solid ${isDark ? colors.primaryFixed : colors.primaryFixed}`,
+          background: isDark ? 'rgba(122, 127, 255, 0.14)' : 'rgba(225, 224, 255, 0.45)',
           color: colors.primary,
           fontWeight: 600,
           fontSize: 13,
           cursor: 'pointer',
           transition: 'background-color 150ms',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = mode === 'dark' ? 'rgba(122, 127, 255, 0.24)' : colors.primaryFixed)}
-        onMouseLeave={(e) => (e.currentTarget.style.background = mode === 'dark' ? 'rgba(122, 127, 255, 0.14)' : 'rgba(225, 224, 255, 0.45)')}
+        onMouseEnter={(e) => (e.currentTarget.style.background = isDark ? 'rgba(122, 127, 255, 0.24)' : colors.primaryFixed)}
+        onMouseLeave={(e) => (e.currentTarget.style.background = isDark ? 'rgba(122, 127, 255, 0.14)' : 'rgba(225, 224, 255, 0.45)')}
       >
         <SparkleIcon size={15} color={colors.secondaryContainer} />
         <span className="coop-topbar-ai-label">AI Assistant</span>
@@ -181,8 +181,8 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
       <button
         type="button"
         onClick={toggle}
-        aria-label={mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        title={mode === 'dark' ? 'Light theme' : 'Dark theme'}
+        aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+        title={isDark ? 'Light theme' : 'Dark theme'}
         style={{
           width: 36,
           height: 36,
@@ -205,7 +205,7 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
           e.currentTarget.style.transform = 'rotate(0deg)';
         }}
       >
-        {mode === 'dark' ? <SunOutlined style={{ fontSize: 17 }} /> : <MoonOutlined style={{ fontSize: 16 }} />}
+        {isDark ? <SunOutlined style={{ fontSize: 17 }} /> : <MoonOutlined style={{ fontSize: 16 }} />}
       </button>
 
       {/* Account menu — profile area */}
