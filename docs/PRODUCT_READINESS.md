@@ -328,9 +328,15 @@ acts copy in the AI composer. Residual ERP-feel:
 - [x] commitlint in CI — done in code (`.commitlintrc.json` + root
       devDeps already existed; the workflow now validates every PR commit).
       Same pending owner push as above.
-- [ ] Team model (memberships, roles, invitations) before multi-seat sales
-- [ ] Daily business summary *delivery* (email/push) — the in-app summary
-      is live; real delivery channels are beyond v1 scope
+- [x] Team model (memberships, roles, invitations) — `business_members` +
+      `business_invitations` (migration 0010); owner invites by email, the
+      five future roles (manager/sales/inventory/accountant/viewer) are
+      enforced by a write matrix in get_current_business and mirrored
+      client-side; invitees join via the accept-or-sign-out gate.
+- [x] Daily business summary *delivery* (email) — SMTP-backed
+      `POST /notifications/summary/send` (owner/manager, rate-limited,
+      audited); the in-app summary remains the always-on channel. Push
+      channels stay beyond v1 scope.
 - [ ] Payment provider integration (after the charging decision — still
       parked, nothing is charged)
 - [ ] Licensing decision — Settings → About states the project is
