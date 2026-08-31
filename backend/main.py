@@ -45,7 +45,15 @@ from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
 from .config import get_env, load_config
 from .database import dispose_db, get_db, init_db
-from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
+from .models import (
+    Business,
+    Customer,
+    Order,
+    OrderItem,
+    Product,
+    StockMovement,
+    StockMovementReason,
+)
 from .schemas import (
     ALLOWED_CURRENCIES,
     ALLOWED_TIMEZONES,
@@ -73,7 +81,6 @@ from .schemas import (
     ProductUpdate,
     RevenueMonthResponse,
     RevenueTodayResponse,
-    StockMovementOut,
     TimeseriesPoint,
     TopProductItem,
 )
@@ -436,7 +443,12 @@ async def _change_stock(
     )
 
 
-@app.post("/products", response_model=ProductOut, status_code=status.HTTP_201_CREATED, tags=["Products"])
+@app.post(
+    "/products",
+    response_model=ProductOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Products"],
+)
 async def create_product(
     product: ProductCreate,
     business: Business = Depends(get_current_business),
@@ -453,7 +465,11 @@ async def create_product(
     if (await db.execute(stmt)).scalars().first():
         raise HTTPException(status_code=409, detail="SKU already exists")
 
-    new_product = Product(**product.model_dump(), business_id=business.id, created_by=business.owner_id)
+    new_product = Product(
+        **product.model_dump(),
+        business_id=business.id,
+        created_by=business.owner_id,
+    )
     db.add(new_product)
     try:
         await db.flush()
@@ -479,7 +495,9 @@ async def create_product(
 @app.get("/products", response_model=ProductListResponse, tags=["Products"])
 async def list_products(
     search: Optional[str] = Query(None, min_length=1),
-    low_stock: bool = Query(False, description="Only products in stock but at/below their reorder level"),
+    low_stock: bool = Query(
+        False, description="Only products in stock but at/below their reorder level"
+    ),
     stock: Optional[str] = Query(
         None, description="Stock status filter: in | low | out (Task 8)"
     ),
@@ -499,7 +517,10 @@ async def list_products(
         if stock == "out":
             base = base.where(Product.current_stock == 0)
         elif stock == "low":
-            base = base.where(Product.current_stock > 0, Product.current_stock <= Product.reorder_level)
+            base = base.where(
+                Product.current_stock > 0,
+                Product.current_stock <= Product.reorder_level,
+            )
         else:  # "in"
             base = base.where(Product.current_stock > Product.reorder_level)
     if search:
@@ -522,7 +543,9 @@ async def get_product(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> ProductOut:
-    stmt = select(Product).where(Product.id == id, Product.business_id == business.id, Product.deleted_at.is_(None))
+    stmt = select(Product).where(
+        Product.id == id, Product.business_id == business.id, Product.deleted_at.is_(None)
+    )
     product = (await db.execute(stmt)).scalars().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -626,13 +649,20 @@ async def inventory_summary(
     row = (await db.execute(
         select(
             func.count(Product.id),
-            func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
+            func.coalesce(
+                func.sum(
+                    Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)
+                ),
+                0.0,
+            ),
             func.coalesce(func.sum(_strictly_low_stock_case()), 0),
             func.coalesce(func.sum(_out_of_stock_case()), 0),
         ).where(*scope)
     )).one()
     categories = (await db.execute(
-        select(func.count(func.distinct(Product.category))).where(*scope, Product.category.is_not(None))
+        select(func.count(func.distinct(Product.category))).where(
+            *scope, Product.category.is_not(None)
+        )
     )).scalar() or 0
     return InventorySummary(
         products_count=row[0],
@@ -647,7 +677,12 @@ async def inventory_summary(
 # Customers CRUD (tenant-scoped)
 # ---------------------------------------------------------------------------
 
-@app.post("/customers", response_model=CustomerOut, status_code=status.HTTP_201_CREATED, tags=["Customers"])
+@app.post(
+    "/customers",
+    response_model=CustomerOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Customers"],
+)
 async def create_customer(
     customer: CustomerCreate,
     business: Business = Depends(get_current_business),
@@ -664,7 +699,11 @@ async def create_customer(
     if (await db.execute(stmt)).scalars().first():
         raise HTTPException(status_code=409, detail="Email already exists")
 
-    new_customer = Customer(**customer.model_dump(), business_id=business.id, created_by=business.owner_id)
+    new_customer = Customer(
+        **customer.model_dump(),
+        business_id=business.id,
+        created_by=business.owner_id,
+    )
     db.add(new_customer)
     await db.flush()
     await db.refresh(new_customer)
@@ -685,11 +724,17 @@ async def list_customers(
     db: AsyncSession = Depends(get_db),
 ) -> CustomerListResponse:
     """Paginated, searchable customer listing (Task 6 envelope)."""
-    base = select(Customer).where(Customer.business_id == business.id, Customer.deleted_at.is_(None))
+    base = select(Customer).where(
+        Customer.business_id == business.id, Customer.deleted_at.is_(None)
+    )
     if search:
         like = f"%{search.lower()}%"
         base = base.where(
-            or_(Customer.full_name.ilike(like), Customer.email.ilike(like), Customer.company.ilike(like))
+            or_(
+                Customer.full_name.ilike(like),
+                Customer.email.ilike(like),
+                Customer.company.ilike(like),
+            )
         )
 
     total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
@@ -706,7 +751,9 @@ async def get_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> CustomerOut:
-    stmt = select(Customer).where(Customer.id == id, Customer.business_id == business.id, Customer.deleted_at.is_(None))
+    stmt = select(Customer).where(
+        Customer.id == id, Customer.business_id == business.id, Customer.deleted_at.is_(None)
+    )
     customer = (await db.execute(stmt)).scalars().first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -792,7 +839,10 @@ async def _load_order(id: int, business: Business, db: AsyncSession) -> Order:
 
 
 def _serialize_order(order: Order) -> OrderOut:
-    from .schemas import OrderItemOut, OrderStatus as SchemaOrderStatus  # local import: avoids cycle at module load
+    from .schemas import (
+        OrderItemOut,
+        OrderStatus as SchemaOrderStatus  # local import: avoids cycle at module load,
+    )
 
     current = order.status.value if hasattr(order.status, "value") else str(order.status)
     allowed = [
@@ -949,7 +999,10 @@ async def list_orders(
 ) -> OrderListResponse:
     base = (
         select(Order)
-        .options(selectinload(Order.customer), selectinload(Order.items).selectinload(OrderItem.product))
+        .options(
+            selectinload(Order.customer),
+            selectinload(Order.items).selectinload(OrderItem.product),
+        )
         .where(Order.business_id == business.id, Order.deleted_at.is_(None))
     )
     if status_filter:
@@ -966,7 +1019,9 @@ async def list_orders(
     if end_date:
         base = base.where(Order.created_at <= end_date)
 
-    total = (await db.execute(select(func.count()).select_from(base.order_by(None).subquery()))).scalar() or 0
+    total = (
+        await db.execute(select(func.count()).select_from(base.order_by(None).subquery()))
+    ).scalar() or 0
     rows = (await db.execute(
         base.order_by(Order.id.desc()).offset((page - 1) * limit).limit(limit)
     )).scalars().all()
@@ -1062,7 +1117,11 @@ async def dashboard_summary(
     today = date.today()
     first_this = _first_day_of_month(today)
     first_next = _next_month_start(today)
-    first_last = date(today.year, today.month - 1, 1) if today.month > 1 else date(today.year - 1, 12, 1)
+    first_last = (
+        date(today.year, today.month - 1, 1)
+        if today.month > 1
+        else date(today.year - 1, 12, 1)
+    )
 
     bid = business.id
     order_scope = [Order.business_id == bid, Order.deleted_at.is_(None)]
@@ -1070,7 +1129,11 @@ async def dashboard_summary(
     # Revenue/orders today (delivered).
     today_row = (await db.execute(
         select(func.coalesce(func.sum(Order.total_amount), 0.0), func.count(Order.id))
-        .where(*order_scope, Order.status == "delivered", Order.order_date >= datetime.combine(today, time.min))
+        .where(
+            *order_scope,
+            Order.status == "delivered",
+            Order.order_date >= datetime.combine(today, time.min),
+        )
     )).one()
 
     # Revenue/orders this month (shipped + delivered).
@@ -1093,7 +1156,10 @@ async def dashboard_summary(
     # Profit this month: sum((unit_price - cost_price) * qty) over order items.
     profit = (await db.execute(
         select(func.coalesce(
-            func.sum((OrderItem.unit_price - func.coalesce(Product.cost_price, 0.0)) * OrderItem.quantity),
+            func.sum(
+                (OrderItem.unit_price - func.coalesce(Product.cost_price, 0.0))
+                * OrderItem.quantity
+            ),
             0.0,
         ))
         .join(Order, Order.id == OrderItem.order_id)
@@ -1108,7 +1174,12 @@ async def dashboard_summary(
     inv_row = (await db.execute(
         select(
             func.count(Product.id),
-            func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
+            func.coalesce(
+                func.sum(
+                    Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)
+                ),
+                0.0,
+            ),
             func.coalesce(func.sum(_strictly_low_stock_case()), 0),
             func.coalesce(func.sum(_out_of_stock_case()), 0),
         ).where(Product.business_id == bid, Product.deleted_at.is_(None))
@@ -1116,7 +1187,9 @@ async def dashboard_summary(
 
     # Customers.
     cust_total = (await db.execute(
-        select(func.count(Customer.id)).where(Customer.business_id == bid, Customer.deleted_at.is_(None))
+        select(func.count(Customer.id)).where(
+            Customer.business_id == bid, Customer.deleted_at.is_(None)
+        )
     )).scalar() or 0
     cust_new = (await db.execute(
         select(func.count(Customer.id)).where(
@@ -1170,7 +1243,11 @@ async def inventory_by_category(
 ) -> List[CategoryValue]:
     """Inventory value grouped by category for the donut chart."""
     category = func.coalesce(Product.category, "Uncategorized").label("category")
-    value = func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)).label("value")
+    value = (
+        func
+        .sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price))
+        .label("value")
+    )
     rows = (await db.execute(
         select(category, value)
         .where(Product.business_id == business.id, Product.deleted_at.is_(None))
@@ -1217,8 +1294,16 @@ async def growth_monthly_revenue(
 ) -> GrowthResponse:
     today = date.today()
     first_this = _first_day_of_month(today)
-    first_last = date(today.year, today.month - 1, 1) if today.month > 1 else date(today.year - 1, 12, 1)
-    scope = [Order.business_id == business.id, Order.deleted_at.is_(None), Order.status.in_(_ACTIVE_STATUSES)]
+    first_last = (
+        date(today.year, today.month - 1, 1)
+        if today.month > 1
+        else date(today.year - 1, 12, 1)
+    )
+    scope = [
+        Order.business_id == business.id,
+        Order.deleted_at.is_(None),
+        Order.status.in_(_ACTIVE_STATUSES),
+    ]
 
     this_rev = (await db.execute(
         select(func.coalesce(func.sum(Order.total_amount), 0.0)).where(
@@ -1234,7 +1319,9 @@ async def growth_monthly_revenue(
     )).scalar() or 0.0
 
     growth = round(((this_rev - last_rev) / last_rev) * 100, 2) if last_rev else None
-    return GrowthResponse(this_month_revenue=this_rev, last_month_revenue=last_rev, growth_percent=growth)
+    return GrowthResponse(
+        this_month_revenue=this_rev, last_month_revenue=last_rev, growth_percent=growth
+    )
 
 
 @app.get("/dashboard/low-stock", response_model=int, tags=["Dashboard"])
@@ -1425,7 +1512,11 @@ async def imports_validate(
         raise HTTPException(status_code=400, detail="Invalid mapping JSON.")
     data = await _read_upload(file)
     parsed = await _run_import_payload(
-        ImportRunRequest(entity=entity, mapping=mapping_dict), data, file.filename or "upload", business, db
+        ImportRunRequest(entity=entity, mapping=mapping_dict),
+        data,
+        file.filename or "upload",
+        business,
+        db,
     )
     v = await importer.validate_import(db, business.id, parsed, entity, mapping_dict)
     return {
@@ -1459,7 +1550,11 @@ async def imports_commit(
         raise HTTPException(status_code=400, detail="Invalid mapping JSON.")
     data = await _read_upload(file)
     parsed = await _run_import_payload(
-        ImportRunRequest(entity=entity, mapping=mapping_dict), data, file.filename or "upload", business, db
+        ImportRunRequest(entity=entity, mapping=mapping_dict),
+        data,
+        file.filename or "upload",
+        business,
+        db,
     )
     try:
         result = await importer.execute_import(db, business.id, parsed, entity, mapping_dict)
@@ -1468,7 +1563,10 @@ async def imports_commit(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="The import failed and was rolled back. No data was written.")
+        raise HTTPException(
+            status_code=400,
+            detail="The import failed and was rolled back. No data was written.",
+        )
     await audit_mod.record_audit(
         db, business.id, "import_batches", result.batch_id, "import",
         change={
@@ -1511,10 +1609,16 @@ async def onboarding_state(
     """Whether the tenant has any business data yet — drives the first-run
     "Welcome to Co-op" screen. A tenant counts as onboarded when it has at
     least one product, customer or order (imported or created live)."""
-    scope = lambda m: m.business_id == business.id, m.deleted_at.is_(None)  # noqa: E731
-    prod = (await db.execute(select(func.count()).select_from(Product).where(*scope(Product)))).scalar() or 0
-    cust = (await db.execute(select(func.count()).select_from(Customer).where(*scope(Customer)))).scalar() or 0
-    orders = (await db.execute(select(func.count()).select_from(Order).where(*scope(Order)))).scalar() or 0
+    scope = lambda m: (m.business_id == business.id, m.deleted_at.is_(None))  # noqa: E731
+    prod = (
+        await db.execute(select(func.count()).select_from(Product).where(*scope(Product)))
+    ).scalar() or 0
+    cust = (
+        await db.execute(select(func.count()).select_from(Customer).where(*scope(Customer)))
+    ).scalar() or 0
+    orders = (
+        await db.execute(select(func.count()).select_from(Order).where(*scope(Order)))
+    ).scalar() or 0
     return {
         "has_data": (prod + cust + orders) > 0,
         "products": prod,
@@ -1609,7 +1713,11 @@ async def ai_usage(
     """Real metered AI usage for the current calendar month (billing reads this)."""
     today = date.today()
     first = datetime.combine(today.replace(day=1), time.min)
-    nxt_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+    nxt_month = (
+        date(today.year + 1, 1, 1)
+        if today.month == 12
+        else date(today.year, today.month + 1, 1)
+    )
     last = datetime.combine(nxt_month, time.min)
     u = await ai_service.month_usage(db, business.id, first, last)
     return AiUsageResponse(
@@ -1633,7 +1741,9 @@ async def ai_forecast(
     as an estimate. No model call, no credits: a pure calculation over
     verified data, so it is free and instant.
     """
-    return await ai_forecast_mod.build_forecast(db, business.id, currency=business.currency or "USD")
+    return await ai_forecast_mod.build_forecast(
+        db, business.id, currency=business.currency or "USD"
+    )
 
 
 class AiHistoryItem(BaseModel):
@@ -1782,7 +1892,9 @@ async def sync_push(
 
 @app.get("/sync/pull", tags=["Sync"])
 async def sync_pull(
-    since: Optional[datetime] = Query(None, description="Delta cursor (ISO). Omit for a full dump."),
+    since: Optional[datetime] = Query(
+        None, description="Delta cursor (ISO). Omit for a full dump."
+    ),
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> dict:

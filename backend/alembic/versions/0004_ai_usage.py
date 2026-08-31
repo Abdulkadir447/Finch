@@ -38,7 +38,8 @@ def upgrade() -> None:
     )
     op.execute("CREATE INDEX IF NOT EXISTS idx_ai_usage_business ON ai_usage (business_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_ai_usage_request ON ai_usage (request_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ai_usage_business_created ON ai_usage (business_id, created_at)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_ai_usage_business_created ON ai_usage"
+        "(business_id, created_at)")
 
 
 def downgrade() -> None:

@@ -30,7 +30,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
     func,
     text,
 )
@@ -112,8 +111,10 @@ class Product(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
-    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
-    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
+    # provenance: NULL = created live
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)
+    # client-generated ULID (offline idempotency key)
+    client_id = Column(String(26), nullable=True, unique=True)
 
     order_items = relationship(
         "OrderItem",
@@ -159,8 +160,10 @@ class Customer(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
-    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
-    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
+    # provenance: NULL = created live
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)
+    # client-generated ULID (offline idempotency key)
+    client_id = Column(String(26), nullable=True, unique=True)
 
     orders = relationship(
         "Order",
@@ -232,7 +235,11 @@ class Order(Base):
     order_date = Column(DateTime, server_default=func.now())
     # native_enum=False keeps `status` a VARCHAR so the ORM-created schema
     # matches the Alembic baseline migration on every database (Task 11 / H4).
-    status = Column(SAEnum(OrderStatus, native_enum=False), default=OrderStatus.pending, nullable=False)
+    status = Column(
+        SAEnum(OrderStatus, native_enum=False),
+        default=OrderStatus.pending,
+        nullable=False,
+    )
     total_amount = Column(Float, nullable=False, default=0.0)
     created_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     updated_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
@@ -241,9 +248,12 @@ class Order(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
-    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
-    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
-    source_order_ref = Column(String(100), nullable=True)  # external order number from the old system (import idempotency)
+    # provenance: NULL = created live
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)
+    # client-generated ULID (offline idempotency key)
+    client_id = Column(String(26), nullable=True, unique=True)
+    # external order number from the old system (import idempotency)
+    source_order_ref = Column(String(100), nullable=True)
 
     customer = relationship("Customer", back_populates="orders")
     items = relationship(
@@ -275,8 +285,10 @@ class OrderItem(Base):
     deleted_at = Column(DateTime, nullable=True)          # soft delete (BSD Ch1.17 / Ch2.12)
     deleted_by = Column(String(255), nullable=True)   # BSD Ch2.12 soft delete actor
     version = Column(Integer, default=1, nullable=False)  # optimistic lock (BSD Ch1.17 / Ch2.9)
-    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)  # provenance: NULL = created live
-    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
+    # provenance: NULL = created live
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True)
+    # client-generated ULID (offline idempotency key)
+    client_id = Column(String(26), nullable=True, unique=True)
 
     order = relationship("Order", back_populates="items")
     product = relationship("Product", back_populates="order_items")
@@ -321,7 +333,8 @@ class StockMovement(Base):
     order_id = Column(Integer, nullable=True)                   # set for order-driven moves
     actor = Column(String(255))                                 # Clerk user id
     created_at = Column(DateTime, server_default=func.now())
-    client_id = Column(String(26), nullable=True, unique=True)  # client-generated ULID (offline idempotency key)
+    # client-generated ULID (offline idempotency key)
+    client_id = Column(String(26), nullable=True, unique=True)
 
     product = relationship("Product")
 
@@ -346,7 +359,8 @@ class AiUsage(Base):
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True, nullable=False)
     user_id = Column(String(255))  # Clerk user id
-    request_id = Column(String(64), index=True)  # idempotency key (client-generated or server-assigned)
+    # idempotency key (client-generated or server-assigned)
+    request_id = Column(String(64), index=True)
     model = Column(String(64))
     input_tokens = Column(Integer, default=0)
     output_tokens = Column(Integer, default=0)
@@ -355,7 +369,10 @@ class AiUsage(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<AiUsage business={self.business_id} model={self.model!r} credits={self.credits_used}>"
+        return (
+            f"<AiUsage business={self.business_id} model={self.model!r} "
+            f"credits={self.credits_used}>"
+        )
 
 
 class AiHistory(Base):
@@ -405,7 +422,8 @@ class Subscription(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     business_id = Column(Integer, index=True, nullable=False)
-    plan = Column(String(20), nullable=False, default="free")  # free | starter | professional | enterprise
+    # free | starter | professional | enterprise
+    plan = Column(String(20), nullable=False, default="free")
     status = Column(String(20), nullable=False, default="active")
     updated_by = Column(String(255), nullable=True)
     created_at = Column(DateTime, server_default=func.now())

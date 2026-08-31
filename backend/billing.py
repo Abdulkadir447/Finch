@@ -225,7 +225,9 @@ async def check_credits(db, business: Business) -> CreditState:
 # Plan changes (real state, no payment in this phase)
 # ---------------------------------------------------------------------------
 
-async def change_plan(db, business: Business, plan: str, actor: Optional[str] = None) -> Subscription:
+async def change_plan(
+    db, business: Business, plan: str, actor: Optional[str] = None
+) -> Subscription:
     """Switch the business's plan.
 
     Real server-side state (enforcement + remaining change immediately),

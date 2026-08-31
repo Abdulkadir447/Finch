@@ -52,7 +52,9 @@ NOTABLE_SWING_PCT = 20.0
 _SEVERITY_RANK = {"critical": 0, "warning": 1, "info": 2}
 
 
-async def _window_revenue_orders(db, business_id: int, start: dt.date, end: dt.date) -> tuple[float, int]:
+async def _window_revenue_orders(
+    db, business_id: int, start: dt.date, end: dt.date
+) -> tuple[float, int]:
     """(revenue, distinct order count) over [start, end] — reporting engine."""
     f = ReportFilters.from_query(from_str=start.isoformat(), to_str=end.isoformat())
     orders, rows = await _scoped_lines(db, business_id, f, start, end)
@@ -60,7 +62,9 @@ async def _window_revenue_orders(db, business_id: int, start: dt.date, end: dt.d
     return revenue, len(orders)
 
 
-def _month_to_date_points(today: dt.date) -> tuple[tuple[dt.date, dt.date], Optional[tuple[dt.date, dt.date]]]:
+def _month_to_date_points(
+    today: dt.date,
+) -> tuple[tuple[dt.date, dt.date], Optional[tuple[dt.date, dt.date]]]:
     """Current month-to-date window, plus the same-length previous-month
     window (None when today is the 1st — the previous window is zero-length)."""
     cur_start = today.replace(day=1)
@@ -94,7 +98,9 @@ async def build_daily_summary(db, business: Business) -> DailySummary:
     prev_mtd_rev: Optional[float] = None
     mtd_change: Optional[float] = None
     if prev_window:
-        prev_mtd_rev, _ = await _window_revenue_orders(db, business.id, prev_window[0], prev_window[1])
+        prev_mtd_rev, _ = await _window_revenue_orders(
+            db, business.id, prev_window[0], prev_window[1]
+        )
         mtd_change = _pct(mtd_rev, prev_mtd_rev) if prev_mtd_rev else None
     month_to_date = DailySummaryMonthToDate(
         revenue=round(mtd_rev, 2),
@@ -105,7 +111,10 @@ async def build_daily_summary(db, business: Business) -> DailySummary:
 
     # --- Notable sales change (day-over-day first, then month-to-date) -----
     notable_change: Optional[DailySummaryNotableChange] = None
-    if vs_yesterday.change_percent is not None and abs(vs_yesterday.change_percent) >= NOTABLE_SWING_PCT:
+    if (
+        vs_yesterday.change_percent is not None
+        and abs(vs_yesterday.change_percent) >= NOTABLE_SWING_PCT
+    ):
         direction = "up" if vs_yesterday.change_percent > 0 else "down"
         notable_change = DailySummaryNotableChange(
             direction=direction,
@@ -133,7 +142,12 @@ async def build_daily_summary(db, business: Business) -> DailySummary:
     low = [p for p in products if 0 < (p.current_stock or 0) <= (p.reorder_level or 0)]
     out = [p for p in products if (p.current_stock or 0) <= 0]
     low_items = [
-        DailySummaryLowItem(name=p.name, sku=p.sku or "", stock=p.current_stock or 0, reorder_level=p.reorder_level or 0)
+        DailySummaryLowItem(
+            name=p.name,
+            sku=p.sku or "",
+            stock=p.current_stock or 0,
+            reorder_level=p.reorder_level or 0,
+        )
         for p in sorted(low, key=lambda p: (p.current_stock or 0))[:5]
     ]
     out_items = [DailySummaryOutItem(name=p.name, sku=p.sku or "") for p in out[:5]]
@@ -176,7 +190,10 @@ async def build_daily_summary(db, business: Business) -> DailySummary:
     )
 
     if not has_data:
-        empty_message = "Once you import or record your first orders, your daily summary appears here."
+        empty_message = (
+            "Once you import or record your first orders, your daily summary "
+            "appears here."
+        )
     elif not notable:
         empty_message = (
             "Nothing notable today — no sales, no stock alerts, and the briefing has no warnings. "

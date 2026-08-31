@@ -1,0 +1,16 @@
+# ---------------------------------------------------------------------------
+# Python tooling configuration (lint gate — wired into CI).
+#
+# One tool: ruff (linter). Replaces the flake8 + isort combination with a
+# single fast pass; format/type gates (black formatting, mypy) remain
+# grandfathered — see docs/PRODUCT_READINESS.md §4 for the explicit
+# grandfathering strategy.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".venv", "backend/.venv", "electron/node_modules", "frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]

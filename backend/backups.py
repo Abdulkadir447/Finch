@@ -255,7 +255,8 @@ async def restore_backup(
             old_customer = int(row["customer_id"])
             if old_customer not in id_map["customers"]:
                 raise BackupValidationError(
-                    f"Backup order references customer id {old_customer} which is not in the backup."
+                    f"Backup order references customer id {old_customer} "
+                    "which is not in the backup."
                 )
             o = Order(
                 business_id=business.id,

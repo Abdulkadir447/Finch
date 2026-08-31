@@ -10,7 +10,13 @@ from sqlalchemy import func, select
 
 def _cust(cid, name="Grace", email="g@x.com"):
     return {"entity": "customer", "client_id": cid, "operation": "create",
-            "payload": {"full_name": name, "email": email, "phone": None, "company": None, "address": None}}
+            "payload": {
+                "full_name": name,
+                "email": email,
+                "phone": None,
+                "company": None,
+                "address": None,
+            }}
 
 
 def _prod(cid, name="Chair", sku="C1", price=100.0, stock=10):
@@ -19,7 +25,11 @@ def _prod(cid, name="Chair", sku="C1", price=100.0, stock=10):
     the create with its 'initial' movement, as the real client does."""
     return {"entity": "product", "client_id": cid, "operation": "create",
             "payload": {"name": name, "sku": sku, "unit_price": price, "cost_price": None,
-                        "current_stock": stock, "reorder_level": 5, "category": None, "description": None}}
+                        "current_stock": stock,
+                        "reorder_level": 5,
+                        "category": None,
+                        "description": None,
+                    }}
 
 
 def _prod_initial(cid, stock, cid_suffix="-INIT"):
@@ -66,10 +76,20 @@ async def test_update_and_delete_apply(session_factory):
         await sync.apply_push(db, biz_id, [_cust("CUST1", name="Grace")])
         upd = await sync.apply_push(db, biz_id, [
             {"entity": "customer", "client_id": "CUST1", "operation": "update",
-             "payload": {"full_name": "Grace H", "email": None, "phone": "555", "company": None, "address": None}},
+             "payload": {
+                 "full_name": "Grace H",
+                 "email": None,
+                 "phone": "555",
+                 "company": None,
+                 "address": None,
+             }},
         ])
         assert upd["applied"] == 1
-        row = (await db.execute(select(Customer).where(Customer.business_id == biz_id))).scalars().first()
+        row = (
+            (await db.execute(select(Customer).where(Customer.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert row.full_name == "Grace H"
         assert row.phone == "555"
 
@@ -77,7 +97,11 @@ async def test_update_and_delete_apply(session_factory):
             {"entity": "customer", "client_id": "CUST1", "operation": "delete", "payload": {}},
         ])
         assert dele["applied"] == 1
-        row = (await db.execute(select(Customer).where(Customer.business_id == biz_id))).scalars().first()
+        row = (
+            (await db.execute(select(Customer).where(Customer.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert row.deleted_at is not None, "delete soft-deletes"
         await db.commit()
 
@@ -89,7 +113,11 @@ async def test_stock_movement_applies_change_exactly_once(session_factory):
         # A -3 movement, pushed twice (retry) must apply only once.
         await sync.apply_push(db, biz_id, [_move("MOVE1", "PROD1", change=-3)])
         await sync.apply_push(db, biz_id, [_move("MOVE1", "PROD1", change=-3)])
-        p = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        p = (
+            (await db.execute(select(Product).where(Product.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert p.current_stock == 7, "the -3 movement must apply exactly once (10 -> 7)"
         moves = (await db.execute(
             select(StockMovement).where(StockMovement.business_id == biz_id))).scalars().all()
@@ -113,7 +141,11 @@ async def test_stock_cannot_go_negative(session_factory):
         assert c["client_id"] == "MOVE1"
         assert c["local"] == {"change": -5, "reason": "correction"}
         assert c["server"]["current_stock"] == 2
-        p = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        p = (
+            (await db.execute(select(Product).where(Product.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert p.current_stock == 2, "stock unchanged when the movement is refused"
         # Retrying the same op conflicts again (no partial, no duplicate).
         r2 = await sync.apply_push(db, biz_id, [_move("MOVE1", "PROD1", change=-5)])
@@ -137,9 +169,17 @@ async def test_order_resolves_customer_by_client_id(session_factory):
                          "quantity": 3, "unit_price": 100.0, "total_price": 300.0}},
         ])
         assert r["applied"] == 4, f"expected 4 applied, errors={r['errors']}"
-        order = (await db.execute(select(Order).where(Order.business_id == biz_id))).scalars().first()
+        order = (
+            (await db.execute(select(Order).where(Order.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert order.client_id == "ORD1"
-        item = (await db.execute(select(OrderItem).where(OrderItem.business_id == biz_id))).scalars().first()
+        item = (
+            (await db.execute(select(OrderItem).where(OrderItem.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert item.order_id == order.id
         assert item.product_id == (await db.execute(
             select(Product).where(Product.business_id == biz_id))).scalars().first().id
@@ -154,7 +194,12 @@ async def test_sync_push_endpoint_is_idempotent_over_http(api):
             {"entity": "customer", "client_id": "HTTPCUST1", "operation": "create",
              "payload": {"full_name": "Http Grace", "email": "h@x.com"}},
             {"entity": "product", "client_id": "HTTPPROD1", "operation": "create",
-             "payload": {"name": "Http Chair", "sku": "HC1", "unit_price": 50.0, "current_stock": 5}},
+             "payload": {
+                 "name": "Http Chair",
+                 "sku": "HC1",
+                 "unit_price": 50.0,
+                 "current_stock": 5,
+             }},
         ]
     }
     r1 = await api.client.post("/sync/push", json=batch)
@@ -287,7 +332,10 @@ async def test_order_status_update_applies_transition(session_factory):
     async with session_factory() as db:
         biz_id = 997
         r = await sync.apply_push(db, biz_id, [
-            _cust("CUST1"), _prod("PROD1", stock=10), *_prod_initial("PROD1", 10), _order("ORD1", "CUST1"),
+            _cust("CUST1"),
+            _prod("PROD1", stock=10),
+            *_prod_initial("PROD1", 10),
+            _order("ORD1", "CUST1"),
             # Cancellation: the order update + its stock restore (operation, rule 5).
             {"entity": "order", "client_id": "ORD1", "operation": "update",
              "payload": {"status": "cancelled"}},
@@ -295,10 +343,18 @@ async def test_order_status_update_applies_transition(session_factory):
         ])
         assert r["applied"] == 6, f"expected 6 applied, errors={r['errors']}"
 
-        order = (await db.execute(select(Order).where(Order.business_id == biz_id))).scalars().first()
+        order = (
+            (await db.execute(select(Order).where(Order.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert order.status.value == "cancelled"
 
-        prod = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        prod = (
+            (await db.execute(select(Product).where(Product.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert prod.current_stock == 12  # 10 + restore of 2, applied once
 
         # Retry the ENTIRE batch (crash + reconnect): nothing re-applies.
@@ -343,7 +399,11 @@ async def test_order_update_invalid_transition_is_rejected(session_factory):
         assert c["reason"] == "invalid_transition"
         assert c["local"] == {"status": "delivered"}
         assert c["server"]["status"] == "pending"
-        order = (await db.execute(select(Order).where(Order.business_id == biz_id))).scalars().first()
+        order = (
+            (await db.execute(select(Order).where(Order.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert order.status.value == "pending"
         await db.commit()
 
@@ -376,7 +436,11 @@ async def test_customer_email_conflict_on_create(session_factory):
         assert c["server"]["email"] == "dup@x.com"
         assert c["operation_id"] is None  # not supplied -> null, shape intact
         # Only CUST-A exists.
-        rows = (await db.execute(select(Customer).where(Customer.business_id == biz_id))).scalars().all()
+        rows = (
+            (await db.execute(select(Customer).where(Customer.business_id == biz_id)))
+            .scalars()
+            .all()
+        )
         assert [r.client_id for r in rows] == ["CUST-A"]
         await db.commit()
 
@@ -396,7 +460,11 @@ async def test_customer_email_conflict_on_update(session_factory):
         c = _email_conflict_entry(r, "CUST-B")
         assert c["reason"] == "email_conflict"
         assert c["server"]["client_id"] == "CUST-A"
-        b = (await db.execute(select(Customer).where(Customer.client_id == "CUST-B"))).scalars().first()
+        b = (
+            (await db.execute(select(Customer).where(Customer.client_id == "CUST-B")))
+            .scalars()
+            .first()
+        )
         assert b.email == "free@x.com", "the losing email is never written"
         await db.commit()
 
@@ -412,7 +480,11 @@ async def test_customer_same_name_is_not_identity(session_factory):
         ])
         assert r["applied"] == 2, "same name, different email -> two customers"
         assert r["conflicts"] == []
-        rows = (await db.execute(select(Customer).where(Customer.business_id == biz_id))).scalars().all()
+        rows = (
+            (await db.execute(select(Customer).where(Customer.business_id == biz_id)))
+            .scalars()
+            .all()
+        )
         assert {r.client_id for r in rows} == {"CUST-A", "CUST-B"}
         await db.commit()
 
@@ -441,7 +513,11 @@ async def test_product_sku_conflict(session_factory):
         ])
         c2 = _email_conflict_entry(r2, "PROD-B2")
         assert c2["reason"] == "sku_conflict"
-        b2 = (await db.execute(select(Product).where(Product.client_id == "PROD-B2"))).scalars().first()
+        b2 = (
+            (await db.execute(select(Product).where(Product.client_id == "PROD-B2")))
+            .scalars()
+            .first()
+        )
         assert b2.sku == "C2", "the conflicting SKU is never written"
         await db.commit()
 
@@ -492,7 +568,11 @@ async def test_duplicate_order_push_remains_idempotent(session_factory):
         n_orders = await _count(db, Order, biz_id)
         n_moves = await _count(db, StockMovement, biz_id)
         assert n_orders == 1 and n_moves == 2  # initial + order deduction, each once
-        prod = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        prod = (
+            (await db.execute(select(Product).where(Product.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         assert prod.current_stock == 8, "10 - 2, applied exactly once"
         await db.commit()
 
@@ -514,7 +594,15 @@ async def test_conflict_response_shape_and_operation_id(session_factory):
         assert body["failed"] == []
         assert body["errors"] == body["failed"], "errors stays a back-compat alias"
         c = _email_conflict_entry(body, "CUST-B")
-        assert set(c.keys()) == {"operation_id", "entity", "client_id", "reason", "error", "local", "server"}
+        assert set(c.keys()) == {
+            "operation_id",
+            "entity",
+            "client_id",
+            "reason",
+            "error",
+            "local",
+            "server",
+        }
         assert c["operation_id"] is None
 
         # With operation_id supplied, it is echoed back verbatim.
@@ -537,7 +625,11 @@ async def test_conflict_is_not_applied_on_retry(session_factory):
             r = await sync.apply_push(db, biz_id, [_cust("CUST-B", email="lock@x.com")])
             assert r["applied"] == 0
             assert len(r["conflicts"]) == 1 and r["conflicts"][0]["reason"] == "email_conflict"
-        rows = (await db.execute(select(Customer).where(Customer.business_id == biz_id))).scalars().all()
+        rows = (
+            (await db.execute(select(Customer).where(Customer.business_id == biz_id)))
+            .scalars()
+            .all()
+        )
         assert [r.client_id for r in rows] == ["CUST-A"], "the conflicting create never lands"
         await db.commit()
 

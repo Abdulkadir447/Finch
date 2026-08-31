@@ -31,7 +31,7 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    from backend.config import database_url, get_env
+    from backend.config import database_url
 
     try:
         return database_url()

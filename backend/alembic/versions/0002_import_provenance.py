@@ -35,11 +35,13 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS idx_import_batches_business ON import_batches (business_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_import_batches_business ON import_batches"
+        "(business_id)")
 
     for table in ("products", "customers", "orders", "order_items"):
         op.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS import_batch_id INTEGER")
-        op.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_import_batch ON {table} (import_batch_id)")
+        op.execute(f"CREATE INDEX IF NOT EXISTS idx_ {table} _import_batch ON {table}"
+            f"(import_batch_id)")
         op.execute(
             f"""
             DO $$ BEGIN

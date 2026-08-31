@@ -19,7 +19,7 @@ import datetime as _dt
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from .models import Customer, Order, OrderItem, Product
 
@@ -193,7 +193,9 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
         o = next((x for x in orders if x.id == it.order_id), None)
         if o is not None and o.customer_id is not None:
             cust_units.setdefault(o.customer_id, {})
-            cust_units[o.customer_id][it.product_id] = cust_units[o.customer_id].get(it.product_id, 0) + it.quantity
+            cust_units[o.customer_id][it.product_id] = (
+                cust_units[o.customer_id].get(it.product_id, 0) + it.quantity
+            )
 
     vip = sorted(cust_revenue.items(), key=lambda kv: -kv[1])[:5]
     vip_list = [
@@ -231,7 +233,10 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
         (p for p in products if 0 < p.current_stock <= (p.reorder_level or 0)),
         key=lambda p: -p.current_stock,
     )[:5]
-    out = sorted((p for p in products if (p.current_stock or 0) <= 0), key=lambda p: -prod_units.get(p.id, 0))[:5]
+    out = sorted(
+        (p for p in products if (p.current_stock or 0) <= 0),
+        key=lambda p: -prod_units.get(p.id, 0),
+    )[:5]
     low_count = sum(1 for p in products if 0 < p.current_stock <= (p.reorder_level or 0))
     out_count = sum(1 for p in products if (p.current_stock or 0) <= 0)
 
@@ -248,13 +253,19 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
             f"Your history is loaded: {total_orders} orders and {_money(total_revenue)} "
             f"across {total_customers} customers"
             if total_orders
-            else f"Your catalog is loaded: {total_products} products and {total_customers} customers"
+            else (
+                f"Your catalog is loaded: {total_products} products and "
+                f"{total_customers} customers"
+            )
         ),
         body=(
             (
-                f"Based on your imported history — {span_months} month{'s' if span_months != 1 else ''} of data "
-                f"({first_day.isoformat() if first_day else '—'} to {last_day.isoformat() if last_day else '—'}). "
-                "Everything below is computed from that history; live activity you add in Co-op joins it from today."
+                f"Based on your imported history — {span_months} "
+                f"month{'s' if span_months != 1 else ''} of data "
+                f"({first_day.isoformat() if first_day else '—'} to "
+                f"{last_day.isoformat() if last_day else '—'}). "
+                "Everything below is computed from that history; live activity "
+                "you add in Co-op joins it from today."
             )
             if total_orders
             else "Import your sales history to unlock revenue and customer insights."
@@ -273,7 +284,8 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
                 f"Revenue is {_pct(growth)} this month vs last month"
             ),
             body=(
-                f"{_money(rev_this)} so far this month ({month_orders.get(cur_month, 0)} orders) vs "
+                f"{_money(rev_this)} so far this month "
+                f"({month_orders.get(cur_month, 0)} orders) vs "
                 f"{_money(rev_last)} last month ({month_orders.get(last_month, 0)} orders)."
             ),
             evidence=f"month-to-date: {_money(rev_this)} · last month: {_money(rev_last)}",
@@ -309,7 +321,11 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
                 kind="product",
                 severity="warning",
                 title=f"Top 3 products make up {concentration:.0f}% of revenue",
-                body="Your revenue is concentrated in a few products. If one of them runs out or demand shifts, a large share of your sales is exposed.",
+                body=(
+                    "Your revenue is concentrated in a few products. If one of "
+                    "them runs out or demand shifts, a large share of your "
+                    "sales is exposed."
+                ),
                 evidence=f"top 3 share: {concentration:.0f}%",
                 link="/products",
             ))
@@ -318,7 +334,9 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
         target = inactive_top[0]
         # Most frequently purchased product for the target (for the action).
         top_prod_id = None
-        for pid, u in sorted(cust_units.get(target["customer_id"], {}).items(), key=lambda kv: -kv[1]):
+        for pid, u in sorted(
+            cust_units.get(target["customer_id"], {}).items(), key=lambda kv: -kv[1]
+        ):
             top_prod_id = pid
             break
         prod = prod_by_id.get(top_prod_id) if top_prod_id else None
@@ -330,10 +348,18 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
                 f"{target['name']} hasn't ordered in {target['days_since']} days"
             ),
             body=(
-                f"{'They were worth ' + _money(target['lifetime']) + ' in lifetime orders. ' if target['lifetime'] else ''}"
-                f"{len(inactive)} customer{'s' if len(inactive) != 1 else ''} in your history have gone quiet for 30+ days — a check-in now is the cheapest growth you have."
+                (
+                    f"They were worth {_money(target['lifetime'])} in lifetime orders. "
+                    if target["lifetime"]
+                    else ""
+                )
+                + f"{len(inactive)} customer{'s' if len(inactive) != 1 else ''} in your history "
+                + "have gone quiet for 30+ days — a check-in now is the cheapest growth you have."
             ),
-            evidence=f"last order {target['days_since']} days ago · {len(inactive)} inactive customers total",
+            evidence=(
+                f"last order {target['days_since']} days ago · "
+                f"{len(inactive)} inactive customers total"
+            ),
             link="/customers",
             action=(
                 {
@@ -362,9 +388,15 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
             id="inactive-customers",
             kind="customer",
             severity="info",
-            title=f"{len(inactive_top)} customer{'s' if len(inactive_top) != 1 else ''} haven't ordered in 30+ days",
+            title=(
+                f"{len(inactive_top)} customer{'s' if len(inactive_top) != 1 else ''} "
+                "haven't ordered in 30+ days"
+            ),
             body="A short check-in or a win-back offer is the cheapest growth available.",
-            evidence=f"most recent: {inactive_top[0]['name']} ({inactive_top[0]['days_since']} days)",
+            evidence=(
+                f"most recent: {inactive_top[0]['name']} "
+                f"({inactive_top[0]['days_since']} days)"
+            ),
             link="/customers",
         ))
 
@@ -377,10 +409,17 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
             title=(
                 f"{out_count} products out of stock and {low_count} at or below reorder level"
                 if out_count and low_count
-                else (f"{out_count} product{'s' if out_count != 1 else ''} out of stock" if out_count
-                      else f"{low_count} product{'s' if low_count != 1 else ''} at or below reorder level")
+                else (
+                    f"{out_count} product{'s' if out_count != 1 else ''} out of stock"
+                    if out_count
+                    else f"{low_count} product{'s' if low_count != 1 else ''} "
+                    "at or below reorder level"
+                )
             ),
-            body="These items can no longer be sold (or soon won't). Restock the top sellers first.",
+            body=(
+                "These items can no longer be sold (or soon won't). Restock the "
+                "top sellers first."
+            ),
             evidence=skus[:120],
             link="/inventory?stock=low",
         ))
@@ -396,9 +435,17 @@ async def build_briefing(db, business_id: int) -> dict[str, Any]:
             body=(
                 f"Compared {_money(margin_revenue)} of revenue against product cost prices "
                 f"(cost data covers {cost_coverage:.0f}% of sold lines). "
-                + ("" if blended_margin >= 25 else "Margins under 25% leave little room for discounts or errors.")
+                + (
+                    ""
+                    if blended_margin >= 25
+                    else "Margins under 25% leave little room for discounts "
+                    "or errors."
+                )
             ),
-            evidence=f"profit {_money(margin_total)} on {_money(margin_revenue)} margin-relevant revenue",
+            evidence=(
+                f"profit {_money(margin_total)} on {_money(margin_revenue)} "
+                "margin-relevant revenue"
+            ),
             link="/products",
         ))
 

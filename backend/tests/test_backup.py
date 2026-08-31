@@ -56,7 +56,7 @@ async def _seed_business(api) -> dict:
 
 @pytest.mark.asyncio
 async def test_export_snapshots_everything(api):
-    seeded = await _seed_business(api)
+    await _seed_business(api)
     resp = await api.client.get("/backups/export")
     assert resp.status_code == 200
     assert "coop-backup-" in resp.headers["content-disposition"]
@@ -74,7 +74,7 @@ async def test_export_snapshots_everything(api):
 
 @pytest.mark.asyncio
 async def test_restore_into_empty_business_rebuilds_data(api):
-    seeded = await _seed_business(api)
+    await _seed_business(api)
     backup = (await api.client.get("/backups/export")).json()
 
     api.set_user("user-b")  # fresh, empty tenant
@@ -169,7 +169,7 @@ async def test_export_is_tenant_scoped(api):
 
 @pytest.mark.asyncio
 async def test_restore_writes_an_audit_row(api):
-    seeded = await _seed_business(api)
+    await _seed_business(api)
     backup = (await api.client.get("/backups/export")).json()
     api.set_user("user-b")
     await api.client.post("/backups/restore", json=backup)

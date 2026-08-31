@@ -173,7 +173,10 @@ async def build_forecast(db, business_id: int, currency: str = "USD") -> dict[st
         "reason": None,
         "currency": currency,
         "as_of": today.isoformat(),
-        "method": "Least-squares trend over your completed months — a transparent calculation, not a machine-learning prediction.",
+        "method": (
+            "Least-squares trend over your completed months — a transparent "
+            "calculation, not a machine-learning prediction."
+        ),
         "months": months,
         "completed_months": len(completed),
         "required_months": MIN_COMPLETED_MONTHS,

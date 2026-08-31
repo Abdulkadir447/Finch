@@ -9,11 +9,10 @@ import datetime as dt
 
 import pytest
 from openpyxl import load_workbook
-from sqlalchemy import select
 
 from backend.exports import export_report
 from backend.models import (
-    Base, Business, Customer, Order, OrderItem, OrderStatus, Product, StockMovement,
+    Business, Customer, Order, OrderItem, OrderStatus, Product, StockMovement,
 )
 from backend.reports import FilterError, ReportFilters, build_report
 
@@ -97,7 +96,9 @@ async def test_sales_kpis(session_factory, seeded):
 async def test_sales_comparison_previous_period(session_factory, seeded):
     bid, _, _ = seeded
     async with session_factory() as db:
-        r = await build_report(db, bid, "sales", ReportFilters.from_query(compare="previous_period"))
+        r = await build_report(
+            db, bid, "sales", ReportFilters.from_query(compare="previous_period")
+        )
     rev = _kpi(r, "revenue")
     assert rev.value == 400.0
     assert rev.previous == 120.0            # the 40-day-ago Lamp order
@@ -213,7 +214,9 @@ async def test_empty_business_all_zero(session_factory):
 async def test_export_csv_matches_report(session_factory, seeded):
     bid, _, _ = seeded
     async with session_factory() as db:
-        r = await build_report(db, bid, "sales", ReportFilters.from_query(compare="previous_period"))
+        r = await build_report(
+            db, bid, "sales", ReportFilters.from_query(compare="previous_period")
+        )
     content, fname, ct = export_report(r, "csv")
     text = content.decode("utf-8")
     assert ct.startswith("text/csv")
@@ -226,7 +229,9 @@ async def test_export_csv_matches_report(session_factory, seeded):
 async def test_export_xlsx_summary_matches_report(session_factory, seeded):
     bid, _, _ = seeded
     async with session_factory() as db:
-        r = await build_report(db, bid, "sales", ReportFilters.from_query(compare="previous_period"))
+        r = await build_report(
+            db, bid, "sales", ReportFilters.from_query(compare="previous_period")
+        )
     content, fname, ct = export_report(r, "xlsx")
     wb = load_workbook(__import__("io").BytesIO(content))
     summary = wb["Summary"]
@@ -263,14 +268,22 @@ def test_unknown_format_rejected():
 # ---------------------------------------------------------------------------
 
 def test_previous_period_range():
-    f = ReportFilters.from_query(from_str="2026-08-01", to_str="2026-08-30", compare="previous_period")
+    f = ReportFilters.from_query(
+        from_str="2026-08-01",
+        to_str="2026-08-30",
+        compare="previous_period",
+    )
     prev = f.previous_range()
     # 30-day window ending the day before `from`, same length.
     assert prev == (dt.date(2026, 7, 2), dt.date(2026, 7, 31))
 
 
 def test_previous_month_range():
-    f = ReportFilters.from_query(from_str="2026-08-01", to_str="2026-08-30", compare="previous_month")
+    f = ReportFilters.from_query(
+        from_str="2026-08-01",
+        to_str="2026-08-30",
+        compare="previous_month",
+    )
     prev = f.previous_range()
     assert prev == (dt.date(2026, 7, 1), dt.date(2026, 7, 31))
 

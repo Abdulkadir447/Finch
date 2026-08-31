@@ -33,7 +33,8 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_business ON subscriptions (business_id)")
+    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_business ON subscriptions"
+        "(business_id)")
 
 
 def downgrade() -> None:

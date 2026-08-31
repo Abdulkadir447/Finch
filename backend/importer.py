@@ -126,7 +126,11 @@ PRODUCTS = DatasetSpec(
                                "collection"), _optional, "text"),
         "unit_price": FieldSpec("unit_price", "Selling price", True,
                                 ("unit_price", "price", "selling_price", "sale_price",
-                                 "price_usd", "retail_price", "mrp", "price_each"), _parse_money, "money"),
+                                 "price_usd",
+                                 "retail_price",
+                                 "mrp",
+                                 "price_each",
+                                 ), _parse_money, "money"),
         "cost_price": FieldSpec("cost_price", "Cost price", False,
                                 ("cost_price", "cost", "unit_cost", "cost_usd", "purchase_price",
                                  "cogs", "landed_cost", "buying_price"), _parse_money, "money"),
@@ -136,7 +140,11 @@ PRODUCTS = DatasetSpec(
                                    _parse_int, "int"),
         "reorder_level": FieldSpec("reorder_level", "Reorder level", False,
                                    ("reorder_level", "reorder_point", "min_stock", "min_quantity",
-                                    "reorder_qty", "reorder", "threshold", "min_level"), _parse_int, "int"),
+                                    "reorder_qty",
+                                    "reorder",
+                                    "threshold",
+                                    "min_level",
+                                    ), _parse_int, "int"),
     },
 )
 
@@ -181,7 +189,9 @@ ORDERS = DatasetSpec(
                                     "account_name", "customer_full_name"), _passthrough, "text"),
         "customer_email": FieldSpec("customer_email", "Customer email", False,
                                     ("customer_email", "buyer_email", "email", "client_email",
-                                     "customer_email_address", "email_address"), _optional, "email"),
+                                     "customer_email_address",
+                                     "email_address",
+                                     ), _optional, "email"),
         "customer_phone": FieldSpec("customer_phone", "Customer phone", False,
                                     ("customer_phone", "phone", "phone_number", "mobile",
                                      "buyer_phone", "client_phone", "contact_phone", "telephone",
@@ -237,7 +247,13 @@ def parse_file(filename: str, data: bytes) -> ParsedFile:
         elif lower.endswith(".xlsx"):
             parsed = _parse_xlsx(data)
         else:
-            return ParsedFile(filename, "unknown", [], [], error="Unsupported file type. Use .csv or .xlsx.")
+            return ParsedFile(
+                filename,
+                "unknown",
+                [],
+                [],
+                error="Unsupported file type. Use .csv or .xlsx.",
+            )
         parsed.filename = filename  # provenance: keep the real file name
         return parsed
     except Exception as e:  # noqa: BLE001 — report any parse failure to the user
@@ -332,7 +348,12 @@ def _is_dateish(v: str) -> bool:
 
 def _is_nameish(v: str) -> bool:
     s = v.strip()
-    return 2 <= len(s) <= 60 and not EMAIL_RE.match(s) and not _is_money(s) and re.search(r"[A-Za-z]", s)
+    return (
+        2 <= len(s) <= 60
+        and not EMAIL_RE.match(s)
+        and not _is_money(s)
+        and re.search(r"[A-Za-z]", s)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -519,7 +540,11 @@ def suggest_mapping(parsed: ParsedFile, dataset_key: str) -> list[SuggestedMappi
             elif spec.kind == "date" and _looks_like(vals, _is_dateish, 0.6):
                 score = max(score, 0.85)
                 hints.append("values look like dates")
-            elif spec.kind == "money" and _looks_like(vals, _is_money, 0.6) and _looks_like(vals, _is_intish, 0.0):
+            elif (
+                spec.kind == "money"
+                and _looks_like(vals, _is_money, 0.6)
+                and _looks_like(vals, _is_intish, 0.0)
+            ):
                 score = max(score, 0.7)
                 hints.append("values look like money")
             elif spec.kind == "int" and _looks_like(vals, _is_intish, 0.8):
@@ -548,7 +573,11 @@ def suggest_mapping(parsed: ParsedFile, dataset_key: str) -> list[SuggestedMappi
             label = "High" if score >= 0.85 else "Medium" if score >= 0.6 else "Review"
             result.append(SuggestedMapping(h, fi, round(score, 2), label, hints))
         else:
-            result.append(SuggestedMapping(h, None, 0.0, "Review", ["no confident match — pick a target or ignore"]))
+            result.append(
+                SuggestedMapping(
+                    h, None, 0.0, "Review", ["no confident match — pick a target or ignore"]
+                )
+            )
     return result
 
 
@@ -635,7 +664,11 @@ def _parse_product_row(row, field_col):
         name = _passthrough(_cell(row, field_col, "name"))
         price = _parse_money(_cell(row, field_col, "unit_price"))
     except ValueError as e:
-        field = "name" if "empty value" in str(e) and not _cell(row, field_col, "name").strip() else "unit_price"
+        field = (
+            "name"
+            if "empty value" in str(e) and not _cell(row, field_col, "name").strip()
+            else "unit_price"
+        )
         return None, f"missing/invalid {field}: {e}"
     rec: dict[str, Any] = {"name": name, "unit_price": price}
     try:
@@ -644,7 +677,11 @@ def _parse_product_row(row, field_col):
         rec["sku"] = ""
     for fkey in ("description", "category"):
         rec[fkey] = _optional(_cell(row, field_col, fkey))
-    for fkey, parse in (("cost_price", _parse_money), ("current_stock", _parse_int), ("reorder_level", _parse_int)):
+    for fkey, parse in (
+        ("cost_price", _parse_money),
+        ("current_stock", _parse_int),
+        ("reorder_level", _parse_int),
+    ):
         raw = _cell(row, field_col, fkey).strip()
         if not raw:
             rec[fkey] = None
@@ -738,7 +775,11 @@ async def validate_import(
         if err:
             errors.append({"row": row_no, "detail": err})
             # bucket by the leading field word ("invalid price", "missing/invalid order date"…)
-            key = err.split(":")[0].replace("missing/invalid", "missing").replace("invalid", "invalid")
+            key = (
+                err.split(":")[0]
+                .replace("missing/invalid", "missing")
+                .replace("invalid", "invalid")
+            )
             error_fields[key] = error_fields.get(key, 0) + 1
             continue
         records.append(rec)
@@ -752,7 +793,11 @@ async def validate_import(
         existing_skus = {
             r[0].lower() for r in (await db.execute(
                 select(Product.sku).where(Product.business_id == business_id,
-                                          Product.deleted_at.is_(None), Product.sku.is_not(None)))).all()
+                                          Product.deleted_at.is_(None),
+                                          Product.sku.is_not(None),
+                                          )
+                                          )
+                                          ).all()
         }
         existing_names = {
             r[0].lower() for r in (await db.execute(
@@ -766,7 +811,9 @@ async def validate_import(
                 duplicates["in_file"] += 1
                 continue
             seen.add(key)
-            if (rec["sku"] and rec["sku"].lower() in existing_skus) or (not rec["sku"] and rec["name"].lower() in existing_names):
+            if (rec["sku"] and rec["sku"].lower() in existing_skus) or (
+                not rec["sku"] and rec["name"].lower() in existing_names
+            ):
                 duplicates["existing"] += 1
                 continue
             would_create["products"] += 1
@@ -871,9 +918,11 @@ async def validate_import(
 
     warnings: list[str] = []
     if dataset_key == "customers" and field_col.get("email") is None:
-        warnings.append("No email column was mapped — placeholder emails will be generated for deduplication.")
+        warnings.append("No email column was mapped — placeholder emails will be generated for"
+            "deduplication.")
     if dataset_key == "orders":
-        warnings.append("Imported sales will be recorded as delivered history; current stock is NOT decremented.")
+        warnings.append("Imported sales will be recorded as delivered history; current stock is NOT"
+            "decremented.")
 
     return ImportValidation(
         dataset=dataset_key,
@@ -926,7 +975,11 @@ async def execute_import(
     if dataset_key == "products":
         existing_skus = {
             r[0].lower() for r in (await db.execute(select(Product.sku).where(
-                Product.business_id == business_id, Product.deleted_at.is_(None), Product.sku.is_not(None)))).all()
+                Product.business_id == business_id,
+                Product.deleted_at.is_(None),
+                Product.sku.is_not(None),
+            )
+        )).all()
         }
         existing_names = {
             r[0].lower() for r in (await db.execute(select(Product.name).where(
@@ -944,7 +997,9 @@ async def execute_import(
                 skipped["in_file"] += 1
                 continue
             seen.add(key)
-            if (rec["sku"] and rec["sku"].lower() in existing_skus) or (not rec["sku"] and rec["name"].lower() in existing_names):
+            if (rec["sku"] and rec["sku"].lower() in existing_skus) or (
+                not rec["sku"] and rec["name"].lower() in existing_names
+            ):
                 skipped["existing"] += 1
                 continue
             gen_n += 1
@@ -1002,7 +1057,8 @@ async def execute_import(
             db.add(c)
             created["customers"] += 1
         if field_col.get("email") is None:
-            warnings.append("No email column was mapped — placeholder emails were generated for deduplication.")
+            warnings.append("No email column was mapped — placeholder emails were generated for"
+                "deduplication.")
         if not created["customers"] and skipped["existing"] == 0:
             warnings.append("No new customers were created.")
 
@@ -1062,15 +1118,27 @@ async def execute_import(
             # with an instruction to disambiguate (see resolve_customer).
             customer, cust_status = resolve_customer(cust_idx, rec)
             if cust_status == "unknown_email":
-                row_error(row_no, f"customer email {rec['cust_email']!r} not found — import customers first or map the name only")
+                row_error(
+                    row_no,
+                    f"customer email {rec['cust_email']!r} not found — import customers "
+                    "first or map the name only",
+                )
                 continue
             if cust_status == "ambiguous_name":
                 ambiguous_name_rows += 1
-                row_error(row_no, f"multiple customers are named {rec['cust_name']!r} — add an email or phone column to disambiguate")
+                row_error(
+                    row_no,
+                    f"multiple customers are named {rec['cust_name']!r} — add an email or "
+                    "phone column to disambiguate",
+                )
                 continue
             if cust_status == "ambiguous_phone":
                 ambiguous_phone_rows += 1
-                row_error(row_no, "multiple customers share this phone number — add an email column to disambiguate")
+                row_error(
+                    row_no,
+                    "multiple customers share this phone number — add an email column "
+                    "to disambiguate",
+                )
                 continue
             if cust_status == "create":
                 gen_cust_n += 1
@@ -1094,19 +1162,30 @@ async def execute_import(
                 if len(cands) == 1:
                     product = cands[0]
                 elif len(cands) > 1:
-                    row_error(row_no, f"multiple products are named {rec['prod_name']!r} — map a SKU column to disambiguate")
+                    row_error(
+                        row_no,
+                        f"multiple products are named {rec['prod_name']!r} — map a SKU "
+                        "column to disambiguate",
+                    )
                     continue
             price = rec["price"]
             if product is None:
                 if price is None:
-                    row_error(row_no, "unknown product with no price to create from — import products first or map a price")
+                    row_error(
+                        row_no,
+                        "unknown product with no price to create from — import products "
+                        "first or map a price",
+                    )
                     continue
                 key = _norm_name(rec["prod_name"])
                 if key not in new_products:
                     gen_prod_n += 1
                     p = Product(
                         business_id=business_id, name=rec["prod_name"],
-                        sku=rec["prod_sku"] or f"IMP-{_slug(rec['prod_name'])[:24] or 'item'}-{gen_prod_n:03d}",
+                        sku=(
+                            rec["prod_sku"]
+                            or f"IMP-{_slug(rec['prod_name'])[:24] or 'item'}-{gen_prod_n:03d}"
+                        ),
                         unit_price=price, created_by="import", import_batch_id=batch.id)
                     db.add(p)
                     await db.flush()  # assign id so order items can reference it
@@ -1115,11 +1194,19 @@ async def execute_import(
             if price is None:
                 price = product.unit_price or 0.0
             if price <= 0:
-                row_error(row_no, "no selling price available — map a price column or import the product first")
+                row_error(
+                    row_no,
+                    "no selling price available — map a price column or import the "
+                    "product first",
+                )
                 continue
 
             dedup = (rec["cust_email"].lower() or rec["cust_name"].lower(), rec["date"],
-                     rec["prod_sku"].lower() or rec["prod_name"].lower(), rec["qty"], round(price, 2))
+                     (
+                         rec["prod_sku"].lower() or rec["prod_name"].lower(),
+                         rec["qty"],
+                         round(price, 2),
+                     ))
             if dedup in seen_rows:
                 skipped["in_file"] += 1
                 continue
@@ -1151,17 +1238,35 @@ async def execute_import(
             created["order_items"] += 1
 
         if ref_skipped:
-            warnings.append(f"{ref_skipped} rows already exist under the same order reference and were skipped.")
+            warnings.append(
+                f"{ref_skipped} rows already exist under the same order reference "
+                "and were skipped."
+            )
         if ambiguous_name_rows:
-            warnings.append(f"{ambiguous_name_rows} rows skipped — multiple customers share a name; add an email or phone column to disambiguate.")
+            warnings.append(
+                f"{ambiguous_name_rows} rows skipped — multiple customers share a "
+                "name; add an email or phone column to disambiguate."
+            )
         if ambiguous_phone_rows:
-            warnings.append(f"{ambiguous_phone_rows} rows skipped — multiple customers share a phone number; add an email column to disambiguate.")
+            warnings.append(
+                f"{ambiguous_phone_rows} rows skipped — multiple customers share a "
+                "phone number; add an email column to disambiguate."
+            )
         if gen_cust_n:
-            warnings.append(f"{gen_cust_n} customers had no email column — placeholder emails were generated.")
+            warnings.append(
+                f"{gen_cust_n} customers had no email column — placeholder emails "
+                "were generated."
+            )
         if gen_prod_n:
-            warnings.append(f"{gen_prod_n} products were created from order rows (price taken from the sale where available).")
+            warnings.append(
+                f"{gen_prod_n} products were created from order rows (price taken "
+                "from the sale where available)."
+            )
         if created["orders"]:
-            warnings.append("Imported sales were recorded as delivered history; current stock was NOT decremented.")
+            warnings.append(
+                "Imported sales were recorded as delivered history; current stock "
+                "was NOT decremented."
+            )
         if not created["orders"] and skipped["errors"] == 0:
             warnings.append("No orders were created.")
 

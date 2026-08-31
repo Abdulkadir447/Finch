@@ -14,7 +14,6 @@ degradation signal — AI never blocks core operations (TRD Ch1.8).
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Optional
 
 from pydantic import ValidationError
@@ -224,7 +223,10 @@ async def handle_chat(
     # visible rather than silent — honesty is the product here.
     message = parsed.message
     for r in rejected:
-        message += f"\n\n(Note: I couldn't prepare the requested {r['type'].lower()} — {r['reason']}.)"
+        message += (
+            f"\n\n(Note: I couldn't prepare the requested {r['type'].lower()} — "
+            f"{r['reason']}.)"
+        )
 
     result_dict = {
         "type": parsed.type,
