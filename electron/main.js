@@ -1,7 +1,9 @@
-const { app, BrowserWindow, session, ipcMain, net } = require('electron');
+const { app, BrowserWindow, session, ipcMain, net, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const { createDataLayer, defaultDbPath } = require('./db');
 const { createDataLayerApp } = require('./dataLayerApp');
+const { isSqliteFile, snapshot, replaceDbFile, assertRestoreSafe } = require('./db/backup');
 
 // ---------------------------------------------------------------------------
 // Content Security Policy for the Co-op desktop app.
@@ -84,8 +86,12 @@ function createWindow () {
     if (mainWindow === win) mainWindow = null;
   });
 
-  // Use an absolute path relative to this script (frontend/dist/index.html).
-  const indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+  // Packaged builds ship the renderer inside the app (scripts/copy-renderer.js
+  // copies frontend/dist -> electron/renderer-dist); dev runs load it from
+  // the repo's frontend/dist.
+  const packedIndex = path.join(__dirname, 'renderer-dist', 'index.html');
+  const devIndex = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
+  const indexPath = fs.existsSync(packedIndex) ? packedIndex : devIndex;
   win.loadFile(indexPath);
   return win;
 }
@@ -98,8 +104,70 @@ function createWindow () {
 // ---------------------------------------------------------------------------
 let dataLayer = null;
 let dataLayerApp = null; // createDataLayerApp(dataLayer) — shared handler surface
+let dataLayerPath = null; // the live SQLite file (backup/restore targets this)
 
 let mainWindow = null;
+
+// ---------------------------------------------------------------------------
+// Local database backup & restore (PRD Phase 4 "Backup system", desktop side).
+//
+// Back up = a consistent copy of the device's SQLite file to a user-chosen
+// location. Restore = replace the live database with a chosen backup — only
+// when the sync queue is empty (nothing unsynced or conflicted can be lost).
+// Restore rebuilds the data layer in place, so the running app switches to
+// the restored database without a relaunch.
+// ---------------------------------------------------------------------------
+
+function registerBackupIpc() {
+  ipcMain.handle('coop:backup', async (_event, { method }) => {
+    if (method === 'create') {
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Back up Co-op local database',
+        defaultPath: `coop-backup-${stamp}.db`,
+        filters: [{ name: 'SQLite database', extensions: ['db'] }],
+      });
+      if (canceled || !filePath) return { ok: false, canceled: true };
+      snapshot(dataLayer.db, filePath);
+      return { ok: true, path: filePath };
+    }
+
+    if (method === 'restore') {
+      const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        title: 'Restore Co-op local database',
+        properties: ['openFile'],
+        filters: [{ name: 'SQLite database', extensions: ['db'] }],
+      });
+      if (canceled || !filePaths || !filePaths.length) return { ok: false, canceled: true };
+      const srcPath = filePaths[0];
+      try {
+        if (!isSqliteFile(srcPath)) {
+          throw new Error('The selected file is not a valid Co-op local database.');
+        }
+        assertRestoreSafe(dataLayer);
+        dataLayer.close();
+        dataLayer = null; // the old layer is gone; a failure below must reopen
+        replaceDbFile(dataLayerPath, srcPath);
+        dataLayer = createDataLayer(dataLayerPath);
+        dataLayerApp = createDataLayerApp(dataLayer);
+        registerDataLayerIpc();
+        if (mainWindow && !mainWindow.isDestroyed()) broadcastSync(mainWindow);
+        return { ok: true };
+      } catch (e) {
+        if (dataLayerPath && !dataLayer) {
+          // The close happened before the failure — reopen so the app keeps
+          // working with its current database.
+          dataLayer = createDataLayer(dataLayerPath);
+          dataLayerApp = createDataLayerApp(dataLayer);
+          registerDataLayerIpc();
+        }
+        return { ok: false, error: e instanceof Error ? e.message : 'Restore failed.' };
+      }
+    }
+
+    throw new Error(`Blocked non-allow-listed backup method: ${method}`);
+  });
+}
 
 function broadcastSync(win) {
   if (dataLayerApp && win && !win.isDestroyed()) {
@@ -135,9 +203,11 @@ function watchConnectivity(win) {
 }
 
 app.whenReady().then(() => {
-  dataLayer = createDataLayer(defaultDbPath(app.getPath('userData')));
+  dataLayerPath = defaultDbPath(app.getPath('userData'));
+  dataLayer = createDataLayer(dataLayerPath);
   dataLayerApp = createDataLayerApp(dataLayer); // cold start: trust an existing mirror
   registerDataLayerIpc();
+  registerBackupIpc();
   const win = createWindow();
   mainWindow = win;
   watchConnectivity(win);

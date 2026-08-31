@@ -6,15 +6,55 @@
   "scripts": {
     "start": "npm run electron",
     "electron": "electron .",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "build:renderer": "npm --prefix ../frontend run build && node scripts/copy-renderer.js",
+    "pack": "npm run build:renderer && electron-builder --dir",
+    "dist": "npm run build:renderer && electron-builder"
   },
   "devDependencies": {
-    "electron": "^33.4.11"
-  },
-  "allowScripts": {
-    "electron@33.4.11": true
+    "electron": "^33.4.11",
+    "electron-builder": "^24.13.3"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0"
+  },
+  "build": {
+    "appId": "app.coop.desktop",
+    "productName": "Co-op",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "dataLayerApp.js",
+      "sync.js",
+      "db/**/*",
+      "renderer-dist/**/*",
+      "coop-icon.png",
+      "package.json"
+    ],
+    "asar": true,
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "author": "Co-op",
+  "allowScripts": {
+    "electron@33.4.11": true
   }
 }
