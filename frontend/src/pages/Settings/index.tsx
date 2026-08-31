@@ -10,7 +10,7 @@
  * the other sections own their state (theme, device prefs, Clerk, sync
  * store, backups, audit log).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Col, Menu, Row, message } from 'antd';
 import {
   AuditOutlined,
@@ -35,14 +35,18 @@ import BackupRestoreSection from './sections/BackupRestoreSection';
 import SyncSection from './sections/SyncSection';
 import AuditLogSection from './sections/AuditLogSection';
 import AboutSection from './sections/AboutSection';
+import TeamSection from './sections/TeamSection';
+import { useTeamRole } from '../../hooks/useTeamRole';
+import { TeamOutlined } from '@ant-design/icons';
 
 const SECTIONS = [
-  { key: 'company', label: 'Company', icon: <BankOutlined /> },
+  { key: 'company', label: 'Company', icon: <BankOutlined />, ownerOnly: true },
+  { key: 'team', label: 'Team', icon: <TeamOutlined />, teamVisible: true },
   { key: 'appearance', label: 'Appearance', icon: <SkinOutlined /> },
   { key: 'ai', label: 'AI', icon: <RobotOutlined /> },
   { key: 'notifications', label: 'Notifications', icon: <BellOutlined /> },
   { key: 'security', label: 'Security', icon: <KeyOutlined /> },
-  { key: 'backup', label: 'Backup & Restore', icon: <DatabaseOutlined /> },
+  { key: 'backup', label: 'Backup & Restore', icon: <DatabaseOutlined />, ownerOnly: true },
   { key: 'sync', label: 'Sync', icon: <CloudSyncOutlined /> },
   { key: 'audit', label: 'Audit Log', icon: <AuditOutlined /> },
   { key: 'about', label: 'About', icon: <InfoCircleOutlined /> },
@@ -50,8 +54,25 @@ const SECTIONS = [
 
 const SettingsPage: React.FC = () => {
   const [messageApi, messageCtx] = message.useMessage();
+  const role = useTeamRole();
   const [active, setActive] = useState('company');
   const { settings, loading, saving, error, save } = useSettings();
+
+  // Client-side mirror of the backend matrix: owner-only sections hidden
+  // for every other role (backend 403s anyway).
+  const visibleSections = SECTIONS.filter((sec) => {
+    if (role == null) return !sec.ownerOnly;
+    if (sec.ownerOnly) return role === 'owner';
+    if (sec.teamVisible) return role === 'owner' || role === 'manager';
+    return true;
+  });
+
+  useEffect(() => {
+    // First visit by a non-owner must not land on an owner-only section.
+    if (visibleSections.every((sec) => sec.key !== active)) {
+      setActive(visibleSections[0]?.key ?? 'about');
+    }
+  }, [active, role, visibleSections]);
 
   const renderSection = () => {
     switch (active) {
@@ -73,6 +94,8 @@ const SettingsPage: React.FC = () => {
         return <SyncSection />;
       case 'audit':
         return <AuditLogSection />;
+      case 'team':
+        return <TeamSection messageApi={messageApi} />;
       case 'about':
         return <AboutSection />;
       default:
@@ -104,7 +127,7 @@ const SettingsPage: React.FC = () => {
               mode="inline"
               selectedKeys={[active]}
               onClick={(e) => setActive(e.key)}
-              items={SECTIONS.map((s) => ({ key: s.key, icon: s.icon, label: s.label }))}
+              items={visibleSections.map((s) => ({ key: s.key, icon: s.icon, label: s.label }))}
               style={{ border: 'none' }}
             />
           </CoopCard>

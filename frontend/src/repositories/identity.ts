@@ -14,11 +14,24 @@
 import type { AxiosInstance } from 'axios';
 import { getLocalDb } from '../sync/localDb';
 
+export interface TeamInviteIdentity {
+  token: string;
+  email: string;
+  role: string;
+  status: string;
+  business_name: string;
+}
+
 export interface BusinessIdentity {
   user_id: string;
-  business_id: number;
+  /** Null while a pending team invitation awaits acceptance. */
+  business_id: number | null;
   business_name: string;
   currency: string;
+  /** owner | manager | sales | inventory | accountant | viewer */
+  role: string;
+  email: string | null;
+  pending_invitation: TeamInviteIdentity | null;
 }
 
 let cachedIdentity: BusinessIdentity | null = null;
@@ -52,6 +65,9 @@ export function fetchIdentity(api: AxiosInstance): Promise<BusinessIdentity> {
 export async function localBusinessId(api: AxiosInstance): Promise<number> {
   if (cachedLocalBizId != null) return cachedLocalBizId;
   const identity = await fetchIdentity(api);
+  if (identity.business_id == null) {
+    throw new Error('Accept the pending team invitation first');
+  }
   const db = getLocalDb();
   if (!db) throw new Error('Local data layer unavailable');
   const row = await db.businessEnsure({
@@ -81,9 +97,14 @@ export async function localBusinessIdLocal(): Promise<number> {
   return cachedLocalBizId;
 }
 
-/** Test/teardown helper: clear the module-level caches. */
-export function _resetIdentityCacheForTests() {
+/** Clear the caches (after accepting an invitation the identity changes). */
+export function clearIdentityCache() {
   cachedIdentity = null;
   inflight = null;
   cachedLocalBizId = null;
+}
+
+/** Test/teardown helper: clear the module-level caches. */
+export function _resetIdentityCacheForTests() {
+  clearIdentityCache();
 }

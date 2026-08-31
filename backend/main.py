@@ -235,6 +235,22 @@ async def get_current_business(
                 )
             role = member.role
         else:
+            if user.email:
+                pending = (
+                    await db.execute(
+                        select(BusinessInvitation)
+                        .where(
+                            BusinessInvitation.email == user.email.lower(),
+                            BusinessInvitation.status == "pending",
+                        )
+                        .limit(1)
+                    )
+                ).scalars().first()
+                if pending is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="You have a pending team invitation — accept it first",
+                    )
             business = Business(
                 name="My Business",
                 owner_id=user.user_id,

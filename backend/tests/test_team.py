@@ -56,6 +56,24 @@ async def test_accept_rejects_wrong_email(api):
 
 
 @pytest.mark.asyncio
+async def test_pending_invitee_cannot_burn_the_invite(api):
+    await _owner_business(api)
+    await _invite(api, "waiting@example.com", role="viewer")
+
+    # Business endpoints must refuse (409) instead of auto-provisioning a
+    # fresh business that would hide the invitation forever.
+    api.set_user("user-waiting", email="waiting@example.com")
+    resp = await api.client.get("/onboarding/state")
+    assert resp.status_code == 409
+    resp = await api.client.get("/products")
+    assert resp.status_code == 409
+
+    me = (await api.client.get("/auth/me")).json()
+    assert me["business_id"] is None
+    assert me["pending_invitation"] is not None
+
+
+@pytest.mark.asyncio
 async def test_accept_rejects_revoked_token(api):
     await _owner_business(api)
     invite = await _invite(api, "revoked@example.com", role="viewer")

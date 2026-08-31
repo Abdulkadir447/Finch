@@ -17,6 +17,9 @@ import { AppShell } from './components/layout';
 import { CoopMark } from './components/brand/CoopLogo';
 import { startSyncEngine } from './sync/engine';
 import { isLocalAvailable } from './sync/localDb';
+import { fetchIdentity } from './repositories/identity';
+import type { TeamInviteIdentity } from './repositories/identity';
+import InviteJoinCard from './pages/Team/InviteJoinCard';
 
 // Route-level code splitting (Stage 2.4 performance QA): each module loads
 // on demand instead of shipping everything in one initial bundle.
@@ -289,9 +292,28 @@ const CurrencySeeder: React.FC = () => {
 // ---------------------------------------------------------------------------
 const RootGate: React.FC = () => {
   const api = useApiClient();
+  const [invite, setInvite] = useState<TeamInviteIdentity | null>(null);
+  const [identityResolved, setIdentityResolved] = useState(false);
   const [hasData, setHasData] = useState<boolean | null>(null);
 
+  // Identity first: a pending invitation takes over the gate — the invitee
+  // has no business yet and must not touch business endpoints (they 409).
   useEffect(() => {
+    let cancelled = false;
+    fetchIdentity(api)
+      .then((me) => {
+        if (cancelled) return;
+        if (me.pending_invitation) setInvite(me.pending_invitation);
+        setIdentityResolved(true);
+      })
+      .catch(() => !cancelled && setIdentityResolved(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (!identityResolved || invite) return undefined;
     let cancelled = false;
     api
       .get<{ has_data: boolean }>('/onboarding/state')
@@ -300,9 +322,22 @@ const RootGate: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [api]);
+  }, [api, identityResolved, invite]);
 
-  if (hasData === null) return <RouteFallback />;
+  if (!identityResolved || hasData === null) return <RouteFallback />;
+  if (invite) {
+    return (
+      <InviteJoinCard
+        invite={invite}
+        onDone={() => {
+          setInvite(null);
+          setIdentityResolved(false);
+          setHasData(null);
+          fetchIdentity(api).catch(() => undefined); // re-cache under the new identity
+        }}
+      />
+    );
+  }
   if (!hasData) return <Navigate to="/welcome" replace />;
   return <DashboardPage />;
 };
