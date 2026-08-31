@@ -320,10 +320,14 @@ acts copy in the AI composer. Residual ERP-feel:
 
 **Still open:**
 
-- [ ] Lint tooling wired into CI (flake8/black/mypy for backend, eslint for
-      frontend) — only after the codebase passes, or with an explicit
-      grandfathering strategy
-- [ ] commitlint in CI (repo already has commitlint config locally)
+- [x] Lint tooling wired into CI — done in code: ruff for the backend
+      (`pyproject.toml`, E/F/W at line-length 100, full suite green),
+      eslint 9 + typescript-eslint for the frontend (`npm run lint`, zero
+      findings on src + test). The CI workflow file itself is the pending
+      owner push below (Appendix A).
+- [x] commitlint in CI — done in code (`.commitlintrc.json` + root
+      devDeps already existed; the workflow now validates every PR commit).
+      Same pending owner push as above.
 - [ ] Team model (memberships, roles, invitations) before multi-seat sales
 - [ ] Daily business summary *delivery* (email/push) — the in-app summary
       is live; real delivery channels are beyond v1 scope
@@ -344,24 +348,25 @@ acts copy in the AI composer. Residual ERP-feel:
 
 ---
 
-## Appendix A — Pending CI fix (requires repo-owner push)
+## Appendix A — Pending CI update (requires repo-owner push)
 
 The agent token used in this session lacks GitHub `workflows` permission,
-so the CI fix below **could not be committed** and is recorded here for the
-repo owner to apply (replace `.github/workflows/ci.yml`, then push).
-Everything else in this pass is already committed.
+so the updated workflow below **could not be committed** and is recorded
+here for the repo owner to apply (replace `.github/workflows/ci.yml`, then
+push). Everything else in this pass is already committed.
 
 ```yaml
 name: CI
 
-# Co-op's enforced gates — the ones the repo actually maintains:
-#   backend  — full pytest suite (incl. the frontend<->backend contract test,
-#              which needs the whole repo, so it runs from the repo root)
-#   frontend — TypeScript check + production build
+# Co-op's enforced gates:
+#   backend    — ruff lint (E/F/W, line-length 100) + full pytest suite
+#                (incl. the frontend<->backend contract test, which needs the
+#                whole repo, so everything runs from the repo root)
+#   frontend   — eslint + TypeScript check + production build
+#   commitlint — conventional-commit shape of every commit in the PR
 #
-# Lint tooling (flake8/black/mypy, eslint/prettier) and commitlint are NOT
-# wired here yet — see docs/PRODUCT_READINESS.md (hardening backlog). A gate
-# that can't pass (or can't fail) doesn't belong in CI.
+# A gate that can't pass (or can't fail) doesn't belong in CI: each of these
+# is green on the current tree and is kept green locally by the same commands.
 
 on:
   push:
@@ -378,7 +383,7 @@ env:
 
 jobs:
   backend:
-    name: Backend tests
+    name: Backend lint + tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -391,13 +396,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio ruff
+
+      - name: Lint (ruff E/F/W)
+        run: ruff check backend/
 
       - name: Run test suite
         run: python -m pytest
 
   frontend:
-    name: Frontend type-check + build
+    name: Frontend lint + type-check + build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -412,6 +420,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Lint (eslint)
+        working-directory: frontend
+        run: npm run lint
+
       - name: Type check
         working-directory: frontend
         run: npx tsc --noEmit -p tsconfig.json
@@ -419,4 +431,27 @@ jobs:
       - name: Production build
         working-directory: frontend
         run: npm run build
+
+  commitlint:
+    name: Commit messages (conventional)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate PR commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: npx commitlint --from "$BASE_SHA" --to HEAD --verbose
 ```
