@@ -63,6 +63,10 @@ class Business(Base):
     tax_id = Column(String(100))
     website = Column(String(255))
     timezone = Column(String(64))
+    # Ask Co-op answer style preference (0009): concise | standard | detailed.
+    ai_response_style = Column(
+        String(20), default="standard", server_default="standard", nullable=False
+    )
     created_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     updated_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
     created_at = Column(DateTime, server_default=func.now())
@@ -468,6 +472,7 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True)          # tenant scoping (0008)
     table_name = Column(String(50), nullable=False)
     record_id = Column(Integer, nullable=True)
     action = Column(String(20), nullable=False)        # INSERT | UPDATE | DELETE

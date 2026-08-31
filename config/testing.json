@@ -24,7 +24,11 @@
     "model": "gpt-4o-mini",
     "credits_per_request": 1,
     "free_output_tokens": 500,
-    "credits_per_1k_output_tokens": 1
+    "credits_per_1k_output_tokens": 1,
+    "rate_limit": {
+      "requests": 0,
+      "window_seconds": 60
+    }
   },
   "features": {
     "dashboard": true,

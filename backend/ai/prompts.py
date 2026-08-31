@@ -17,6 +17,21 @@ ALLOWED_PERIODS = ("this_month", "last_month", "last_30_days", "previous_30_days
 ALLOWED_SOURCES = ("orders", "products", "customers", "inventory")
 ALLOWED_KINDS = ("fact", "calculation", "forecast", "suggestion", "draft", "clarify")
 
+# The owner's Ask Co-op answer-style preference (Settings — AI Preferences).
+ALLOWED_AI_RESPONSE_STYLES = ("concise", "standard", "detailed")
+
+_STYLE_GUIDANCE = {
+    "concise": (
+        "\nSTYLE PREFERENCE: be extra concise — at most 1-3 very short bullets "
+        "or sentences. Skip any explanation the owner did not ask for."
+    ),
+    "standard": "",
+    "detailed": (
+        "\nSTYLE PREFERENCE: be detailed — explain the reasoning step by step, "
+        "use more of the context's numbers, and cover follow-up angles."
+    ),
+}
+
 # Uses __TOKEN__ placeholders (not str.format) because the answer contract
 # below contains literal JSON braces that would otherwise collide.
 SYSTEM_PROMPT = """You are the Co-op AI advisor for one small business.
@@ -57,14 +72,16 @@ ACTION REGISTRY — the ONLY actions you may propose:
 You never propose any other action. You never modify data. You never contact anyone."""
 
 
-def build_system_prompt() -> str:
-    return (
+def build_system_prompt(style: str = "standard") -> str:
+    base = (
         SYSTEM_PROMPT
         .replace("__KINDS__", ", ".join(ALLOWED_KINDS))
         .replace("__PERIODS__", ", ".join(ALLOWED_PERIODS))
         .replace("__SOURCES__", ", ".join(ALLOWED_SOURCES))
         .replace("__LINK_TARGETS__", ", ".join(ALLOWED_LINK_TARGETS))
     )
+    guidance = _STYLE_GUIDANCE.get(style, "")
+    return base + guidance if guidance else base
 
 
 REPAIR_PROMPT = (

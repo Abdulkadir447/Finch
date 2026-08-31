@@ -22,6 +22,7 @@ from typing import Any, Optional
 
 from sqlalchemy import select
 
+from .audit import record_audit
 from .models import (
     Customer,
     Order,
@@ -235,6 +236,13 @@ async def apply_push(db, business_id: int, operations: list[dict[str, Any]]) -> 
         # Success path: applied or idempotent-skip.
         if created:
             applied += 1
+            # Every applied offline op lands in the owner's audit trail —
+            # same transaction, actor marked as the sync engine.
+            await record_audit(
+                db, business_id, entity or "", server_id, operation or "",
+                change={"via": "sync", "client_id": client_id or ""},
+                actor="offline-sync",
+            )
         else:
             skipped += 1
         if server_id is not None and client_id:

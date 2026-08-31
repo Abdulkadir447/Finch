@@ -349,6 +349,7 @@ class BusinessSettingsUpdate(BaseModel):
     tax_id: Optional[str] = Field(None, max_length=100)
     website: Optional[str] = Field(None, max_length=255)
     timezone: Optional[str] = Field(None, max_length=64)
+    ai_response_style: Optional[str] = Field(None, max_length=20)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -365,6 +366,7 @@ class BusinessSettingsOut(BaseModel):
     tax_id: Optional[str] = None
     website: Optional[str] = None
     timezone: Optional[str] = None
+    ai_response_style: str = "standard"
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -378,3 +380,17 @@ class AuthMeResponse(BaseModel):
     business_id: int
     business_name: str
     currency: str
+
+
+class AuditEntryOut(BaseModel):
+    """One audit_log row (read view, newest first)."""
+
+    id: int
+    table_name: str
+    record_id: Optional[int] = None
+    action: str
+    actor: Optional[str] = None
+    change: Optional[str] = Field(default=None, validation_alias="change_json")
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

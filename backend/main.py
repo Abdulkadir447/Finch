@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, or_, select, text
 from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
@@ -28,9 +29,13 @@ from sqlalchemy.orm import selectinload
 
 from . import briefing as briefing_mod
 from . import importer
+from . import audit as audit_mod
+from . import backups as backups_mod
 from .ai import service as ai_service
 from .ai import forecast as ai_forecast_mod
 from .ai import history as ai_history_mod
+from .ai import prompts as ai_prompts_mod
+from .ai.ratelimit import enforce_ai_rate_limit
 from .exports import export_report, ExportError
 from .notifications import build_daily_summary
 from .notifications.schemas import DailySummary as DailySummarySchema
@@ -38,12 +43,14 @@ from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
 from .sync import ALLOWED_ORDER_TRANSITIONS, apply_push
 from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
+from .config import get_env, load_config
 from .database import dispose_db, get_db, init_db
 from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
 from .schemas import (
     ALLOWED_CURRENCIES,
     ALLOWED_TIMEZONES,
     AdjustStockRequest,
+    AuditEntryOut,
     AuthMeResponse,
     BusinessSettingsOut,
     BusinessSettingsUpdate,
@@ -96,16 +103,33 @@ app = FastAPI(
 )
 
 # CORS: Bearer-token auth (no cookies), so '*' without credentials is a safe
-# dev default. Set CORS_ORIGINS to a comma-separated allow-list to tighten it
-# (e.g. https://app.coop.example) (Task 12 polish).
-_cors_origins = [
-    o.strip()
-    for o in os.getenv("CORS_ORIGINS", "*").split(",")
-    if o.strip()
-]
+# DEV default. Production refuses to start with an open CORS policy: set
+# CORS_ORIGINS (comma-separated) or config/production.json cors.origins —
+# neither present means a RuntimeError at startup (hardening backlog item).
+def cors_allowlist() -> list[str]:
+    """Resolve the CORS origin allow-list for the active environment."""
+    raw = os.getenv("CORS_ORIGINS")
+    if raw:
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    if get_env() == "production":
+        origins = [
+            o
+            for o in (load_config().get("cors", {}) or {}).get("origins", [])
+            if o
+        ]
+        if not origins:
+            raise RuntimeError(
+                "CORS_ORIGINS is not set and production config has no "
+                "cors.origins. Refusing to start with an open CORS policy "
+                "in production."
+            )
+        return origins
+    return ["*"]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=cors_allowlist(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -242,6 +266,16 @@ async def update_business_settings(
                 status_code=422,
                 detail=f"Unsupported timezone '{data['timezone']}'.",
             )
+    if "ai_response_style" in data and data["ai_response_style"] is not None:
+        style = data["ai_response_style"]
+        if style not in ai_prompts_mod.ALLOWED_AI_RESPONSE_STYLES:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Unsupported AI response style '{style}'. "
+                    f"Allowed: {', '.join(ai_prompts_mod.ALLOWED_AI_RESPONSE_STYLES)}"
+                ),
+            )
 
     # Only schema-whitelisted fields can ever be set here (owner_id, id,
     # timestamps, version are not part of BusinessSettingsUpdate).
@@ -251,7 +285,71 @@ async def update_business_settings(
 
     await db.flush()
     await db.refresh(business)
+    await audit_mod.record_audit(
+        db, business.id, "businesses", business.id, "update",
+        change=data, actor=business.owner_id,
+    )
     return business
+
+
+# ---------------------------------------------------------------------------
+# Audit log (hardening backlog) — append-only trail of every mutation in the
+# tenant, written by the same transaction as the mutation it describes.
+# ---------------------------------------------------------------------------
+
+@app.get("/audit", response_model=List[AuditEntryOut], tags=["Audit"])
+async def audit_entries(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> List[AuditEntryOut]:
+    """The caller's activity log, newest first (tenant-scoped)."""
+    rows = await audit_mod.list_entries(db, business.id, limit=limit, offset=offset)
+    return [AuditEntryOut.model_validate(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Backup & Restore (PRD Phase 4 "Backup system").
+#
+# Export downloads a JSON snapshot of the tenant's business data; restore
+# uploads one and is allowed ONLY into an empty business (never a merge).
+# ---------------------------------------------------------------------------
+
+@app.get("/backups/export", tags=["Backup"])
+async def backups_export(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Download the tenant's business data as a Co-op backup file."""
+    payload = await backups_mod.build_backup(db, business)
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    return JSONResponse(
+        content=payload,
+        headers={
+            "Content-Disposition": f'attachment; filename="coop-backup-{stamp}.json"'
+        },
+    )
+
+
+@app.post("/backups/restore", tags=["Backup"])
+async def backups_restore(
+    payload: Dict[str, Any],
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Restore a Co-op backup into an EMPTY business (409 otherwise)."""
+    try:
+        result = await backups_mod.restore_backup(db, business, payload)
+    except backups_mod.RestoreRefused as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except backups_mod.BackupValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await audit_mod.record_audit(
+        db, business.id, "businesses", business.id, "restore",
+        change={"restored": result["restored"]}, actor=business.owner_id,
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -370,6 +468,11 @@ async def create_product(
             StockMovementReason.initial, business.owner_id,
         )
     await db.refresh(new_product)
+    await audit_mod.record_audit(
+        db, business.id, "products", new_product.id, "create",
+        change={"sku": new_product.sku, "name": new_product.name},
+        actor=business.owner_id,
+    )
     return new_product
 
 
@@ -439,6 +542,10 @@ async def update_product(
     product.updated_by = business.owner_id
     await db.flush()
     await db.refresh(product)
+    await audit_mod.record_audit(
+        db, business.id, "products", product.id, "update",
+        change=updates.model_dump(exclude_unset=True), actor=business.owner_id,
+    )
     return product
 
 
@@ -453,6 +560,9 @@ async def delete_product(
     product.deleted_at = datetime.utcnow()
     product.deleted_by = business.owner_id
     await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "products", product.id, "delete", actor=business.owner_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +588,11 @@ async def adjust_stock(
     )
     await db.flush()
     await db.refresh(product)
+    await audit_mod.record_audit(
+        db, business.id, "products", product.id, "adjust",
+        change={"change": req.change, "reason": req.reason.value, "note": req.note},
+        actor=business.owner_id,
+    )
     return product
 
 
@@ -553,6 +668,11 @@ async def create_customer(
     db.add(new_customer)
     await db.flush()
     await db.refresh(new_customer)
+    await audit_mod.record_audit(
+        db, business.id, "customers", new_customer.id, "create",
+        change={"email": new_customer.email, "full_name": new_customer.full_name},
+        actor=business.owner_id,
+    )
     return new_customer
 
 
@@ -618,6 +738,10 @@ async def update_customer(
     customer.updated_by = business.owner_id
     await db.flush()
     await db.refresh(customer)
+    await audit_mod.record_audit(
+        db, business.id, "customers", customer.id, "update",
+        change=updates.model_dump(exclude_unset=True), actor=business.owner_id,
+    )
     return customer
 
 
@@ -631,6 +755,9 @@ async def delete_customer(
     customer.deleted_at = datetime.utcnow()
     customer.deleted_by = business.owner_id
     await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "customers", customer.id, "delete", actor=business.owner_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -778,6 +905,15 @@ async def create_order(
             db, business.id, product, -item.quantity,
             StockMovementReason.order, business.owner_id, order_id=new_order.id,
         )
+    await audit_mod.record_audit(
+        db, business.id, "orders", new_order.id, "create",
+        change={
+            "customer_id": new_order.customer_id,
+            "total_amount": new_order.total_amount,
+            "status": "pending",
+        },
+        actor=business.owner_id,
+    )
     return _serialize_order(await _load_order(new_order.id, business, db))
 
 
@@ -877,6 +1013,10 @@ async def update_order_status(
     order.updated_by = business.owner_id
     await db.flush()
     await db.refresh(order)
+    await audit_mod.record_audit(
+        db, business.id, "orders", order.id, "status",
+        change={"from": current, "to": requested}, actor=business.owner_id,
+    )
     # Re-load relationships refreshed by the stock restore.
     return _serialize_order(await _load_order(id, business, db))
 
@@ -895,6 +1035,10 @@ async def delete_order(
     order.deleted_at = datetime.utcnow()
     order.deleted_by = business.owner_id
     await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "orders", order.id, "delete",
+        change={"status": current}, actor=business.owner_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1325,6 +1469,15 @@ async def imports_commit(
     except Exception:
         await db.rollback()
         raise HTTPException(status_code=400, detail="The import failed and was rolled back. No data was written.")
+    await audit_mod.record_audit(
+        db, business.id, "import_batches", result.batch_id, "import",
+        change={
+            "entity": result.dataset,
+            "created": result.created,
+            "skipped": result.skipped,
+        },
+        actor=business.owner_id,
+    )
     return {
         "entity": result.dataset,
         "batch_id": result.batch_id,
@@ -1407,6 +1560,7 @@ async def ai_chat(
     req: AiChatRequest,
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
+    _rate: None = Depends(enforce_ai_rate_limit),
 ) -> dict:
     """One grounded AI turn: verified context -> model -> structured answer.
 
@@ -1566,6 +1720,10 @@ async def billing_change_plan(
         await billing_mod.change_plan(db, business, req.plan, actor=business.owner_id)
     except InvalidPlan as e:
         raise HTTPException(status_code=422, detail=str(e))
+    await audit_mod.record_audit(
+        db, business.id, "subscriptions", None, "plan",
+        change={"plan": req.plan}, actor=business.owner_id,
+    )
     return await billing_mod.billing_summary(db, business)
 
 
