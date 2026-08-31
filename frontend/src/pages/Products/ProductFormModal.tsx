@@ -21,7 +21,6 @@ export interface ProductFormModalProps {
   open: boolean;
   /** null = create mode; a Product = edit mode. */
   product: Product | null;
-  submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: ProductFormValues) => Promise<void>;
   /** Edit mode only: opens the destructive delete confirmation. */
@@ -33,7 +32,6 @@ const hintStyle = (color: string): React.CSSProperties => ({ ...type.bodyCompact
 const ProductFormModal: React.FC<ProductFormModalProps> = ({
   open,
   product,
-  submitting,
   onCancel,
   onSubmit,
   onDelete,

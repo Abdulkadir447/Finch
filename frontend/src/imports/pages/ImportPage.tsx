@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { message } from 'antd';
-import { spacing, type } from '../../theme';
+import { spacing } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 import { useApiClient, ApiError } from '../../services/api/client';
 import PageHeader from '../../components/layout/PageHeader';
@@ -24,7 +24,6 @@ import {
   mapImport,
   previewImport,
   validateImport,
-  type ImportMapping,
 } from '../services/importer';
 import type {
   CommitPayload,

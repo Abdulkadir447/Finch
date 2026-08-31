@@ -67,8 +67,8 @@ const ConflictCard: React.FC<ConflictCardProps> = ({ conflict, productName, onRe
   // Per-reason description + comparison rows + actions
   // ------------------------------------------------------------------
   let description = conf.error;
-  let rows: Array<{ label: string; local: React.ReactNode; cloud: React.ReactNode }> = [];
-  let actions: React.ReactNode = null;
+  let rows: Array<{ label: string; local: React.ReactNode; cloud: React.ReactNode }>;
+  let actions: React.ReactNode;
 
   if (conf.reason === 'email_conflict') {
     description = `“${str(local.email)}” is already used by ${str(server.full_name)} in the cloud.`;

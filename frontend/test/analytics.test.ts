@@ -35,7 +35,6 @@ import {
   topProducts,
 } from '../src/analytics/localDashboard';
 import {
-  LocalFilterError,
   buildLocalReport,
   parseFilters,
   previousRange,

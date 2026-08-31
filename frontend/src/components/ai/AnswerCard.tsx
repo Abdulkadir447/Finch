@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { radius, type } from '../../theme';
 import { tint } from '../../theme/colors';
 import { useCoopTheme } from '../../theme-provider';
+import type { CoopThemeContextValue } from '../../theme-provider';
 import type { Answer } from '../../ai/types';
 import MiniChart from './MiniChart';
 import { DraftCard } from './DraftCard';
@@ -31,7 +32,9 @@ const KIND_META: Record<
 // Badge tone palettes. Fixed tones use the design palette directly
 // (primaryFixed / secondaryFixed families); info & warning derive their
 // tints from the palette colors with contrast-paired text colors.
-const TONE_STYLE: Record<string, { bg: (c: any) => string; fg: (c: any) => string }> = {
+type TonePalette = CoopThemeContextValue['colors'] & { isDark: boolean };
+
+const TONE_STYLE: Record<string, { bg: (c: TonePalette) => string; fg: (c: TonePalette) => string }> = {
   primary: { bg: (c) => c.primaryFixed, fg: (c) => c.onPrimaryFixedVariant },
   info: {
     bg: (c) => tint(c.info, c.isDark ? 0.18 : 0.1),

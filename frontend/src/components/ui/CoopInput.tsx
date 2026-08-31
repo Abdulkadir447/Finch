@@ -46,7 +46,7 @@ const CoopInput = React.forwardRef<InputRef, CoopInputProps>(
       // `rest` is InputProps (input events); the cast is safe for the shared
       // props consumers actually pass (value/onChange/maxLength/rules…).
       <Input.TextArea
-        ref={ref as React.Ref<any>}
+        ref={ref as React.Ref<React.ComponentRef<typeof Input.TextArea>>}
         rows={rows}
         placeholder={placeholder ?? 'Write details here'}
         style={inputStyle}

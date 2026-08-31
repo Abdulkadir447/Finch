@@ -165,7 +165,7 @@ export function useOrders() {
       setPage(requestedPage);
       setPendingSyncIds(pending);
     },
-    [api],
+    [],
   );
 
   const load = useCallback(

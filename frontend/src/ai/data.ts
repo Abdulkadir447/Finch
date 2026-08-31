@@ -178,7 +178,7 @@ export function useAiData() {
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, loadLocal]);
 
   useEffect(() => {
     void load();

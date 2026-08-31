@@ -70,7 +70,7 @@ interface AiOrderDraft {
  * POST /orders executes.
  */
 function readAiDraft(): AiOrderDraft | null {
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = localStorage.getItem(AI_ORDER_DRAFT_KEY);
   } catch {

@@ -17,10 +17,8 @@ export interface CoopMarkProps {
   title?: string;
 }
 
-let uid = 0;
-
 export const CoopMark: React.FC<CoopMarkProps> = ({ size = 32, className, title }) => {
-  const id = React.useMemo(() => `coop-mark-${(uid += 1)}`, []);
+  const id = React.useId();
   return (
     <svg
       width={size}

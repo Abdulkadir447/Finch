@@ -46,7 +46,6 @@ const ProductsPage: React.FC = () => {
   const [messageApi, messageCtx] = message.useMessage();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -79,7 +78,6 @@ const ProductsPage: React.FC = () => {
   };
 
   const handleSubmit = async (values: ProductFormValues) => {
-    setSubmitting(true);
     try {
       if (editing) {
         // SKU and stock are immutable on update (Task 12 / M6): stock moves
@@ -95,8 +93,6 @@ const ProductsPage: React.FC = () => {
       reload();
     } catch (e) {
       messageApi.error(e instanceof Error ? e.message : 'Request failed');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -445,7 +441,6 @@ const ProductsPage: React.FC = () => {
       <ProductFormModal
         open={modalOpen}
         product={editing}
-        submitting={submitting}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleSubmit}
         onDelete={editing ? () => {

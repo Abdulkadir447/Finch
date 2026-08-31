@@ -108,7 +108,7 @@ export function useProducts() {
       setItems(list.slice(start, start + PRODUCTS_PAGE_SIZE));
       setPage(requestedPage);
     },
-    [api],
+    [],
   );
 
   const load = useCallback(

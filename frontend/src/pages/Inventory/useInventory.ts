@@ -189,7 +189,7 @@ export function useInventory() {
       setItems(list.slice(start, start + INVENTORY_PAGE_SIZE));
       setPage(requestedPage);
     },
-    [api],
+    [],
   );
 
   const load = useCallback(

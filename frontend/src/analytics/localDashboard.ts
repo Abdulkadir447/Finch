@@ -91,7 +91,6 @@ export function summary(b: LocalBundle): LDashboardSummary {
   const today = todayIso();
   const firstThis = monthStart(today);
   const firstLast = previousMonthStart(firstThis);
-  const firstNext = previousMonthStartAddOne(firstThis);
 
   let revenueToday = 0;
   let ordersToday = 0;

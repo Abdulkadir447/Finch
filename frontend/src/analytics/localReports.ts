@@ -229,7 +229,7 @@ function salesReport(b: LocalBundle, f: LocalReportFilters): ReportData {
 
   const notes: string[] = [];
   let prevKpis: Record<string, number | null> = {};
-  let prevSeries = new Map<string, number>();
+  const prevSeries = new Map<string, number>();
   if (f.compare !== 'none') {
     const prev = previousRange(f);
     if (prev) {
