@@ -15,7 +15,7 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from ..models import Customer, Order, OrderItem, Product
 from .filters import ReportFilters
@@ -63,7 +63,9 @@ class ReportData:
     chart: ReportChart
     tables: list
     notes: list = field(default_factory=list)
-    generated_at: str = field(default_factory=lambda: dt.datetime.now().isoformat(timespec="seconds"))
+    generated_at: str = field(
+        default_factory=lambda: dt.datetime.now().isoformat(timespec="seconds")
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -84,7 +86,12 @@ class ReportData:
             "chart": {"kind": self.chart.kind, "labels": self.chart.labels,
                       "series": self.chart.series, "money": self.chart.money},
             "tables": [
-                {"title": t.title, "columns": t.columns, "rows": t.rows, "numeric_cols": t.numeric_cols}
+                {
+                    "title": t.title,
+                    "columns": t.columns,
+                    "rows": t.rows,
+                    "numeric_cols": t.numeric_cols,
+                }
                 for t in self.tables
             ],
             "notes": self.notes,
@@ -209,14 +216,18 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
             for o in p_orders:
                 od = _as_date(o.order_date)
                 if od:
-                    prev_series[_bucket_key(od, mode)] = prev_series.get(_bucket_key(od, mode), 0) + (o.total_amount or 0)
+                    prev_series[_bucket_key(od, mode)] = prev_series.get(
+                        _bucket_key(od, mode), 0
+                    ) + (o.total_amount or 0)
 
     for k in kpis:
         if k.previous is None and k.key in prev_kpis:
             k.previous = prev_kpis[k.key]
         if k.key != "units":
             k.change_percent = _pct(k.value, k.previous)
-    kpis[0].change_percent = _pct(revenue, prev_kpis.get("revenue")) if f.compare != "none" else None
+    kpis[0].change_percent = (
+        _pct(revenue, prev_kpis.get("revenue")) if f.compare != "none" else None
+    )
 
     # Chart: revenue over time (+ comparison overlay).
     order_dates = [_as_date(o.order_date) for o in orders if o.order_date]
@@ -225,7 +236,9 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
     for o in orders:
         od = _as_date(o.order_date)
         if od:
-            cur_series[_bucket_key(od, mode)] = cur_series.get(_bucket_key(od, mode), 0) + (o.total_amount or 0)
+                    cur_series[_bucket_key(od, mode)] = cur_series.get(
+                        _bucket_key(od, mode), 0
+                    ) + (o.total_amount or 0)
     if f.compare != "none" and prev:
         # Align the previous series onto the CURRENT axis by ordinal position:
         # oldest bucket of the previous window sits under the oldest bucket of
@@ -237,7 +250,10 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
             if i < len(cur_keys):
                 aligned[cur_keys[i]] = prev_series[pk]
         series = [
-            {"name": "Current period", "data": [_round(cur_series.get(k, 0)) for k in sorted(cur_series)]},
+            {
+                "name": "Current period",
+                "data": [_round(cur_series.get(k, 0)) for k in sorted(cur_series)],
+            },
             {"name": f"Previous ({_compare_label(f, prev)})", "data": [
                 _round(aligned.get(k, 0)) for k in sorted(cur_series)
             ]},
@@ -245,14 +261,27 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
     else:
         # Data follows the SAME sorted-key order as the labels (dict order is
         # insertion order and would misalign values against the axis).
-        series = [{"name": "Revenue", "data": [_round(cur_series.get(k, 0)) for k in sorted(cur_series)]}]
+        series = [
+            {
+                "name": "Revenue",
+                "data": [_round(cur_series.get(k, 0)) for k in sorted(cur_series)],
+            }
+        ]
 
     # Tables: top products / by category / top customers (line-level).
     by_product: dict[tuple, dict] = {}
     by_category: dict[str, dict] = {}
     by_customer: dict[int, dict] = {}
     for r in rows:
-        pid, pname, cat, qty, price, total, _ = r[2], r[3], r[4] or "Uncategorized", r[5], r[6], r[7], r[8]
+        pid, pname, cat, qty, _price, total, _ = (
+            r[2],
+            r[3],
+            r[4] or "Uncategorized",
+            r[5],
+            r[6],
+            r[7],
+            r[8],
+        )
         pk = (pid, pname)
         d = by_product.setdefault(pk, {"units": 0, "revenue": 0.0})
         d["units"] += qty or 0
@@ -299,12 +328,24 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
         compare=f.compare,
         filters=f.to_query_dict(),
         kpis=kpis,
-        chart=ReportChart("line", [_fmt_bucket(k, mode) for k in sorted(cur_series)], series, money=True),
+        chart=ReportChart(
+            "line", [_fmt_bucket(k, mode) for k in sorted(cur_series)], series, money=True
+        ),
         tables=[
             ReportTable("Top products", ["Product", "Units", "Revenue", "Share"],
-                        [[r["name"], r["units"], r["revenue"], f"{r['share']}%"] for r in prod_rows], [1, 2, 3]),
+                        [
+                            [r["name"], r["units"], r["revenue"], f"{r['share']}%"]
+                            for r in prod_rows
+                        ],
+                        [1, 2, 3]
+                    ),
             ReportTable("Sales by category", ["Category", "Units", "Revenue", "Share"],
-                        [[r["category"], r["units"], r["revenue"], f"{r['share']}%"] for r in cat_rows], [1, 2, 3]),
+                        [
+                            [r["category"], r["units"], r["revenue"], f"{r['share']}%"]
+                            for r in cat_rows
+                        ],
+                        [1, 2, 3]
+                    ),
             ReportTable("Top customers", ["Customer", "Orders", "Revenue"],
                         [[r["name"], r["orders"], r["revenue"]] for r in cust_rows], [1, 2]),
         ],
@@ -313,7 +354,11 @@ async def sales_report(db, business_id: int, f: ReportFilters) -> ReportData:
 
 
 def _compare_label(f: ReportFilters, prev: tuple[dt.date, dt.date]) -> str:
-    names = {"previous_period": "previous period", "previous_month": "previous month", "previous_year": "previous year"}
+    names = {
+        "previous_period": "previous period",
+        "previous_month": "previous month",
+        "previous_year": "previous year",
+    }
     return names.get(f.compare, "previous")
 
 
@@ -330,15 +375,26 @@ async def profit_loss_report(db, business_id: int, f: ReportFilters) -> ReportDa
     margin = (gross / revenue * 100) if revenue else None
     coverage = (cost_covered_value / revenue * 100) if revenue else 0.0
 
-    notes: list[str] = ["Gross P&L — Co-op does not track operating expenses yet, so this is revenue minus cost of goods, not a full accounting statement."]
+    notes: list[str] = [
+        "Gross P&L — Co-op does not track operating expenses yet, so this is "
+        "revenue minus cost of goods, not a full accounting statement."
+    ]
     if rows and coverage < 99.9:
-        notes.append(f"Cost data covers {coverage:.0f}% of sold-line value; products without a cost price are excluded from COGS.")
+        notes.append(
+            f"Cost data covers {coverage:.0f}% of sold-line value; products without "
+            "a cost price are excluded from COGS."
+        )
 
     kpis = [
         Kpi("revenue", "Revenue", _round(revenue), "money"),
         Kpi("cogs", "COGS", _round(cogs), "money", good_when="down"),
         Kpi("gross_profit", "Gross profit", _round(gross), "money"),
-        Kpi("gross_margin", "Gross margin", _round(margin, 1) if margin is not None else 0, "percent"),
+        Kpi(
+            "gross_margin",
+            "Gross margin",
+            _round(margin, 1) if margin is not None else 0,
+            "percent",
+        ),
     ]
     if f.compare != "none":
         prev = f.previous_range()
@@ -389,12 +445,17 @@ async def profit_loss_report(db, business_id: int, f: ReportFilters) -> ReportDa
     prof = sorted(
         ({"name": n, "units": d["units"], "revenue": _round(d["revenue"]),
           "cogs": _round(d["cogs"]), "profit": _round(d["revenue"] - d["cogs"]),
-          "margin": _round((d["revenue"] - d["cogs"]) / d["revenue"] * 100, 1) if d["revenue"] else None}
+          "margin": (
+              _round((d["revenue"] - d["cogs"]) / d["revenue"] * 100, 1)
+              if d["revenue"]
+              else None
+          )}
          for (_i, n), d in by_product.items()),
         key=lambda x: -x["profit"],
     )
     tables.append(ReportTable(
-        "Most profitable products", ["Product", "Units", "Revenue", "COGS", "Gross profit", "Margin"],
+        "Most profitable products",
+        ["Product", "Units", "Revenue", "COGS", "Gross profit", "Margin"],
         [[p["name"], p["units"], p["revenue"], p["cogs"], p["profit"],
           f"{p['margin']}%" if p["margin"] is not None else "—"] for p in prof[:10]],
         [1, 2, 3, 4, 5]))
@@ -402,7 +463,10 @@ async def profit_loss_report(db, business_id: int, f: ReportFilters) -> ReportDa
     lowest.sort(key=lambda x: x["margin"])
     tables.append(ReportTable(
         "Lowest-margin products", ["Product", "Units", "Revenue", "COGS", "Gross profit", "Margin"],
-        [[p["name"], p["units"], p["revenue"], p["cogs"], p["profit"], f"{p['margin']}%"] for p in lowest[:5]],
+        [
+            [p["name"], p["units"], p["revenue"], p["cogs"], p["profit"], f"{p['margin']}%"]
+            for p in lowest[:5]
+        ],
         [1, 2, 3, 4, 5]))
 
     return ReportData(
@@ -414,8 +478,20 @@ async def profit_loss_report(db, business_id: int, f: ReportFilters) -> ReportDa
         kpis=kpis,
         chart=ReportChart("bar", [_fmt_bucket(k, mode) for k in sorted(rev_series)],
                           # Data follows the SAME sorted-key order as the labels.
-                          [{"name": "Revenue", "data": [_round(rev_series.get(k, 0)) for k in sorted(rev_series)]},
-                           {"name": "Gross profit", "data": [_round(gp_series.get(k, 0)) for k in sorted(rev_series)]}],
+                          [
+                              {
+                                  "name": "Revenue",
+                                  "data": [
+                                      _round(rev_series.get(k, 0)) for k in sorted(rev_series)
+                                  ],
+                              },
+                              {
+                                  "name": "Gross profit",
+                                  "data": [
+                                      _round(gp_series.get(k, 0)) for k in sorted(rev_series)
+                                  ],
+                              },
+                          ],
                           money=True),
         tables=tables,
         notes=notes,
@@ -452,18 +528,26 @@ async def inventory_report(db, business_id: int, f: ReportFilters) -> ReportData
 
     notes: list[str] = []
     if out:
-        notes.append(f"{len(out)} product{'s' if len(out) != 1 else ''} out of stock — these generate no revenue until restocked.")
+        notes.append(
+            f"{len(out)} product{'s' if len(out) != 1 else ''} out of stock — "
+            "these generate no revenue until restocked."
+        )
     if low:
         notes.append(f"{len(low)} product{'s' if len(low) != 1 else ''} at or below reorder level.")
 
     # Chart: inventory value by category.
     by_cat: dict[str, float] = {}
     for p in products:
-        by_cat[p.category or "Uncategorized"] = by_cat.get(p.category or "Uncategorized", 0) + value(p)
+        by_cat[p.category or "Uncategorized"] = (
+            by_cat.get(p.category or "Uncategorized", 0) + value(p)
+        )
     cats = sorted(by_cat, key=lambda c: -by_cat[c])
 
     # Table 1: stock risk (out first, then low).
-    risk = sorted(out + low, key=lambda p: (0 if (p.current_stock or 0) <= 0 else 1, p.current_stock or 0))
+    risk = sorted(
+        out + low,
+        key=lambda p: (0 if (p.current_stock or 0) <= 0 else 1, p.current_stock or 0),
+    )
     # Table 2: top inventory value.
     top_value = sorted(products, key=value, reverse=True)[:10]
     # Table 3: movement within the period (from the immutable stock ledger).
@@ -473,7 +557,8 @@ async def inventory_report(db, business_id: int, f: ReportFilters) -> ReportData
             StockMovement.business_id == business_id,
             StockMovement.product_id.in_([p.id for p in products]) if products else False,
             StockMovement.created_at >= dt.datetime.combine(f.from_date, dt.time.min),
-            StockMovement.created_at < dt.datetime.combine(f.to_date + dt.timedelta(days=1), dt.time.min),
+            StockMovement.created_at
+            < dt.datetime.combine(f.to_date + dt.timedelta(days=1), dt.time.min),
         )
     )).scalars().all() if products else []
     prod_names = {p.id: p.name for p in products}
@@ -503,16 +588,43 @@ async def inventory_report(db, business_id: int, f: ReportFilters) -> ReportData
         compare=f.compare,
         filters=f.to_query_dict(),
         kpis=kpis,
-        chart=ReportChart("donut", cats, [{"name": "Value", "data": [_round(by_cat.get(c, 0)) for c in cats]}], money=True),
+        chart=ReportChart(
+            "donut",
+            cats,
+            [{"name": "Value", "data": [_round(by_cat.get(c, 0)) for c in cats]}],
+            money=True,
+        ),
         tables=[
             ReportTable("Stock risk", ["Product", "SKU", "On hand", "Reorder level", "Value"],
-                        [[p.name, p.sku or "—", p.current_stock, p.reorder_level or 0, _round(value(p))] for p in risk[:15]],
+                        [
+                            [
+                                p.name,
+                                p.sku or "—",
+                                p.current_stock,
+                                p.reorder_level or 0,
+                                _round(value(p)),
+                            ]
+                            for p in risk[:15]
+                        ],
                         [2, 3, 4]),
             ReportTable("Top inventory value", ["Product", "Units", "Unit cost", "Value"],
-                        [[p.name, p.current_stock or 0, _round(p.cost_price or p.unit_price), _round(value(p))] for p in top_value],
+                        [
+                            [
+                                p.name,
+                                p.current_stock or 0,
+                                _round(p.cost_price or p.unit_price),
+                                _round(value(p)),
+                            ]
+                            for p in top_value
+                        ],
                         [1, 2, 3]),
             ReportTable(f"Stock movement ({f.period_label})", ["Product", "In", "Out", "Net"],
-                        [[n, d["in"], d["out"], d["in"] - d["out"]] for n, d in mv_rows], [1, 2, 3]),
+                        [
+                            [n, d["in"], d["out"], d["in"] - d["out"]]
+                            for n, d in mv_rows
+                        ],
+                        [1, 2, 3]
+                    ),
             ReportTable("Fast movers (period)", ["Product", "Units sold", "On hand"],
                         [[n, s, h] for n, s, h in fast], [1, 2]),
             ReportTable("Slow movers (no sales in period)", ["Product", "Units sold", "On hand"],
@@ -553,7 +665,9 @@ async def customers_report(db, business_id: int, f: ReportFilters) -> ReportData
     period_revenue_by_cust: dict[int, float] = {}
     for o in period_orders:
         if o.customer_id:
-            period_revenue_by_cust[o.customer_id] = period_revenue_by_cust.get(o.customer_id, 0) + (o.total_amount or 0)
+            period_revenue_by_cust[o.customer_id] = (
+                period_revenue_by_cust.get(o.customer_id, 0) + (o.total_amount or 0)
+            )
     n_active = len(period_revenue_by_cust)
     period_revenue = sum(period_revenue_by_cust.values())
     rev_per_cust = period_revenue / n_active if n_active else None
@@ -592,7 +706,10 @@ async def customers_report(db, business_id: int, f: ReportFilters) -> ReportData
 
     notes: list[str] = []
     if inactive:
-        notes.append(f"{len(inactive)} customer{'s' if len(inactive) != 1 else ''} haven't ordered in 30+ days — the top ones are listed below.")
+        notes.append(
+            f"{len(inactive)} customer{'s' if len(inactive) != 1 else ''} haven't "
+            "ordered in 30+ days — the top ones are listed below."
+        )
 
     # Chart: new customers over time (creation dates within the period).
     new_dates = [_as_date(c.created_at) for c in new_in_period if c.created_at]
@@ -632,9 +749,18 @@ async def customers_report(db, business_id: int, f: ReportFilters) -> ReportData
         filters=f.to_query_dict(),
         kpis=kpis,
         chart=ReportChart("bar", [_fmt_bucket(k, mode) for k in sorted(new_series)],
-                          [{"name": "New customers", "data": [new_series.get(k, 0) for k in sorted(new_series)]}]),
+                          [
+                              {
+                                  "name": "New customers",
+                                  "data": [
+                                      new_series.get(k, 0) for k in sorted(new_series)
+                                  ],
+                              }
+                          ]),
         tables=[
-            ReportTable("Top customers (period)", ["Customer", "Orders", "Revenue (period)", "Lifetime revenue", "Last order"],
+            ReportTable(
+                "Top customers (period)",
+                ["Customer", "Orders", "Revenue (period)", "Lifetime revenue", "Last order"],
                         top_rows, [1, 2, 3]),
             ReportTable("Inactive 30+ days", ["Customer", "Days since order", "Lifetime revenue"],
                         inactive_rows, [1, 2]),

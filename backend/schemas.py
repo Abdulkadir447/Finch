@@ -349,6 +349,7 @@ class BusinessSettingsUpdate(BaseModel):
     tax_id: Optional[str] = Field(None, max_length=100)
     website: Optional[str] = Field(None, max_length=255)
     timezone: Optional[str] = Field(None, max_length=64)
+    ai_response_style: Optional[str] = Field(None, max_length=20)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -365,6 +366,7 @@ class BusinessSettingsOut(BaseModel):
     tax_id: Optional[str] = None
     website: Optional[str] = None
     timezone: Optional[str] = None
+    ai_response_style: str = "standard"
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -375,6 +377,62 @@ class AuthMeResponse(BaseModel):
     """Identity + tenant info for the signed-in Co-op user."""
 
     user_id: str
-    business_id: int
-    business_name: str
-    currency: str
+    business_id: Optional[int] = None  # None while a pending invitation awaits
+    business_name: str = ""
+    currency: str = "USD"
+    role: str = "owner"  # owner | manager | sales | inventory | accountant | viewer
+    email: Optional[str] = None
+    pending_invitation: Optional["TeamInviteOut"] = None
+
+
+class AuditEntryOut(BaseModel):
+    """One audit_log row (read view, newest first)."""
+
+    id: int
+    table_name: str
+    record_id: Optional[int] = None
+    action: str
+    actor: Optional[str] = None
+    change: Optional[str] = Field(default=None, validation_alias="change_json")
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Team model (TRD Ch17 §17.7)
+# ---------------------------------------------------------------------------
+class TeamMemberOut(BaseModel):
+    """One non-owner member of the business."""
+
+    user_id: str
+    email: Optional[str] = None
+    role: str
+    joined_at: Optional[datetime] = None
+
+
+class TeamInviteCreate(BaseModel):
+    email: EmailStr
+    role: str = Field(pattern="^(manager|sales|inventory|accountant|viewer)$")
+
+
+class TeamInviteAccept(BaseModel):
+    token: str = Field(min_length=8, max_length=128)
+
+
+class TeamInviteOut(BaseModel):
+    token: str
+    email: str
+    role: str
+    status: str
+    business_name: str = ""
+    created_at: Optional[datetime] = None
+
+
+class TeamRoleUpdate(BaseModel):
+    role: str = Field(pattern="^(manager|sales|inventory|accountant|viewer)$")
+
+
+class TeamResponse(BaseModel):
+    members: List[TeamMemberOut]
+    invitations: List[TeamInviteOut]

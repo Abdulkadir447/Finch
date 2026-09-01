@@ -100,11 +100,17 @@ async def fetch_jwks(frontend_api: str, force: bool = False) -> dict:
 
 @dataclass(frozen=True)
 class ClerkUser:
-    """Authenticated Co-op user, identified by their Clerk user id (``sub``)."""
+    """Authenticated Co-op user, identified by their Clerk user id (``sub``).
+
+    ``email`` is the Clerk primary-email claim when the JWT carries one
+    (it normally does); it is what invitation accept uses to bind an invite
+    to the right person. The unit-test seam leaves it None.
+    """
 
     user_id: str
     session_id: Optional[str] = None
     azp: Optional[str] = None
+    email: Optional[str] = None
 
 
 def _auth_error(detail: str = "Could not validate credentials") -> HTTPException:
@@ -173,6 +179,7 @@ async def verify_clerk_token(
         user_id=user_id,
         session_id=payload.get("session_id") or payload.get("sid"),
         azp=azp,
+        email=payload.get("email"),
     )
 
 

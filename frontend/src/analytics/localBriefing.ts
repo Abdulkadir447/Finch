@@ -269,7 +269,7 @@ export function buildLocalBriefing(b: LocalBundle): LBriefing {
   if (vipList.length && inactiveTop.length) {
     const target = inactiveTop[0];
     let topProdId: number | null = null;
-    for (const [pid, u] of [...(custUnits.get(target.customer_id) ?? new Map<number, number>()).entries()].sort((a, z) => z[1] - a[1])) {
+    for (const [pid] of [...(custUnits.get(target.customer_id) ?? new Map<number, number>()).entries()].sort((a, z) => z[1] - a[1])) {
       topProdId = pid;
       break;
     }

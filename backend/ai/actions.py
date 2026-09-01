@@ -36,7 +36,10 @@ ALLOWED_LINK_TARGETS: tuple[str, ...] = (
 # The complete v1 registry. New capabilities are added here — deliberately.
 ACTION_REGISTRY: dict[str, dict[str, str]] = {
     "DRAFT_ORDER": {
-        "description": "Prepare an order the owner reviews; executes via the existing Create Order flow.",
+        "description": (
+            "Prepare an order the owner reviews; executes via the existing "
+            "Create Order flow."
+        ),
     },
 }
 
@@ -46,7 +49,9 @@ def validate_links(links: list[Any]) -> list[dict[str, str]]:
     out = []
     for link in links or []:
         to = getattr(link, "to", None) or (link.get("to") if isinstance(link, dict) else None)
-        label = getattr(link, "label", None) or (link.get("label") if isinstance(link, dict) else None)
+        label = getattr(link, "label", None) or (
+            link.get("label") if isinstance(link, dict) else None
+        )
         if to in ALLOWED_LINK_TARGETS and label:
             out.append({"label": str(label)[:60], "to": to})
     return out[:3]
@@ -86,7 +91,11 @@ async def _resolve_draft_order(
         {"cust_email": customer_email, "cust_name": customer_name},
     )
     if status in ("ambiguous_name", "ambiguous_phone"):
-        return None, f"multiple customers match {customer_name!r} — the owner should choose manually"
+        return (
+            None,
+            f"multiple customers match {customer_name!r} — the owner should "
+            "choose manually",
+        )
     if status == "unknown_email":
         return None, f"no customer with email {customer_email!r}"
     if status == "create" or customer is None:
@@ -114,7 +123,11 @@ async def _resolve_draft_order(
         return None, f"only {stock} of {product.name!r} in stock"
     unit_price = params.get("unit_price")
     try:
-        unit_price = float(unit_price) if unit_price is not None and float(unit_price) > 0 else (product.unit_price or 0)
+        unit_price = (
+            float(unit_price)
+            if unit_price is not None and float(unit_price) > 0
+            else (product.unit_price or 0)
+        )
     except (TypeError, ValueError):
         unit_price = product.unit_price or 0
     if unit_price <= 0:
@@ -145,8 +158,12 @@ async def validate_actions(
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, str]] = []
     for action in actions or []:
-        atype = getattr(action, "type", None) or (action.get("type") if isinstance(action, dict) else None)
-        raw = getattr(action, "parameters", None) or (action.get("parameters") if isinstance(action, dict) else None) or {}
+        atype = getattr(action, "type", None) or (
+            action.get("type") if isinstance(action, dict) else None
+        )
+        raw = getattr(action, "parameters", None) or (
+            action.get("parameters") if isinstance(action, dict) else None
+        ) or {}
         params = dict(raw) if isinstance(raw, dict) else {}
         if atype not in ACTION_REGISTRY:
             rejected.append({"type": str(atype), "reason": "not a supported action"})

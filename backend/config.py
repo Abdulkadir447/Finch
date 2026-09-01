@@ -64,7 +64,8 @@ _load_dotenv_once()
 
 def _resolve_env() -> str:
     env = os.getenv("COOP_ENV") or os.getenv("FINCH_ENV") or os.getenv("APP_ENV") or DEFAULT_ENV
-    # COOP_ENV is the renamed variable; FINCH_ENV is kept as a compatibility fallback for existing .env files.
+    # COOP_ENV is the renamed variable; FINCH_ENV is kept as a compatibility fallback for existing
+    # .env files.
     return env if env in VALID_ENVS else DEFAULT_ENV
 
 

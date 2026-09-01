@@ -63,7 +63,7 @@ def render_csv(report: ReportData) -> bytes:
 
 def render_xlsx(report: ReportData) -> bytes:
     from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
 
     wb = Workbook()
@@ -152,13 +152,19 @@ def render_pdf(report: ReportData) -> bytes:
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("t", parent=styles["Title"], fontSize=20, leading=24, spaceAfter=2)
-    sub_style = ParagraphStyle("s", parent=styles["Normal"], fontSize=10, textColor=colors.HexColor("#555555"))
+    sub_style = ParagraphStyle(
+        "s",
+        parent=styles["Normal"],
+        fontSize=10,
+        textColor=colors.HexColor("#555555"),
+    )
     sec_style = ParagraphStyle("sec", parent=styles["Heading2"], fontSize=13, leading=16,
                                spaceBefore=10, spaceAfter=4, textColor=colors.HexColor("#3335b8"))
 
     elements = []
     elements.append(Paragraph("Co-op", ParagraphStyle("brand", parent=styles["Normal"],
-                                                      fontSize=12, textColor=colors.HexColor("#5b5fef"),
+                                                      fontSize=12,
+                                                      textColor=colors.HexColor("#5b5fef"),
                                                       spaceAfter=0)))
     elements.append(Paragraph(report.title, title_style))
     meta = [f"Period: {report.period_label}"]
@@ -195,7 +201,12 @@ def render_pdf(report: ReportData) -> bytes:
     elements.append(kpi_table)
 
     # Simple chart: a bar for the primary series if it's a line/bar chart.
-    if report.chart.kind in ("line", "bar") and report.chart.series and report.chart.labels and report.chart.series[0]["data"]:
+    if (
+        report.chart.kind in ("line", "bar")
+        and report.chart.series
+        and report.chart.labels
+        and report.chart.series[0]["data"]
+    ):
         from reportlab.graphics.charts.barcharts import VerticalBarChart
         from reportlab.graphics.renderPDF import Drawing, GraphicsFlowable
 
@@ -204,7 +215,7 @@ def render_pdf(report: ReportData) -> bytes:
         data = [max(0, float(v or 0)) for v in report.chart.series[0]["data"][:16]]
         labels = report.chart.labels[:16]
         chart.data = [data]
-        chart.categoryAxis.categoryNames = [_short(l) for l in labels]
+        chart.categoryAxis.categoryNames = [_short(label) for label in labels]
         chart.categoryAxis.labels.fontSize = 6
         chart.valueAxis.valueMin = 0
         chart.bars[0].fillColor = colors.HexColor("#5b5fef")

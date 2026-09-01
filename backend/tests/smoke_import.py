@@ -6,8 +6,6 @@ Exercises parse -> detect -> suggest -> execute -> briefing against a
 temporary SQLite DB (no server, no auth).
 """
 import asyncio
-import csv
-import io
 import os
 import sys
 import tempfile
@@ -109,7 +107,13 @@ async def main():
     print("  ready", out["ready"])
     print("  history", out["history"])
     for i in out["insights"]:
-        action = f"  [ACTION {i['action']['type']} -> customer {i['action']['customer']['full_name']} x product {i['action']['product']['name'] if i['action']['product'] else None}]" if i["action"] else ""
+        action = (
+            f"  [ACTION {i['action']['type']} -> "
+            f"customer {i['action']['customer']['full_name']} x product "
+            f"{i['action']['product']['name'] if i['action']['product'] else None}]"
+            if i["action"]
+            else ""
+        )
         print(f"  [{i['severity']:8}] {i['title']}")
         print(f"             {i['body']}{action}")
 
@@ -128,7 +132,8 @@ async def main():
         # provenance check: every imported order is stamped with a batch
         stamped = (await db.execute(
             select(func.count(Order.id)).where(Order.import_batch_id.is_not(None)))).scalar()
-    print(f"  DB totals: products={p} customers={c} orders={o} import_batches={b} (orders stamped {stamped}/{o})")
+    print(f"DB totals: products= {p} customers= {c} orders= {o} import_batches= {b} (orders"
+        f"stamped {stamped} / {o} )")
 
     print("== 6. REF IDEMPOTENCY (re-import the same sales file) ==")
     parsed_r = importer.parse_file("sales.csv", ord_csv.encode())

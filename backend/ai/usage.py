@@ -36,7 +36,9 @@ class CreditPolicy:
 
     def apply(self, input_tokens: int, output_tokens: int) -> int:
         extra = max(0, output_tokens - self.free_output_tokens)
-        return self.credits_per_request + math.ceil(extra / 1000 * self.credits_per_1k_output_tokens)
+        return self.credits_per_request + math.ceil(
+            extra / 1000 * self.credits_per_1k_output_tokens
+        )
 
 
 def credit_policy() -> CreditPolicy:

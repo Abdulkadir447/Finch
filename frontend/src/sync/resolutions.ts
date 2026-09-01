@@ -68,7 +68,6 @@ export async function resolveConflict(
   const conf = c.conflict;
   if (!conf) throw new ResolutionError('This conflict has no server context.');
   const server = (conf.server ?? {}) as Record<string, unknown>;
-  const local = (conf.local ?? {}) as Record<string, unknown>;
 
   switch (conf.reason) {
     // ------------------------------------------------------------------

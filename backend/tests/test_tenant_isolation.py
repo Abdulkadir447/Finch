@@ -35,7 +35,9 @@ async def test_products_are_isolated(api):
     assert (await api.client.get(f"/products/{pid}")).status_code == 404
     assert (await api.client.put(f"/products/{pid}", json={"name": "hijack"})).status_code == 404
     assert (await api.client.delete(f"/products/{pid}")).status_code == 404
-    assert (await api.client.post(f"/products/{pid}/adjust", json={"change": 1, "reason": "purchase"})).status_code == 404
+    assert (
+        await api.client.post(f"/products/{pid}/adjust", json={"change": 1, "reason": "purchase"})
+    ).status_code == 404
     assert (await api.client.get(f"/products/{pid}/movements")).status_code == 404
 
 
@@ -45,7 +47,9 @@ async def test_customers_are_isolated(api):
     api.set_user("user-b")
     assert (await api.client.get("/customers")).json()["items"] == []
     assert (await api.client.get(f"/customers/{cid}")).status_code == 404
-    assert (await api.client.put(f"/customers/{cid}", json={"full_name": "hijack"})).status_code == 404
+    assert (
+        await api.client.put(f"/customers/{cid}", json={"full_name": "hijack"})
+    ).status_code == 404
     assert (await api.client.delete(f"/customers/{cid}")).status_code == 404
 
 
@@ -55,7 +59,9 @@ async def test_orders_are_isolated(api):
     api.set_user("user-b")
     assert (await api.client.get("/orders")).json()["items"] == []
     assert (await api.client.get(f"/orders/{oid}")).status_code == 404
-    assert (await api.client.put(f"/orders/{oid}/status", json={"status": "confirmed"})).status_code == 404
+    assert (
+        await api.client.put(f"/orders/{oid}/status", json={"status": "confirmed"})
+    ).status_code == 404
     assert (await api.client.delete(f"/orders/{oid}")).status_code == 404
 
 

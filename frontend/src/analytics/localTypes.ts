@@ -140,7 +140,7 @@ export function fmtMonth(day: string): string {
 
 /** '%b %-d, %Y' (e.g. 'Aug 3, 2026'). */
 export function fmtDayYear(day: string): string {
-  const [y, m, d] = day.split('-');
+  const [y] = day.split('-');
   return `${fmtDay(day)}, ${y}`;
 }
 

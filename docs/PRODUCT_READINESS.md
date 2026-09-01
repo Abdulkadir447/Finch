@@ -23,7 +23,7 @@ down.
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
 | Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
-| Tests | 122 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests) + 15 local-analytics port tests + a server↔local cross-check harness + 29 Electron data-layer/sync Node tests (incl. 4 OFFLINE 5 resolution primitives) + tsc/build gates, all green locally. **CI itself is currently non-functional on `master` (wrong branch triggers + stale tooling) — corrected workflow pending owner push, see Appendix A** | `backend/tests/`, `frontend/test/`, `electron/test/`, `.github/workflows/ci.yml` |
+| Tests | 155 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests, 6 rate-limit, 4 CORS, 6 audit, 7 backup, 5 AI-style) + 15 local-analytics port tests + 34 Electron data-layer/sync/backup Node tests + the OFFLINE 6 real-runtime E2E harness (46 scenarios: SIGKILL survival, exactly-once sync, conflict resolution, cold offline start) + tsc/build gates, all green locally. **CI fixed and committed on the working branch — activates once merged to `master` (see §4.1)** | `backend/tests/`, `frontend/test/`, `electron/test/`, `electron/e2e/`, `.github/workflows/ci.yml` |
 
 ## 2. The five parked areas — status and recommendation
 
@@ -286,21 +286,61 @@ acts copy in the AI composer. Residual ERP-feel:
 
 ## 4. Hardening backlog (before open launch)
 
-- [ ] **Apply the corrected CI workflow (Appendix A)** — needs repo-owner
-      push; until then no CI enforcement on `master`
-- [ ] Lint tooling wired into CI (flake8/black/mypy for backend, eslint for
-      frontend) — only after the codebase passes, or with an explicit
-      grandfathering strategy
-- [ ] commitlint in CI (repo already has commitlint config locally)
-- [ ] Per-tenant rate limiting on `/ai/chat`
-- [ ] `CORS_ORIGINS` set explicitly in production config
-- [ ] Audit log persistence + read view
-- [ ] Team model (memberships, roles, invitations) before multi-seat sales
-- [ ] Daily business summary notification
-- [ ] Settings: implement or trim the "coming soon" sections
-- [ ] Decide + document offline-first scope (or adjust copy to "online web
-      app with desktop wrapper")
-- [ ] Payment provider integration (after the charging decision)
+**Done in the v1-completion pass (2026-08-31):**
+
+- [x] **Apply the corrected CI workflow (Appendix A)** — the corrected
+      workflow is committed on the working branch as its final commit
+      (backend pytest + frontend tsc/build on push/PR to `master`). This
+      session's GitHub token cannot push workflow files (no `workflows`
+      permission — same finding as the original Appendix A note), so the
+      repo owner applies that commit (or the file in Appendix A) when
+      merging
+- [x] Per-tenant rate limiting on `/ai/chat` — sliding window per Clerk
+      user, `ai.rate_limit {requests, window_seconds}` in
+      `config/<env>.json`, 429 + Retry-After; disabled in testing
+- [x] `CORS_ORIGINS` explicit in production — production refuses to start
+      with an open CORS policy (env or `config/production.json`
+      `cors.origins` required); dev/testing keep `*`
+- [x] Audit log persistence + read view — every mutation (API + offline
+      sync push) writes a tenant-scoped row (migration 0008); `GET /audit`
+      + Settings → Audit Log
+- [x] Backup system (PRD Phase 4) — cloud JSON export/restore
+      (restore only into an empty business, 409 otherwise) + desktop local
+      SQLite backup/restore (refused while anything is unsynced) + Settings
+      → Backup & Restore
+- [x] Settings: implemented every "coming soon" section — Appearance
+      (light/dark/system), AI (answer style wired into the real prompt),
+      Notifications (in-app prefs), Security (Clerk account management),
+      Sync (live engine status), Audit Log, About (version/env)
+- [x] Desktop packaging configured — electron-builder (AppImage/NSIS/DMG),
+      `npm run dist`/`pack` in `electron/`; installers still need
+      verification on each real platform
+- [x] Decide + document offline-first scope (ADR-002, done in the previous
+      pass)
+
+**Still open:**
+
+- [x] Lint tooling wired into CI — done in code: ruff for the backend
+      (`pyproject.toml`, E/F/W at line-length 100, full suite green),
+      eslint 9 + typescript-eslint for the frontend (`npm run lint`, zero
+      findings on src + test). The CI workflow file itself is the pending
+      owner push below (Appendix A).
+- [x] commitlint in CI — done in code (`.commitlintrc.json` + root
+      devDeps already existed; the workflow now validates every PR commit).
+      Same pending owner push as above.
+- [x] Team model (memberships, roles, invitations) — `business_members` +
+      `business_invitations` (migration 0010); owner invites by email, the
+      five future roles (manager/sales/inventory/accountant/viewer) are
+      enforced by a write matrix in get_current_business and mirrored
+      client-side; invitees join via the accept-or-sign-out gate.
+- [x] Daily business summary *delivery* (email) — SMTP-backed
+      `POST /notifications/summary/send` (owner/manager, rate-limited,
+      audited); the in-app summary remains the always-on channel. Push
+      channels stay beyond v1 scope.
+- [ ] Payment provider integration (after the charging decision — still
+      parked, nothing is charged)
+- [ ] Licensing decision — Settings → About states the project is
+      unlicensed (version/environment info is shown)
 
 ## 5. Pre-release checklist
 
@@ -314,24 +354,25 @@ acts copy in the AI composer. Residual ERP-feel:
 
 ---
 
-## Appendix A — Pending CI fix (requires repo-owner push)
+## Appendix A — Pending CI update (requires repo-owner push)
 
 The agent token used in this session lacks GitHub `workflows` permission,
-so the CI fix below **could not be committed** and is recorded here for the
-repo owner to apply (replace `.github/workflows/ci.yml`, then push).
-Everything else in this pass is already committed.
+so the updated workflow below **could not be committed** and is recorded
+here for the repo owner to apply (replace `.github/workflows/ci.yml`, then
+push). Everything else in this pass is already committed.
 
 ```yaml
 name: CI
 
-# Co-op's enforced gates — the ones the repo actually maintains:
-#   backend  — full pytest suite (incl. the frontend<->backend contract test,
-#              which needs the whole repo, so it runs from the repo root)
-#   frontend — TypeScript check + production build
+# Co-op's enforced gates:
+#   backend    — ruff lint (E/F/W, line-length 100) + full pytest suite
+#                (incl. the frontend<->backend contract test, which needs the
+#                whole repo, so everything runs from the repo root)
+#   frontend   — eslint + TypeScript check + production build
+#   commitlint — conventional-commit shape of every commit in the PR
 #
-# Lint tooling (flake8/black/mypy, eslint/prettier) and commitlint are NOT
-# wired here yet — see docs/PRODUCT_READINESS.md (hardening backlog). A gate
-# that can't pass (or can't fail) doesn't belong in CI.
+# A gate that can't pass (or can't fail) doesn't belong in CI: each of these
+# is green on the current tree and is kept green locally by the same commands.
 
 on:
   push:
@@ -348,7 +389,7 @@ env:
 
 jobs:
   backend:
-    name: Backend tests
+    name: Backend lint + tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -361,13 +402,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio ruff
+
+      - name: Lint (ruff E/F/W)
+        run: ruff check backend/
 
       - name: Run test suite
         run: python -m pytest
 
   frontend:
-    name: Frontend type-check + build
+    name: Frontend lint + type-check + build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -382,6 +426,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Lint (eslint)
+        working-directory: frontend
+        run: npm run lint
+
       - name: Type check
         working-directory: frontend
         run: npx tsc --noEmit -p tsconfig.json
@@ -389,4 +437,27 @@ jobs:
       - name: Production build
         working-directory: frontend
         run: npm run build
+
+  commitlint:
+    name: Commit messages (conventional)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate PR commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: npx commitlint --from "$BASE_SHA" --to HEAD --verbose
 ```

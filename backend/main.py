@@ -12,38 +12,70 @@ Authentication model (this phase):
 """
 
 import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, or_, select, text
 from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 from . import briefing as briefing_mod
 from . import importer
+from . import audit as audit_mod
+from . import backups as backups_mod
 from .ai import service as ai_service
 from .ai import forecast as ai_forecast_mod
 from .ai import history as ai_history_mod
+from .ai import prompts as ai_prompts_mod
+from .ai.ratelimit import SlidingWindowRateLimiter, enforce_ai_rate_limit
 from .exports import export_report, ExportError
 from .notifications import build_daily_summary
+from .notifications import delivery as delivery_mod
 from .notifications.schemas import DailySummary as DailySummarySchema
 from .reports import FilterError, ReportFilters, REPORT_TITLES, build_report
 from .sync import ALLOWED_ORDER_TRANSITIONS, apply_push
 from .pull import build_pull_payload
 from .clerk_auth import ClerkUser, get_frontend_api, verify_clerk_token
+from .config import get_env, load_config
+from . import team as team_mod
 from .database import dispose_db, get_db, init_db
-from .models import Business, Customer, Order, OrderItem, Product, StockMovement, StockMovementReason
+from .models import (
+    Business,
+    BusinessInvitation,
+    BusinessMember,
+    Customer,
+    Order,
+    OrderItem,
+    Product,
+    StockMovement,
+    StockMovementReason,
+)
 from .schemas import (
     ALLOWED_CURRENCIES,
     ALLOWED_TIMEZONES,
     AdjustStockRequest,
+    AuditEntryOut,
     AuthMeResponse,
     BusinessSettingsOut,
     BusinessSettingsUpdate,
@@ -66,9 +98,14 @@ from .schemas import (
     ProductUpdate,
     RevenueMonthResponse,
     RevenueTodayResponse,
-    StockMovementOut,
     TimeseriesPoint,
     TopProductItem,
+    TeamInviteAccept,
+    TeamInviteCreate,
+    TeamInviteOut,
+    TeamMemberOut,
+    TeamResponse,
+    TeamRoleUpdate,
 )
 
 # ---------------------------------------------------------------------------
@@ -96,16 +133,33 @@ app = FastAPI(
 )
 
 # CORS: Bearer-token auth (no cookies), so '*' without credentials is a safe
-# dev default. Set CORS_ORIGINS to a comma-separated allow-list to tighten it
-# (e.g. https://app.coop.example) (Task 12 polish).
-_cors_origins = [
-    o.strip()
-    for o in os.getenv("CORS_ORIGINS", "*").split(",")
-    if o.strip()
-]
+# DEV default. Production refuses to start with an open CORS policy: set
+# CORS_ORIGINS (comma-separated) or config/production.json cors.origins —
+# neither present means a RuntimeError at startup (hardening backlog item).
+def cors_allowlist() -> list[str]:
+    """Resolve the CORS origin allow-list for the active environment."""
+    raw = os.getenv("CORS_ORIGINS")
+    if raw:
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    if get_env() == "production":
+        origins = [
+            o
+            for o in (load_config().get("cors", {}) or {}).get("origins", [])
+            if o
+        ]
+        if not origins:
+            raise RuntimeError(
+                "CORS_ORIGINS is not set and production config has no "
+                "cors.origins. Refusing to start with an open CORS policy "
+                "in production."
+            )
+        return origins
+    return ["*"]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=cors_allowlist(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -113,6 +167,10 @@ app.add_middleware(
 
 # Order statuses that count toward revenue/profit (not pending/cancelled).
 _ACTIVE_STATUSES = ["shipped", "delivered"]
+
+# Daily-summary email: 3 sends per 15 minutes per business. The summary is
+# one identical message; this only stops accidental spam/refresh loops.
+_SUMMARY_EMAIL_LIMITER = SlidingWindowRateLimiter(requests=3, window_seconds=900)
 
 
 # ---------------------------------------------------------------------------
@@ -140,26 +198,77 @@ def _out_of_stock_case():
 # ---------------------------------------------------------------------------
 
 async def get_current_business(
+    request: Request,
     user: ClerkUser = Depends(verify_clerk_token),
     db: AsyncSession = Depends(get_db),
 ) -> Business:
-    """Resolve the caller's business, creating it on first use."""
+    """Resolve the caller's business and role (TRD Ch17 §17.7).
+
+    Owners match on owner_id (auto-provisioned on first use). Non-owners
+    resolve through their team membership. The resolved role is stored on
+    request.state and every mutation is checked against the role matrix
+    here — the single choke point all business endpoints pass through.
+    """
     stmt = select(Business).where(
         Business.owner_id == user.user_id,
         Business.deleted_at.is_(None),
     ).order_by(Business.id).limit(1)
     business = (await db.execute(stmt)).scalars().first()
 
+    role = "owner"
     if business is None:
-        business = Business(
-            name="My Business",
-            owner_id=user.user_id,
-            currency="USD",
-            created_by=user.user_id,
-        )
-        db.add(business)
-        await db.flush()
+        member = (
+            await db.execute(
+                select(BusinessMember)
+                .where(BusinessMember.user_id == user.user_id)
+                .order_by(BusinessMember.id)
+                .limit(1)
+            )
+        ).scalars().first()
+        if member is not None:
+            business = (
+                await db.execute(
+                    select(Business).where(
+                        Business.id == member.business_id,
+                        Business.deleted_at.is_(None),
+                    )
+                )
+            ).scalars().first()
+            if business is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Your team's business no longer exists",
+                )
+            role = member.role
+        else:
+            if user.email:
+                pending = (
+                    await db.execute(
+                        select(BusinessInvitation)
+                        .where(
+                            BusinessInvitation.email == user.email.lower(),
+                            BusinessInvitation.status == "pending",
+                        )
+                        .limit(1)
+                    )
+                ).scalars().first()
+                if pending is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="You have a pending team invitation — accept it first",
+                    )
+            business = Business(
+                name="My Business",
+                owner_id=user.user_id,
+                currency="USD",
+                created_by=user.user_id,
+            )
+            db.add(business)
+            await db.flush()
 
+    request.state.team_role = role
+    request.state.is_owner = role == "owner"
+    team_mod.assert_can_write(role, request.method, request.url.path)
     return business
 
 
@@ -195,14 +304,392 @@ async def read_root() -> dict:
 # ---------------------------------------------------------------------------
 
 @app.get("/auth/me", response_model=AuthMeResponse, tags=["Authentication"])
-async def auth_me(business: Business = Depends(get_current_business)) -> AuthMeResponse:
-    """Identity + tenant for the signed-in user (Clerk-verified)."""
+async def auth_me(
+    user: ClerkUser = Depends(verify_clerk_token),
+    db: AsyncSession = Depends(get_db),
+) -> AuthMeResponse:
+    """Identity + tenant for the signed-in user (Clerk-verified).
+
+    Resolution order: owned business -> team membership -> pending
+    invitation (the invitee must accept before a business is provisioned).
+    A brand-new owner gets the auto-provisioned "My Business".
+    """
+    business = (
+        await db.execute(
+            select(Business)
+            .where(Business.owner_id == user.user_id, Business.deleted_at.is_(None))
+            .order_by(Business.id)
+            .limit(1)
+        )
+    ).scalars().first()
+
+    if business is not None:
+        return AuthMeResponse(
+            user_id=user.user_id,
+            business_id=business.id,
+            business_name=business.name,
+            currency=business.currency or "USD",
+            role="owner",
+            email=user.email,
+        )
+
+    member = (
+        await db.execute(
+            select(BusinessMember)
+            .where(BusinessMember.user_id == user.user_id)
+            .order_by(BusinessMember.id)
+            .limit(1)
+        )
+    ).scalars().first()
+    if member is not None:
+        team_business = (
+            await db.execute(
+                select(Business).where(
+                    Business.id == member.business_id, Business.deleted_at.is_(None)
+                )
+            )
+        ).scalars().first()
+        if team_business is not None:
+            return AuthMeResponse(
+                user_id=user.user_id,
+                business_id=team_business.id,
+                business_name=team_business.name,
+                currency=team_business.currency or "USD",
+                role=member.role,
+                email=member.email or user.email,
+            )
+
+    if user.email:
+        invite = (
+            await db.execute(
+                select(BusinessInvitation)
+                .where(
+                    BusinessInvitation.email == user.email.lower(),
+                    BusinessInvitation.status == "pending",
+                )
+                .order_by(BusinessInvitation.id.desc())
+                .limit(1)
+            )
+        ).scalars().first()
+        if invite is not None:
+            invite_business = (
+                await db.execute(
+                    select(Business).where(
+                        Business.id == invite.business_id, Business.deleted_at.is_(None)
+                    )
+                )
+            ).scalars().first()
+            return AuthMeResponse(
+                user_id=user.user_id,
+                business_id=None,
+                business_name=invite_business.name if invite_business else "",
+                currency="USD",
+                role="viewer",
+                email=user.email,
+                pending_invitation=TeamInviteOut(
+                    token=invite.token,
+                    email=invite.email,
+                    role=invite.role,
+                    status=invite.status,
+                    business_name=invite_business.name if invite_business else "",
+                    created_at=invite.created_at,
+                ),
+            )
+
+    # Brand-new owner: auto-provision on first contact.
+    business = Business(
+        name="My Business",
+        owner_id=user.user_id,
+        currency="USD",
+        created_by=user.user_id,
+    )
+    db.add(business)
+    await db.flush()
     return AuthMeResponse(
-        user_id=business.owner_id or "",
+        user_id=user.user_id,
         business_id=business.id,
         business_name=business.name,
-        currency=business.currency or "USD",
+        currency="USD",
+        role="owner",
+        email=user.email,
     )
+
+
+# ---------------------------------------------------------------------------
+# Team (TRD Ch17 §17.7) — memberships, roles, invitations
+# ---------------------------------------------------------------------------
+
+def _invite_out(invite, business_name: str) -> TeamInviteOut:
+    return TeamInviteOut(
+        token=invite.token,
+        email=invite.email,
+        role=invite.role,
+        status=invite.status,
+        business_name=business_name,
+        created_at=invite.created_at,
+    )
+
+
+@app.get("/team", response_model=TeamResponse, tags=["Team"])
+async def get_team(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> TeamResponse:
+    """Members + invitations for the tenant. Any member may read the roster;
+    management endpoints below are owner-only."""
+    members = (
+        (
+            await db.execute(
+                select(BusinessMember)
+                .where(BusinessMember.business_id == business.id)
+                .order_by(BusinessMember.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    invites = (
+        (
+            await db.execute(
+                select(BusinessInvitation)
+                .where(BusinessInvitation.business_id == business.id)
+                .order_by(BusinessInvitation.id.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return TeamResponse(
+        members=[
+            TeamMemberOut(
+                user_id=m.user_id,
+                email=m.email,
+                role=m.role,
+                joined_at=m.created_at,
+            )
+            for m in members
+        ],
+        invitations=[_invite_out(i, business.name) for i in invites],
+    )
+
+
+@app.post(
+    "/team/invites",
+    response_model=TeamInviteOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Team"],
+)
+async def create_team_invite(
+    payload: TeamInviteCreate,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> TeamInviteOut:
+    """Owner invites someone by email with one of the five future roles."""
+    email = payload.email.lower()
+    if business.owner_email and business.owner_email.lower() == email:
+        raise HTTPException(status_code=400, detail="That is the owner's email")
+    existing_member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == business.id,
+                BusinessMember.email == email,
+            )
+        )
+    ).scalars().first()
+    if existing_member is not None:
+        raise HTTPException(status_code=400, detail="That person is already a member")
+
+    token = secrets.token_urlsafe(24)
+    invite = BusinessInvitation(
+        business_id=business.id,
+        email=email,
+        role=payload.role,
+        token=token,
+        status="pending",
+        created_by=user.user_id,
+    )
+    db.add(invite)
+    await db.flush()
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "team",
+        invite.id,
+        "INVITE",
+        {"email": email, "role": payload.role},
+        actor=user.user_id,
+    )
+    return _invite_out(invite, business.name)
+
+
+@app.post("/team/invites/accept", response_model=TeamMemberOut, tags=["Team"])
+async def accept_team_invite(
+    payload: TeamInviteAccept,
+    user: ClerkUser = Depends(verify_clerk_token),
+    db: AsyncSession = Depends(get_db),
+) -> TeamMemberOut:
+    """The invited person claims the invite. Deliberately independent of
+    get_current_business: the invitee has no business yet."""
+    invite = (
+        await db.execute(
+            select(BusinessInvitation).where(BusinessInvitation.token == payload.token)
+        )
+    ).scalars().first()
+    if invite is None or invite.status != "pending":
+        raise HTTPException(status_code=400, detail="Invitation not found or no longer pending")
+    if user.email and invite.email != user.email.lower():
+        raise HTTPException(
+            status_code=403, detail="This invitation was sent to a different email"
+        )
+
+    business = (
+        await db.execute(
+            select(Business).where(
+                Business.id == invite.business_id, Business.deleted_at.is_(None)
+            )
+        )
+    ).scalars().first()
+    if business is None:
+        raise HTTPException(status_code=404, detail="The inviting business no longer exists")
+
+    member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == invite.business_id,
+                BusinessMember.user_id == user.user_id,
+            )
+        )
+    ).scalars().first()
+    if member is None:
+        member = BusinessMember(
+            business_id=invite.business_id,
+            user_id=user.user_id,
+            email=invite.email,
+            role=invite.role,
+            invited_by=invite.created_by,
+        )
+        db.add(member)
+        await db.flush()
+
+    invite.status = "accepted"
+    invite.accepted_by = user.user_id
+    await audit_mod.record_audit(
+        db,
+        invite.business_id,
+        "team",
+        invite.id,
+        "INVITE_ACCEPT",
+        {"email": invite.email, "role": invite.role},
+        actor=user.user_id,
+    )
+    return TeamMemberOut(
+        user_id=member.user_id,
+        email=member.email,
+        role=member.role,
+        joined_at=member.created_at,
+    )
+
+
+@app.delete("/team/invites/{token}", tags=["Team"])
+async def revoke_team_invite(
+    token: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> dict:
+    invite = (
+        await db.execute(
+            select(BusinessInvitation).where(
+                BusinessInvitation.token == token,
+                BusinessInvitation.business_id == business.id,
+            )
+        )
+    ).scalars().first()
+    if invite is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if invite.status == "pending":
+        invite.status = "revoked"
+        await audit_mod.record_audit(
+            db,
+            business.id,
+            "team",
+            invite.id,
+            "INVITE_REVOKE",
+            {"email": invite.email},
+            actor=user.user_id,
+        )
+    return {"ok": True}
+
+
+@app.patch("/team/members/{member_user_id}", response_model=TeamMemberOut, tags=["Team"])
+async def update_team_member_role(
+    member_user_id: str,
+    payload: TeamRoleUpdate,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> TeamMemberOut:
+    member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == business.id,
+                BusinessMember.user_id == member_user_id,
+            )
+        )
+    ).scalars().first()
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    member.role = payload.role
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "team",
+        member.id,
+        "MEMBER_ROLE",
+        {"user_id": member.user_id, "role": payload.role},
+        actor=user.user_id,
+    )
+    return TeamMemberOut(
+        user_id=member.user_id,
+        email=member.email,
+        role=member.role,
+        joined_at=member.created_at,
+    )
+
+
+@app.delete("/team/members/{member_user_id}", tags=["Team"])
+async def remove_team_member(
+    member_user_id: str,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> dict:
+    member = (
+        await db.execute(
+            select(BusinessMember).where(
+                BusinessMember.business_id == business.id,
+                BusinessMember.user_id == member_user_id,
+            )
+        )
+    ).scalars().first()
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    await db.delete(member)
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "team",
+        member.id,
+        "MEMBER_REMOVE",
+        {"user_id": member.user_id, "role": member.role},
+        actor=user.user_id,
+    )
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +729,16 @@ async def update_business_settings(
                 status_code=422,
                 detail=f"Unsupported timezone '{data['timezone']}'.",
             )
+    if "ai_response_style" in data and data["ai_response_style"] is not None:
+        style = data["ai_response_style"]
+        if style not in ai_prompts_mod.ALLOWED_AI_RESPONSE_STYLES:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Unsupported AI response style '{style}'. "
+                    f"Allowed: {', '.join(ai_prompts_mod.ALLOWED_AI_RESPONSE_STYLES)}"
+                ),
+            )
 
     # Only schema-whitelisted fields can ever be set here (owner_id, id,
     # timestamps, version are not part of BusinessSettingsUpdate).
@@ -251,7 +748,71 @@ async def update_business_settings(
 
     await db.flush()
     await db.refresh(business)
+    await audit_mod.record_audit(
+        db, business.id, "businesses", business.id, "update",
+        change=data, actor=business.owner_id,
+    )
     return business
+
+
+# ---------------------------------------------------------------------------
+# Audit log (hardening backlog) — append-only trail of every mutation in the
+# tenant, written by the same transaction as the mutation it describes.
+# ---------------------------------------------------------------------------
+
+@app.get("/audit", response_model=List[AuditEntryOut], tags=["Audit"])
+async def audit_entries(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> List[AuditEntryOut]:
+    """The caller's activity log, newest first (tenant-scoped)."""
+    rows = await audit_mod.list_entries(db, business.id, limit=limit, offset=offset)
+    return [AuditEntryOut.model_validate(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Backup & Restore (PRD Phase 4 "Backup system").
+#
+# Export downloads a JSON snapshot of the tenant's business data; restore
+# uploads one and is allowed ONLY into an empty business (never a merge).
+# ---------------------------------------------------------------------------
+
+@app.get("/backups/export", tags=["Backup"])
+async def backups_export(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Download the tenant's business data as a Co-op backup file."""
+    payload = await backups_mod.build_backup(db, business)
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    return JSONResponse(
+        content=payload,
+        headers={
+            "Content-Disposition": f'attachment; filename="coop-backup-{stamp}.json"'
+        },
+    )
+
+
+@app.post("/backups/restore", tags=["Backup"])
+async def backups_restore(
+    payload: Dict[str, Any],
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """Restore a Co-op backup into an EMPTY business (409 otherwise)."""
+    try:
+        result = await backups_mod.restore_backup(db, business, payload)
+    except backups_mod.RestoreRefused as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except backups_mod.BackupValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await audit_mod.record_audit(
+        db, business.id, "businesses", business.id, "restore",
+        change={"restored": result["restored"]}, actor=business.owner_id,
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +899,12 @@ async def _change_stock(
     )
 
 
-@app.post("/products", response_model=ProductOut, status_code=status.HTTP_201_CREATED, tags=["Products"])
+@app.post(
+    "/products",
+    response_model=ProductOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Products"],
+)
 async def create_product(
     product: ProductCreate,
     business: Business = Depends(get_current_business),
@@ -355,7 +921,11 @@ async def create_product(
     if (await db.execute(stmt)).scalars().first():
         raise HTTPException(status_code=409, detail="SKU already exists")
 
-    new_product = Product(**product.model_dump(), business_id=business.id, created_by=business.owner_id)
+    new_product = Product(
+        **product.model_dump(),
+        business_id=business.id,
+        created_by=business.owner_id,
+    )
     db.add(new_product)
     try:
         await db.flush()
@@ -370,13 +940,20 @@ async def create_product(
             StockMovementReason.initial, business.owner_id,
         )
     await db.refresh(new_product)
+    await audit_mod.record_audit(
+        db, business.id, "products", new_product.id, "create",
+        change={"sku": new_product.sku, "name": new_product.name},
+        actor=business.owner_id,
+    )
     return new_product
 
 
 @app.get("/products", response_model=ProductListResponse, tags=["Products"])
 async def list_products(
     search: Optional[str] = Query(None, min_length=1),
-    low_stock: bool = Query(False, description="Only products in stock but at/below their reorder level"),
+    low_stock: bool = Query(
+        False, description="Only products in stock but at/below their reorder level"
+    ),
     stock: Optional[str] = Query(
         None, description="Stock status filter: in | low | out (Task 8)"
     ),
@@ -396,7 +973,10 @@ async def list_products(
         if stock == "out":
             base = base.where(Product.current_stock == 0)
         elif stock == "low":
-            base = base.where(Product.current_stock > 0, Product.current_stock <= Product.reorder_level)
+            base = base.where(
+                Product.current_stock > 0,
+                Product.current_stock <= Product.reorder_level,
+            )
         else:  # "in"
             base = base.where(Product.current_stock > Product.reorder_level)
     if search:
@@ -419,7 +999,9 @@ async def get_product(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> ProductOut:
-    stmt = select(Product).where(Product.id == id, Product.business_id == business.id, Product.deleted_at.is_(None))
+    stmt = select(Product).where(
+        Product.id == id, Product.business_id == business.id, Product.deleted_at.is_(None)
+    )
     product = (await db.execute(stmt)).scalars().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -439,6 +1021,10 @@ async def update_product(
     product.updated_by = business.owner_id
     await db.flush()
     await db.refresh(product)
+    await audit_mod.record_audit(
+        db, business.id, "products", product.id, "update",
+        change=updates.model_dump(exclude_unset=True), actor=business.owner_id,
+    )
     return product
 
 
@@ -453,6 +1039,9 @@ async def delete_product(
     product.deleted_at = datetime.utcnow()
     product.deleted_by = business.owner_id
     await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "products", product.id, "delete", actor=business.owner_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +1067,11 @@ async def adjust_stock(
     )
     await db.flush()
     await db.refresh(product)
+    await audit_mod.record_audit(
+        db, business.id, "products", product.id, "adjust",
+        change={"change": req.change, "reason": req.reason.value, "note": req.note},
+        actor=business.owner_id,
+    )
     return product
 
 
@@ -511,13 +1105,20 @@ async def inventory_summary(
     row = (await db.execute(
         select(
             func.count(Product.id),
-            func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
+            func.coalesce(
+                func.sum(
+                    Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)
+                ),
+                0.0,
+            ),
             func.coalesce(func.sum(_strictly_low_stock_case()), 0),
             func.coalesce(func.sum(_out_of_stock_case()), 0),
         ).where(*scope)
     )).one()
     categories = (await db.execute(
-        select(func.count(func.distinct(Product.category))).where(*scope, Product.category.is_not(None))
+        select(func.count(func.distinct(Product.category))).where(
+            *scope, Product.category.is_not(None)
+        )
     )).scalar() or 0
     return InventorySummary(
         products_count=row[0],
@@ -532,7 +1133,12 @@ async def inventory_summary(
 # Customers CRUD (tenant-scoped)
 # ---------------------------------------------------------------------------
 
-@app.post("/customers", response_model=CustomerOut, status_code=status.HTTP_201_CREATED, tags=["Customers"])
+@app.post(
+    "/customers",
+    response_model=CustomerOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Customers"],
+)
 async def create_customer(
     customer: CustomerCreate,
     business: Business = Depends(get_current_business),
@@ -549,10 +1155,19 @@ async def create_customer(
     if (await db.execute(stmt)).scalars().first():
         raise HTTPException(status_code=409, detail="Email already exists")
 
-    new_customer = Customer(**customer.model_dump(), business_id=business.id, created_by=business.owner_id)
+    new_customer = Customer(
+        **customer.model_dump(),
+        business_id=business.id,
+        created_by=business.owner_id,
+    )
     db.add(new_customer)
     await db.flush()
     await db.refresh(new_customer)
+    await audit_mod.record_audit(
+        db, business.id, "customers", new_customer.id, "create",
+        change={"email": new_customer.email, "full_name": new_customer.full_name},
+        actor=business.owner_id,
+    )
     return new_customer
 
 
@@ -565,11 +1180,17 @@ async def list_customers(
     db: AsyncSession = Depends(get_db),
 ) -> CustomerListResponse:
     """Paginated, searchable customer listing (Task 6 envelope)."""
-    base = select(Customer).where(Customer.business_id == business.id, Customer.deleted_at.is_(None))
+    base = select(Customer).where(
+        Customer.business_id == business.id, Customer.deleted_at.is_(None)
+    )
     if search:
         like = f"%{search.lower()}%"
         base = base.where(
-            or_(Customer.full_name.ilike(like), Customer.email.ilike(like), Customer.company.ilike(like))
+            or_(
+                Customer.full_name.ilike(like),
+                Customer.email.ilike(like),
+                Customer.company.ilike(like),
+            )
         )
 
     total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
@@ -586,7 +1207,9 @@ async def get_customer(
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> CustomerOut:
-    stmt = select(Customer).where(Customer.id == id, Customer.business_id == business.id, Customer.deleted_at.is_(None))
+    stmt = select(Customer).where(
+        Customer.id == id, Customer.business_id == business.id, Customer.deleted_at.is_(None)
+    )
     customer = (await db.execute(stmt)).scalars().first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -618,6 +1241,10 @@ async def update_customer(
     customer.updated_by = business.owner_id
     await db.flush()
     await db.refresh(customer)
+    await audit_mod.record_audit(
+        db, business.id, "customers", customer.id, "update",
+        change=updates.model_dump(exclude_unset=True), actor=business.owner_id,
+    )
     return customer
 
 
@@ -631,6 +1258,9 @@ async def delete_customer(
     customer.deleted_at = datetime.utcnow()
     customer.deleted_by = business.owner_id
     await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "customers", customer.id, "delete", actor=business.owner_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -665,7 +1295,10 @@ async def _load_order(id: int, business: Business, db: AsyncSession) -> Order:
 
 
 def _serialize_order(order: Order) -> OrderOut:
-    from .schemas import OrderItemOut, OrderStatus as SchemaOrderStatus  # local import: avoids cycle at module load
+    from .schemas import (
+        OrderItemOut,
+        OrderStatus as SchemaOrderStatus  # local import: avoids cycle at module load,
+    )
 
     current = order.status.value if hasattr(order.status, "value") else str(order.status)
     allowed = [
@@ -778,6 +1411,15 @@ async def create_order(
             db, business.id, product, -item.quantity,
             StockMovementReason.order, business.owner_id, order_id=new_order.id,
         )
+    await audit_mod.record_audit(
+        db, business.id, "orders", new_order.id, "create",
+        change={
+            "customer_id": new_order.customer_id,
+            "total_amount": new_order.total_amount,
+            "status": "pending",
+        },
+        actor=business.owner_id,
+    )
     return _serialize_order(await _load_order(new_order.id, business, db))
 
 
@@ -813,7 +1455,10 @@ async def list_orders(
 ) -> OrderListResponse:
     base = (
         select(Order)
-        .options(selectinload(Order.customer), selectinload(Order.items).selectinload(OrderItem.product))
+        .options(
+            selectinload(Order.customer),
+            selectinload(Order.items).selectinload(OrderItem.product),
+        )
         .where(Order.business_id == business.id, Order.deleted_at.is_(None))
     )
     if status_filter:
@@ -830,7 +1475,9 @@ async def list_orders(
     if end_date:
         base = base.where(Order.created_at <= end_date)
 
-    total = (await db.execute(select(func.count()).select_from(base.order_by(None).subquery()))).scalar() or 0
+    total = (
+        await db.execute(select(func.count()).select_from(base.order_by(None).subquery()))
+    ).scalar() or 0
     rows = (await db.execute(
         base.order_by(Order.id.desc()).offset((page - 1) * limit).limit(limit)
     )).scalars().all()
@@ -877,6 +1524,10 @@ async def update_order_status(
     order.updated_by = business.owner_id
     await db.flush()
     await db.refresh(order)
+    await audit_mod.record_audit(
+        db, business.id, "orders", order.id, "status",
+        change={"from": current, "to": requested}, actor=business.owner_id,
+    )
     # Re-load relationships refreshed by the stock restore.
     return _serialize_order(await _load_order(id, business, db))
 
@@ -895,6 +1546,10 @@ async def delete_order(
     order.deleted_at = datetime.utcnow()
     order.deleted_by = business.owner_id
     await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "orders", order.id, "delete",
+        change={"status": current}, actor=business.owner_id,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -918,7 +1573,11 @@ async def dashboard_summary(
     today = date.today()
     first_this = _first_day_of_month(today)
     first_next = _next_month_start(today)
-    first_last = date(today.year, today.month - 1, 1) if today.month > 1 else date(today.year - 1, 12, 1)
+    first_last = (
+        date(today.year, today.month - 1, 1)
+        if today.month > 1
+        else date(today.year - 1, 12, 1)
+    )
 
     bid = business.id
     order_scope = [Order.business_id == bid, Order.deleted_at.is_(None)]
@@ -926,7 +1585,11 @@ async def dashboard_summary(
     # Revenue/orders today (delivered).
     today_row = (await db.execute(
         select(func.coalesce(func.sum(Order.total_amount), 0.0), func.count(Order.id))
-        .where(*order_scope, Order.status == "delivered", Order.order_date >= datetime.combine(today, time.min))
+        .where(
+            *order_scope,
+            Order.status == "delivered",
+            Order.order_date >= datetime.combine(today, time.min),
+        )
     )).one()
 
     # Revenue/orders this month (shipped + delivered).
@@ -949,7 +1612,10 @@ async def dashboard_summary(
     # Profit this month: sum((unit_price - cost_price) * qty) over order items.
     profit = (await db.execute(
         select(func.coalesce(
-            func.sum((OrderItem.unit_price - func.coalesce(Product.cost_price, 0.0)) * OrderItem.quantity),
+            func.sum(
+                (OrderItem.unit_price - func.coalesce(Product.cost_price, 0.0))
+                * OrderItem.quantity
+            ),
             0.0,
         ))
         .join(Order, Order.id == OrderItem.order_id)
@@ -964,7 +1630,12 @@ async def dashboard_summary(
     inv_row = (await db.execute(
         select(
             func.count(Product.id),
-            func.coalesce(func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)), 0.0),
+            func.coalesce(
+                func.sum(
+                    Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)
+                ),
+                0.0,
+            ),
             func.coalesce(func.sum(_strictly_low_stock_case()), 0),
             func.coalesce(func.sum(_out_of_stock_case()), 0),
         ).where(Product.business_id == bid, Product.deleted_at.is_(None))
@@ -972,7 +1643,9 @@ async def dashboard_summary(
 
     # Customers.
     cust_total = (await db.execute(
-        select(func.count(Customer.id)).where(Customer.business_id == bid, Customer.deleted_at.is_(None))
+        select(func.count(Customer.id)).where(
+            Customer.business_id == bid, Customer.deleted_at.is_(None)
+        )
     )).scalar() or 0
     cust_new = (await db.execute(
         select(func.count(Customer.id)).where(
@@ -1026,7 +1699,11 @@ async def inventory_by_category(
 ) -> List[CategoryValue]:
     """Inventory value grouped by category for the donut chart."""
     category = func.coalesce(Product.category, "Uncategorized").label("category")
-    value = func.sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price)).label("value")
+    value = (
+        func
+        .sum(Product.current_stock * func.coalesce(Product.cost_price, Product.unit_price))
+        .label("value")
+    )
     rows = (await db.execute(
         select(category, value)
         .where(Product.business_id == business.id, Product.deleted_at.is_(None))
@@ -1073,8 +1750,16 @@ async def growth_monthly_revenue(
 ) -> GrowthResponse:
     today = date.today()
     first_this = _first_day_of_month(today)
-    first_last = date(today.year, today.month - 1, 1) if today.month > 1 else date(today.year - 1, 12, 1)
-    scope = [Order.business_id == business.id, Order.deleted_at.is_(None), Order.status.in_(_ACTIVE_STATUSES)]
+    first_last = (
+        date(today.year, today.month - 1, 1)
+        if today.month > 1
+        else date(today.year - 1, 12, 1)
+    )
+    scope = [
+        Order.business_id == business.id,
+        Order.deleted_at.is_(None),
+        Order.status.in_(_ACTIVE_STATUSES),
+    ]
 
     this_rev = (await db.execute(
         select(func.coalesce(func.sum(Order.total_amount), 0.0)).where(
@@ -1090,7 +1775,9 @@ async def growth_monthly_revenue(
     )).scalar() or 0.0
 
     growth = round(((this_rev - last_rev) / last_rev) * 100, 2) if last_rev else None
-    return GrowthResponse(this_month_revenue=this_rev, last_month_revenue=last_rev, growth_percent=growth)
+    return GrowthResponse(
+        this_month_revenue=this_rev, last_month_revenue=last_rev, growth_percent=growth
+    )
 
 
 @app.get("/dashboard/low-stock", response_model=int, tags=["Dashboard"])
@@ -1281,7 +1968,11 @@ async def imports_validate(
         raise HTTPException(status_code=400, detail="Invalid mapping JSON.")
     data = await _read_upload(file)
     parsed = await _run_import_payload(
-        ImportRunRequest(entity=entity, mapping=mapping_dict), data, file.filename or "upload", business, db
+        ImportRunRequest(entity=entity, mapping=mapping_dict),
+        data,
+        file.filename or "upload",
+        business,
+        db,
     )
     v = await importer.validate_import(db, business.id, parsed, entity, mapping_dict)
     return {
@@ -1315,7 +2006,11 @@ async def imports_commit(
         raise HTTPException(status_code=400, detail="Invalid mapping JSON.")
     data = await _read_upload(file)
     parsed = await _run_import_payload(
-        ImportRunRequest(entity=entity, mapping=mapping_dict), data, file.filename or "upload", business, db
+        ImportRunRequest(entity=entity, mapping=mapping_dict),
+        data,
+        file.filename or "upload",
+        business,
+        db,
     )
     try:
         result = await importer.execute_import(db, business.id, parsed, entity, mapping_dict)
@@ -1324,7 +2019,19 @@ async def imports_commit(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="The import failed and was rolled back. No data was written.")
+        raise HTTPException(
+            status_code=400,
+            detail="The import failed and was rolled back. No data was written.",
+        )
+    await audit_mod.record_audit(
+        db, business.id, "import_batches", result.batch_id, "import",
+        change={
+            "entity": result.dataset,
+            "created": result.created,
+            "skipped": result.skipped,
+        },
+        actor=business.owner_id,
+    )
     return {
         "entity": result.dataset,
         "batch_id": result.batch_id,
@@ -1358,10 +2065,16 @@ async def onboarding_state(
     """Whether the tenant has any business data yet — drives the first-run
     "Welcome to Co-op" screen. A tenant counts as onboarded when it has at
     least one product, customer or order (imported or created live)."""
-    scope = lambda m: m.business_id == business.id, m.deleted_at.is_(None)  # noqa: E731
-    prod = (await db.execute(select(func.count()).select_from(Product).where(*scope(Product)))).scalar() or 0
-    cust = (await db.execute(select(func.count()).select_from(Customer).where(*scope(Customer)))).scalar() or 0
-    orders = (await db.execute(select(func.count()).select_from(Order).where(*scope(Order)))).scalar() or 0
+    scope = lambda m: (m.business_id == business.id, m.deleted_at.is_(None))  # noqa: E731
+    prod = (
+        await db.execute(select(func.count()).select_from(Product).where(*scope(Product)))
+    ).scalar() or 0
+    cust = (
+        await db.execute(select(func.count()).select_from(Customer).where(*scope(Customer)))
+    ).scalar() or 0
+    orders = (
+        await db.execute(select(func.count()).select_from(Order).where(*scope(Order)))
+    ).scalar() or 0
     return {
         "has_data": (prod + cust + orders) > 0,
         "products": prod,
@@ -1407,6 +2120,7 @@ async def ai_chat(
     req: AiChatRequest,
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
+    _rate: None = Depends(enforce_ai_rate_limit),
 ) -> dict:
     """One grounded AI turn: verified context -> model -> structured answer.
 
@@ -1455,7 +2169,11 @@ async def ai_usage(
     """Real metered AI usage for the current calendar month (billing reads this)."""
     today = date.today()
     first = datetime.combine(today.replace(day=1), time.min)
-    nxt_month = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
+    nxt_month = (
+        date(today.year + 1, 1, 1)
+        if today.month == 12
+        else date(today.year, today.month + 1, 1)
+    )
     last = datetime.combine(nxt_month, time.min)
     u = await ai_service.month_usage(db, business.id, first, last)
     return AiUsageResponse(
@@ -1479,7 +2197,9 @@ async def ai_forecast(
     as an estimate. No model call, no credits: a pure calculation over
     verified data, so it is free and instant.
     """
-    return await ai_forecast_mod.build_forecast(db, business.id, currency=business.currency or "USD")
+    return await ai_forecast_mod.build_forecast(
+        db, business.id, currency=business.currency or "USD"
+    )
 
 
 class AiHistoryItem(BaseModel):
@@ -1566,6 +2286,10 @@ async def billing_change_plan(
         await billing_mod.change_plan(db, business, req.plan, actor=business.owner_id)
     except InvalidPlan as e:
         raise HTTPException(status_code=422, detail=str(e))
+    await audit_mod.record_audit(
+        db, business.id, "subscriptions", None, "plan",
+        change={"plan": req.plan}, actor=business.owner_id,
+    )
     return await billing_mod.billing_summary(db, business)
 
 
@@ -1585,6 +2309,52 @@ async def notifications_daily_summary(
 ) -> DailySummarySchema:
     """Today's verified business summary for the in-app notification panel."""
     return await build_daily_summary(db, business)
+
+
+class SummarySendRequest(BaseModel):
+    email: Optional[EmailStr] = None
+
+
+@app.post("/notifications/summary/send", tags=["Notifications"])
+async def send_daily_summary_email(
+    payload: SummarySendRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+) -> dict:
+    """Email today's verified summary to the owner/manager (or the address
+    they give). SMTP settings come from notifications.smtp + env overrides;
+    unconfigured deployments answer 503 — the in-app summary still works."""
+    recipient = payload.email or user.email or business.owner_email
+    if not recipient:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide an email address to deliver to",
+        )
+    _SUMMARY_EMAIL_LIMITER.check(f"summary:{business.id}:{user.user_id}")
+    summary = await build_daily_summary(db, business)
+    try:
+        await run_in_threadpool(delivery_mod.send_daily_summary_email, summary, recipient)
+    except delivery_mod.EmailNotConfiguredError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email delivery is not configured for this deployment",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The email provider rejected the message — try again later",
+        )
+    await audit_mod.record_audit(
+        db,
+        business.id,
+        "notifications",
+        None,
+        "SUMMARY_EMAIL",
+        {"email": recipient, "date": summary.date},
+        actor=user.user_id,
+    )
+    return {"ok": True, "email": recipient, "date": summary.date}
 
 
 # ---------------------------------------------------------------------------
@@ -1624,7 +2394,9 @@ async def sync_push(
 
 @app.get("/sync/pull", tags=["Sync"])
 async def sync_pull(
-    since: Optional[datetime] = Query(None, description="Delta cursor (ISO). Omit for a full dump."),
+    since: Optional[datetime] = Query(
+        None, description="Delta cursor (ISO). Omit for a full dump."
+    ),
     business: Business = Depends(get_current_business),
     db: AsyncSession = Depends(get_db),
 ) -> dict:

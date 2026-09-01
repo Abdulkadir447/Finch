@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS businesses (
     tax_id        TEXT,
     website       TEXT,
     timezone      TEXT,
+    ai_response_style TEXT NOT NULL DEFAULT 'standard',  -- 0009: concise | standard | detailed
     created_by    TEXT,
     updated_by    TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -206,6 +207,7 @@ CREATE INDEX IF NOT EXISTS idx_sync_queue_business ON sync_queue(business_id);
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id INTEGER,                             -- 0008: tenant scoping
     table_name  TEXT NOT NULL,
     record_id   INTEGER,
     action      TEXT NOT NULL,
@@ -214,6 +216,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_business ON audit_log(business_id);
 
 -- ---------------------------------------------------------------------------
 -- Analytics snapshots (session-based report cache)

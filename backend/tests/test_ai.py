@@ -7,11 +7,10 @@ import datetime as dt
 import json
 
 import pytest
-from sqlalchemy import select
 
 from backend.ai import service as ai_service
 from backend.ai.providers.openai import ProviderError, ProviderResult
-from backend.models import Base, Business, Customer, Order, OrderItem, OrderStatus, Product
+from backend.models import Business, Customer, Order, OrderItem, OrderStatus, Product
 
 
 def _good_reply(**over) -> dict:

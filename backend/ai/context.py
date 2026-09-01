@@ -26,16 +26,30 @@ def _as_date(x) -> Optional[_dt.date]:
     return x
 
 
-async def build_context(db, business_id: int, business_name: str = "", currency: str = "USD") -> dict[str, Any]:
+async def build_context(
+    db, business_id: int, business_name: str = "", currency: str = "USD"
+) -> dict[str, Any]:
     """Assemble the verified context for one business. Read-only."""
     today = _dt.date.today()
     first_this = today.replace(day=1)
-    first_next = _dt.date(today.year + 1, 1, 1) if today.month == 12 else _dt.date(today.year, today.month + 1, 1)
-    first_last = _dt.date(today.year, today.month - 1, 1) if today.month > 1 else _dt.date(today.year - 1, 12, 1)
+    first_next = (
+        _dt.date(today.year + 1, 1, 1)
+        if today.month == 12
+        else _dt.date(today.year, today.month + 1, 1)
+    )
+    first_last = (
+        _dt.date(today.year, today.month - 1, 1)
+        if today.month > 1
+        else _dt.date(today.year - 1, 12, 1)
+    )
     last_30 = today - _dt.timedelta(days=29)
 
     bid = business_id
-    order_scope = [Order.business_id == bid, Order.deleted_at.is_(None), Order.status != "cancelled"]
+    order_scope = [
+        Order.business_id == bid,
+        Order.deleted_at.is_(None),
+        Order.status != "cancelled",
+    ]
 
     # --- Revenue: this month / last month / trailing 30 days ----------------
     async def _rev(a: _dt.date, b: _dt.date) -> tuple[float, int]:
@@ -73,7 +87,6 @@ async def build_context(db, business_id: int, business_name: str = "", currency:
         {"name": r.name, "units": r.units or 0, "revenue": round(r.revenue or 0, 2)}
         for r in top_rows
     ]
-    top30_revenue = sum(t["revenue"] for t in top_products)
 
     # --- Inventory risk ------------------------------------------------------
     products = (await db.execute(
@@ -123,7 +136,13 @@ async def build_context(db, business_id: int, business_name: str = "", currency:
     # --- Margin (trailing 30 days) -------------------------------------------
     margin_row = (await db.execute(
         select(
-            func.coalesce(func.sum((OrderItem.unit_price - func.coalesce(Product.cost_price, 0.0)) * OrderItem.quantity), 0.0),
+            func.coalesce(
+                func.sum(
+                    (OrderItem.unit_price - func.coalesce(Product.cost_price, 0.0))
+                    * OrderItem.quantity
+                ),
+                0.0,
+            ),
             func.coalesce(func.sum(OrderItem.unit_price * OrderItem.quantity), 0.0),
         )
         .join(Order, Order.id == OrderItem.order_id)
@@ -174,7 +193,12 @@ async def build_context(db, business_id: int, business_name: str = "", currency:
             "products": len(products),
             "total_value": round(inv_value, 2),
             "low_stock": [
-                {"name": p.name, "sku": p.sku, "stock": p.current_stock, "reorder_level": p.reorder_level}
+                {
+                    "name": p.name,
+                    "sku": p.sku,
+                    "stock": p.current_stock,
+                    "reorder_level": p.reorder_level,
+                }
                 for p in low
             ],
             "out_of_stock": [{"name": p.name, "sku": p.sku} for p in out],

@@ -13,6 +13,7 @@ import {
   type PeriodPreset,
 } from './reportConfig';
 import { useCoopTheme } from '../../theme-provider';
+import type { CoopThemeContextValue } from '../../theme-provider';
 import { radius, type } from '../../theme';
 
 export interface ReportFiltersProps {
@@ -28,7 +29,7 @@ export interface ReportFiltersProps {
   onCategory: (c: string) => void;
 }
 
-const selectStyle = (colors: any): React.CSSProperties => ({
+const selectStyle = (colors: CoopThemeContextValue['colors']): React.CSSProperties => ({
   border: `1px solid ${colors.outlineVariant}`,
   borderRadius: radius.md,
   padding: '7px 10px',

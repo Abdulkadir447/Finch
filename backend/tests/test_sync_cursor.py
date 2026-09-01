@@ -35,7 +35,14 @@ async def test_order_create_resolves_cloud_customer_by_server_id(session_factory
     async with session_factory() as db:
         # A cloud-native customer: server id, but NO client_id (created live,
         # not via offline push).
-        db.add(Customer(business_id=biz_id, full_name="Cloud Cust", email="cc@x.com", client_id=None))
+        db.add(
+            Customer(
+                business_id=biz_id,
+                full_name="Cloud Cust",
+                email="cc@x.com",
+                client_id=None,
+            )
+        )
         await db.flush()
         await db.commit()
         cust_server_id = cust_id  # we set the id explicitly below
@@ -123,7 +130,11 @@ async def test_delta_cursor_is_second_precision_and_at_least_once(session_factor
     # (>=, at-least-once), not lost.
     async with session_factory() as db:
         biz_id = await _biz_id_from(db)
-        p = (await db.execute(select(Product).where(Product.business_id == biz_id))).scalars().first()
+        p = (
+            (await db.execute(select(Product).where(Product.business_id == biz_id)))
+            .scalars()
+            .first()
+        )
         p.updated_at = c1_dt  # same second as the cursor
         await db.commit()
 
@@ -136,7 +147,10 @@ async def test_delta_cursor_is_second_precision_and_at_least_once(session_factor
 
 
 async def _seed_minimal(api):
-    await api.client.post("/products", json={"sku": "CH1", "name": "Chair", "unit_price": 100.0, "current_stock": 5})
+    await api.client.post(
+        "/products",
+        json={"sku": "CH1", "name": "Chair", "unit_price": 100.0, "current_stock": 5},
+    )
     await api.client.post("/customers", json={"full_name": "Grace", "email": "g@x.com"})
 
 

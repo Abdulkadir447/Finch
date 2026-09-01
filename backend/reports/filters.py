@@ -24,7 +24,12 @@ COMPARE_PREVIOUS_PERIOD = "previous_period"  # equal-length window ending the da
 COMPARE_PREVIOUS_MONTH = "previous_month"    # previous calendar month (for "this month" ranges)
 COMPARE_PREVIOUS_YEAR = "previous_year"      # same window shifted one year earlier
 
-VALID_COMPARES = (COMPARE_NONE, COMPARE_PREVIOUS_PERIOD, COMPARE_PREVIOUS_MONTH, COMPARE_PREVIOUS_YEAR)
+VALID_COMPARES = (
+    COMPARE_NONE,
+    COMPARE_PREVIOUS_PERIOD,
+    COMPARE_PREVIOUS_MONTH,
+    COMPARE_PREVIOUS_YEAR,
+)
 
 
 @dataclass(frozen=True)
@@ -48,7 +53,8 @@ class ReportFilters:
     ) -> "ReportFilters":
         today = dt.date.today()
         to = _parse_date(to_str) or today
-        from_ = _parse_date(from_str) or (to - dt.timedelta(days=29))  # default: last 30 days incl. today
+        # default: last 30 days incl. today
+        from_ = _parse_date(from_str) or (to - dt.timedelta(days=29))
         if from_ > to:
             raise FilterError("'from' must be on or before 'to'.")
         span_days = (to - from_).days

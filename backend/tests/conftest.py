@@ -15,6 +15,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from typing import Optional
+
 from backend.clerk_auth import ClerkUser, verify_clerk_token
 from backend.database import get_db
 from backend.main import app
@@ -44,9 +46,11 @@ class TestApi:
     def __init__(self, client: AsyncClient):
         self.client = client
 
-    def set_user(self, user_id: str) -> None:
+    def set_user(self, user_id: str, email: Optional[str] = None) -> None:
         async def override_verify():
-            return ClerkUser(user_id=user_id, session_id="test-session", azp=None)
+            return ClerkUser(
+                user_id=user_id, session_id="test-session", azp=None, email=email
+            )
 
         app.dependency_overrides[verify_clerk_token] = override_verify
 

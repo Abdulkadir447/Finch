@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import datetime as dt
 
-import pytest
 from sqlalchemy import select
 
 from backend.models import Business, Customer, Order, OrderItem, OrderStatus, Product
@@ -20,7 +19,14 @@ def _dt(days_ago: int) -> dt.datetime:
     return dt.datetime.combine(TODAY - dt.timedelta(days=days_ago), dt.time(12))
 
 
-async def _seed(session_factory, *, products=None, customers=None, orders=None, business_name="Test Co"):
+async def _seed(
+    session_factory,
+    *,
+    products=None,
+    customers=None,
+    orders=None,
+    business_name="Test Co",
+):
     """orders: list of (customer_idx, product_idx, qty, unit_price, days_ago)."""
     async with session_factory() as db:
         b = Business(name=business_name, owner_id="u-ds", currency="USD")

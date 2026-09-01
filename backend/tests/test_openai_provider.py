@@ -30,7 +30,12 @@ class _MockOpenAI(BaseHTTPRequestHandler):
             "model": body.get("model", "mock"),
             "choices": [
                 {"message": {"role": "assistant",
-                              "content": '{"type": "answer", "kind": "fact", "title": "t", "message": "m", "basis": {"period": "last_30_days", "sources": ["orders"]}, "follow_ups": [], "links": [], "actions": []}'}}
+                              "content": (
+                                  '{"type": "answer", "kind": "fact", "title": "t", '
+                                  '"message": "m", "basis": {"period": "last_30_days", '
+                                  '"sources": ["orders"]}, "follow_ups": [], "links": [], '
+                                  '"actions": []}'
+                              )}},
             ],
             "usage": {"prompt_tokens": 123, "completion_tokens": 45},
         }

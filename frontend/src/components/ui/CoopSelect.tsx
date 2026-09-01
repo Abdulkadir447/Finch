@@ -9,7 +9,7 @@
 import React from 'react';
 import { Select } from 'antd';
 import type { SelectProps } from 'antd';
-import { spacing, type } from '../../theme';
+import { type } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 
 export interface CoopOption {

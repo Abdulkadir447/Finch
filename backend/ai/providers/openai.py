@@ -29,7 +29,8 @@ class BaseProvider:
     def __init__(self, model: str) -> None:
         self.model = model
 
-    def complete(self, system: str, messages: list[dict[str, str]]) -> ProviderResult:  # pragma: no cover
+    # pragma: no cover
+    def complete(self, system: str, messages: list[dict[str, str]]) -> ProviderResult:
         raise NotImplementedError
 
 

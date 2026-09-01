@@ -7,7 +7,6 @@ from __future__ import annotations
 import datetime as dt
 import json
 
-import pytest
 
 from backend.ai import service as ai_service
 from backend.ai.providers.openai import ProviderResult
@@ -111,12 +110,16 @@ async def test_ai_chat_consumes_credits(api, monkeypatch):
 async def test_insufficient_credits_returns_402(api, session_factory, monkeypatch):
     _install_fake(monkeypatch)
     await _seed_ai_data(api)
-    summary = await _summary(api)
+    await _summary(api)
     # Find the business (owner of the seeded tenant) and drain the free
     # allowance directly in the ledger: 25 requests x 1 credit.
     from sqlalchemy import select
     async with session_factory() as db:
-        biz = (await db.execute(select(Business).where(Business.owner_id == "user-a"))).scalars().first()
+        biz = (
+            (await db.execute(select(Business).where(Business.owner_id == "user-a")))
+            .scalars()
+            .first()
+        )
         assert biz is not None
         for _ in range(25):
             db.add(AiUsage(business_id=biz.id, model="fake-model",
@@ -149,7 +152,11 @@ async def test_enterprise_is_unlimited(api, session_factory, monkeypatch):
     # Even a drained month does not block an unlimited plan.
     from sqlalchemy import select
     async with session_factory() as db:
-        biz = (await db.execute(select(Business).where(Business.owner_id == "user-a"))).scalars().first()
+        biz = (
+            (await db.execute(select(Business).where(Business.owner_id == "user-a")))
+            .scalars()
+            .first()
+        )
         for _ in range(5):
             db.add(AiUsage(business_id=biz.id, model="fake-model",
                            input_tokens=10, output_tokens=10, credits_used=1))
@@ -168,7 +175,11 @@ async def test_previous_month_usage_does_not_count(api, session_factory):
     first_this = today.replace(day=1)
     last_month_day = (first_this - dt.timedelta(days=1))
     async with session_factory() as db:
-        biz = (await db.execute(select(Business).where(Business.owner_id == "user-a"))).scalars().first()
+        biz = (
+            (await db.execute(select(Business).where(Business.owner_id == "user-a")))
+            .scalars()
+            .first()
+        )
         db.add(AiUsage(business_id=biz.id, model="fake-model",
                        input_tokens=10, output_tokens=10, credits_used=25,
                        created_at=dt.datetime.combine(last_month_day, dt.time(12))))

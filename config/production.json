@@ -26,7 +26,11 @@
     "model": "gpt-4o-mini",
     "credits_per_request": 1,
     "free_output_tokens": 500,
-    "credits_per_1k_output_tokens": 1
+    "credits_per_1k_output_tokens": 1,
+    "rate_limit": {
+      "requests": 8,
+      "window_seconds": 60
+    }
   },
   "features": {
     "dashboard": true,
@@ -63,6 +67,22 @@
         "label": "Enterprise",
         "credits_per_month": null
       }
+    }
+  },
+  "cors": {
+    "_comment": "CORS allow-list used when CORS_ORIGINS env is unset. Production refuses to start if both are empty.",
+    "origins": [
+      "https://app.coop.example"
+    ]
+  },
+  "notifications": {
+    "smtp": {
+      "host": "",
+      "port": 587,
+      "username": "",
+      "password": "",
+      "from": "Co-op <no-reply@coop.app>",
+      "tls": true
     }
   }
 }

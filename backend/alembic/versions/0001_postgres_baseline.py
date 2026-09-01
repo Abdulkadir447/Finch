@@ -375,8 +375,10 @@ def upgrade() -> None:
     op.execute("CREATE INDEX IF NOT EXISTS idx_order_items_business ON order_items (business_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items (order_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items (product_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_business ON stock_movements (business_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements (product_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_business ON stock_movements"
+        "(business_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements"
+        "(product_id)")
 
 
 def _add_columns(table: str, columns: list[str]) -> None:

@@ -116,7 +116,7 @@ const OrderDetailsPage: React.FC = () => {
     };
     setOrder(data);
     setNextStatus(data.allowed_transitions[0] ?? null);
-  }, [api, orderId]);
+  }, [orderId]);
 
   const load = useCallback(async () => {
     if (!Number.isInteger(orderId) || orderId <= 0) {

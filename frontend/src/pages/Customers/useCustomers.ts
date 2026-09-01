@@ -91,7 +91,7 @@ export function useCustomers() {
       setItems(list.slice(start, start + CUSTOMERS_PAGE_SIZE));
       setPage(requestedPage);
     },
-    [api],
+    [],
   );
 
   const load = useCallback(
