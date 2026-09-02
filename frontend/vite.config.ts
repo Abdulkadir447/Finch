@@ -12,7 +12,10 @@ export default defineConfig({
     // browser cannot reach the sandbox's localhost directly).
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // 127.0.0.1, not "localhost": on Windows (Node >= 17) "localhost"
+        // can resolve to ::1, while uvicorn binds 127.0.0.1 by default —
+        // that mismatch makes every proxied call fail with 502.
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, ''),
       },
