@@ -69,7 +69,7 @@ const SplashScreen: React.FC = () => {
   >
     <CoopMark size={64} title="Co-op" />
     <div style={{ textAlign: 'center' }}>
-      <div style={{ ...type.sectionHeading, color: colors.primary, fontSize: 26, lineHeight: 34 }}>Co-op</div>
+      <div style={{ ...type.sectionHeading, color: colors.primary, fontSize: 26, lineHeight: '34px' }}>Co-op</div>
       <div style={{ ...type.labelCaps, color: colors.onSurfaceVariant, marginTop: 2, letterSpacing: '0.1em' }}>
         Better business, together.
       </div>

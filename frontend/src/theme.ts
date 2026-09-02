@@ -62,7 +62,9 @@ const baseTokens = {
   fontFamily,
   // Default UI size is body-compact (14); paragraphs use body-default (16).
   fontSize: type.bodyCompact.fontSize,
-  lineHeight: type.bodyCompact.lineHeight / type.bodyCompact.fontSize,
+  // antd expects a unitless ratio here (lineHeight × fontSize); the token
+  // itself is a px string ('20px'), so parse it back to a number.
+  lineHeight: parseFloat(type.bodyCompact.lineHeight) / type.bodyCompact.fontSize,
   colorText: colors.onSurface,
   colorTextSecondary: colors.onSurfaceVariant,
   colorTextTertiary: colors.outline,
