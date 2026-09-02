@@ -45,6 +45,18 @@ const WelcomePage: React.FC = () => {
   const { colors } = useCoopTheme();
   const navigate = useNavigate();
 
+  // "Start from scratch" → the empty dashboard. RootGate shows /welcome only
+  // until the owner makes this choice; the flag stops it bouncing back here
+  // on every "/" visit while the business still has no data.
+  const startFromScratch = () => {
+    try {
+      window.localStorage.setItem('coop:started-manual', '1');
+    } catch {
+      /* persistence is a nicety */
+    }
+    navigate('/');
+  };
+
   return (
     <div
       style={{
@@ -92,7 +104,7 @@ const WelcomePage: React.FC = () => {
             Import my business data
           </CoopButton>
           <div style={{ ...type.bodyCompact, fontSize: 12.5, color: colors.outline }}>or</div>
-          <CoopButton size="lg" variant="secondary" icon={<RocketOutlined />} onClick={() => navigate('/')}>
+          <CoopButton size="lg" variant="secondary" icon={<RocketOutlined />} onClick={startFromScratch}>
             Start from scratch
           </CoopButton>
         </div>

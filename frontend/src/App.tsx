@@ -296,6 +296,18 @@ const RootGate: React.FC = () => {
   const [identityResolved, setIdentityResolved] = useState(false);
   const [hasData, setHasData] = useState<boolean | null>(null);
 
+  // The owner can explicitly choose "Start from scratch" on /welcome —
+  // respect that choice instead of re-routing them to /welcome on every "/"
+  // visit while the business is still empty (the empty dashboard renders
+  // real zeros and native no-data states).
+  const startedManual = () => {
+    try {
+      return window.localStorage.getItem('coop:started-manual') === '1';
+    } catch {
+      return false;
+    }
+  };
+
   // Identity first: a pending invitation takes over the gate — the invitee
   // has no business yet and must not touch business endpoints (they 409).
   useEffect(() => {
@@ -338,7 +350,7 @@ const RootGate: React.FC = () => {
       />
     );
   }
-  if (!hasData) return <Navigate to="/welcome" replace />;
+  if (!hasData && !startedManual()) return <Navigate to="/welcome" replace />;
   return <DashboardPage />;
 };
 
