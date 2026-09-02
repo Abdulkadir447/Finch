@@ -30,7 +30,7 @@ export interface CoopCardProps {
   hoverable?: boolean;
   /** Remove body padding (edge-to-edge content such as tables). */
   flush?: boolean;
-  /** Body padding when not flush. Defaults to 20. */
+  /** Body padding when not flush. Defaults to 16. */
   bodyPadding?: number;
   style?: React.CSSProperties;
   className?: string;
@@ -47,7 +47,7 @@ const CoopCard: React.FC<CoopCardProps> = ({
   aiLabel,
   hoverable = false,
   flush = false,
-  bodyPadding = 20,
+  bodyPadding = 16,
   style,
   className,
   onClick,

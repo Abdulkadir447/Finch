@@ -27,7 +27,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, actions, style
         alignItems: 'flex-end',
         justifyContent: 'space-between',
         gap: spacing.md,
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
         ...style,
       }}
     >

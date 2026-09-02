@@ -45,6 +45,32 @@ body {
   min-height: 100vh;
 }
 
+/*
+ * App-wide text rhythm: the app ships no CSS reset, so unstyled headings
+ * and paragraphs inherit the browser's UA margins (h1 ≈0.67em top+bottom,
+ * p ≈1em top+bottom) — that reads as oversized blank space above and below
+ * text blocks. Components that style their own margins are unaffected
+ * (inline styles win); this trims the default vertical rhythm only.
+ */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-top: 0;
+  margin-bottom: 0.4em;
+}
+p {
+  margin-top: 0;
+  margin-bottom: 0.6em;
+}
+ul,
+ol {
+  margin-top: 0;
+  margin-bottom: 0.6em;
+}
+
 /* Number alignment for monetary/quantitative values. */
 .coop-numeric {
   font-variant-numeric: tabular-nums;

@@ -99,7 +99,7 @@ const WelcomePage: React.FC = () => {
         </p>
 
         {/* Primary CTA — the importer is the hero of first run */}
-        <div style={{ marginTop: spacing.xl, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
+        <div style={{ marginTop: spacing.lg, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
           <CoopButton size="lg" icon={<ImportOutlined />} onClick={() => navigate('/import')}>
             Import my business data
           </CoopButton>
@@ -112,7 +112,7 @@ const WelcomePage: React.FC = () => {
         {/* What happens — sets the expectation, keeps the trust story */}
         <div
           style={{
-            marginTop: spacing.xl,
+            marginTop: spacing.lg,
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
             gap: 12,

@@ -41,7 +41,7 @@ const DashboardHeader: React.FC<{
         alignItems: 'flex-end',
         justifyContent: 'space-between',
         gap: spacing.md,
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
       }}
     >
       <div style={{ minWidth: 0 }}>
