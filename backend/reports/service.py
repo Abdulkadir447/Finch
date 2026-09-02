@@ -18,7 +18,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 
 from ..models import Customer, Order, OrderItem, Product
-from .filters import ReportFilters
+from .filters import ReportFilters, fmt_full_date, fmt_short_date
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,9 @@ def _bucket_key(d: dt.date, mode: str) -> dt.date:
 
 
 def _fmt_bucket(d: dt.date, mode: str) -> str:
-    return d.strftime("%b %-d") if mode == "day" else d.strftime("%b %Y")
+    if mode == "day":
+        return fmt_short_date(d)  # portable "Sep 2" (see fmt_short_date)
+    return d.strftime("%b %Y")
 
 
 # ---------------------------------------------------------------------------
@@ -726,7 +728,7 @@ async def customers_report(db, business_id: int, f: ReportFilters) -> ReportData
     top_rows = [
         [c.full_name, len(orders_by_cust.get(c.id, [])), _round(period_revenue_by_cust[c.id]),
          _round(lifetime.get(c.id, 0)),
-         last_order[c.id].strftime("%b %-d, %Y") if c.id in last_order else "—"]
+         fmt_full_date(last_order[c.id]) if c.id in last_order else "—"]
         for c in top
     ]
     inactive_rows = [
@@ -738,7 +740,7 @@ async def customers_report(db, business_id: int, f: ReportFilters) -> ReportData
         (c for c in new_in_period),
         key=lambda c: _as_date(c.created_at) or today,
     )[:10]
-    new_rows = [[c.full_name, (_as_date(c.created_at) or today).strftime("%b %-d, %Y"),
+    new_rows = [[c.full_name, fmt_full_date(_as_date(c.created_at) or today),
                  _round(period_revenue_by_cust.get(c.id, 0))] for c in new_rows]
 
     return ReportData(
