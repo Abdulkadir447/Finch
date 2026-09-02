@@ -65,6 +65,11 @@
         "label": "Enterprise",
         "credits_per_month": null
       }
+    },
+    "trial": {
+      "_comment": "One free trial per business, opt-in from Billing. No card, nothing charged; the effective plan reverts to the base plan when the window closes.",
+      "enabled": true,
+      "days": 10
     }
   },
   "notifications": {

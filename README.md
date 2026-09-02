@@ -63,8 +63,14 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
 - **Real billing + credits** — plans and monthly AI-credit allowances are
   real server-side state; credits are computed from the `ai_usage` ledger
   (nothing mutable to drift) and enforced on every AI request (402 when
-  exhausted, 429 when the per-tenant rate limit is exceeded). Payment
-  collection is the one deliberately unplugged part — the UI says so.
+  exhausted, 429 when the per-tenant rate limit is exceeded). A business
+  can opt into one **10-day free trial** of a paid plan (no card): the
+  trial grants that plan's allowance for a fixed window without changing
+  the plan it owns, so it expires by itself — the effective plan is a pure
+  function of (plan, trial window, now), with no scheduler to miss and no
+  downgrade job to fail. Trial length lives in `config/<env>.json`
+  (`billing.trial`). Payment collection is the one deliberately unplugged
+  part — the UI says so.
 - **Audit log** — every mutation (create/update/delete, stock adjustments,
   order status changes, imports, plan changes, restores, and offline-synced
   operations) writes an append-only, tenant-scoped audit row; Settings →
@@ -191,6 +197,7 @@ AI          POST /ai/chat   (verified context, structured answer, 402 when out
                              of credits, 429 over the per-tenant rate limit)
             GET /ai/usage
 Billing     GET /billing/summary   POST /billing/plan
+            POST /billing/trial (start the one 10-day free trial; 409 if used)
 Backup      GET /backups/export (download JSON snapshot)
             POST /backups/restore (into an EMPTY business only — 409 otherwise)
 Audit       GET /audit   (append-only activity trail, tenant-scoped)

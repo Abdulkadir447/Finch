@@ -201,3 +201,225 @@ def test_month_bounds():
     assert end == dt.datetime(2026, 9, 1)
     start, end = month_bounds(dt.date(2026, 12, 15))
     assert end == dt.datetime(2027, 1, 1)
+
+
+# ---------------------------------------------------------------------------
+# Free trial (opt-in, one per business, lazy expiry)
+# ---------------------------------------------------------------------------
+
+async def _sub(session_factory, owner="user-a"):
+    """Fetch the tenant's subscription row directly."""
+    from sqlalchemy import select
+
+    from backend.models import Subscription
+    async with session_factory() as db:
+        biz = (
+            (await db.execute(select(Business).where(Business.owner_id == owner)))
+            .scalars()
+            .first()
+        )
+        return (await db.execute(
+            select(Subscription).where(Subscription.business_id == biz.id)
+        )).scalars().first()
+
+
+async def _expire_trial(session_factory, owner="user-a"):
+    """Move the trial window into the past (simulates the 10 days elapsing)."""
+    from sqlalchemy import select
+
+    from backend.models import Subscription
+    async with session_factory() as db:
+        biz = (
+            (await db.execute(select(Business).where(Business.owner_id == owner)))
+            .scalars()
+            .first()
+        )
+        sub = (await db.execute(
+            select(Subscription).where(Subscription.business_id == biz.id)
+        )).scalars().first()
+        sub.trial_started_at = dt.datetime.utcnow() - dt.timedelta(days=11)
+        sub.trial_ends_at = dt.datetime.utcnow() - dt.timedelta(days=1)
+        await db.commit()
+
+
+async def test_trial_offered_to_new_business(api):
+    body = await _summary(api)
+    assert body["trial_days"] == 10
+    assert body["trial"]["available"] is True
+    assert body["trial"]["active"] is False
+    assert body["trial"]["used"] is False
+    assert body["base_plan"] == "free"
+    # Paid plans advertise trialability; free does not.
+    plans = {p["key"]: p for p in body["plans"]}
+    assert plans["professional"]["trialable"] is True
+    assert plans["free"]["trialable"] is False
+
+
+async def test_start_trial_grants_plan_allowance_for_10_days(api):
+    r = await api.client.post("/billing/trial", json={"plan": "professional"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # Effective plan + allowance are the trialled plan's...
+    assert body["plan"] == "professional"
+    assert body["granted"] == 1000
+    assert body["remaining"] == 1000
+    # ...while the plan the business actually owns is untouched.
+    assert body["base_plan"] == "free"
+    t = body["trial"]
+    assert t["active"] is True
+    assert t["used"] is True
+    assert t["available"] is False
+    assert t["plan"] == "professional"
+    assert t["days_remaining"] == 10
+    ends = dt.datetime.fromisoformat(t["ends_at"])
+    started = dt.datetime.fromisoformat(t["started_at"])
+    assert (ends - started).days == 10
+
+
+async def test_trial_survives_reload_and_is_not_a_plan_change(api, session_factory):
+    await api.client.post("/billing/trial", json={"plan": "starter"})
+    sub = await _sub(session_factory)
+    assert sub.plan == "free"          # base plan never overwritten
+    assert sub.trial_plan == "starter"
+    assert sub.status == "trialing"
+    assert (await _summary(api))["plan"] == "starter"
+
+
+async def test_trial_cannot_be_started_twice(api):
+    assert (await api.client.post(
+        "/billing/trial", json={"plan": "professional"})).status_code == 200
+    r = await api.client.post("/billing/trial", json={"plan": "professional"})
+    assert r.status_code == 409
+    assert r.json()["detail"]["error"] == "trial_unavailable"
+    assert "already used" in r.json()["detail"]["message"]
+
+
+async def test_trial_cannot_be_restarted_after_it_expires(api, session_factory):
+    await api.client.post("/billing/trial", json={"plan": "professional"})
+    await _expire_trial(session_factory)
+    r = await api.client.post("/billing/trial", json={"plan": "professional"})
+    assert r.status_code == 409
+
+
+async def test_trial_rejects_free_and_unknown_plans(api):
+    for plan in ("free", "platinum", ""):
+        r = await api.client.post("/billing/trial", json={"plan": plan})
+        assert r.status_code == 409, plan
+
+
+async def test_trial_not_available_on_a_paid_plan(api):
+    await api.client.post("/billing/plan", json={"plan": "starter"})
+    r = await api.client.post("/billing/trial", json={"plan": "professional"})
+    assert r.status_code == 409
+    assert "Free plan" in r.json()["detail"]["message"]
+
+
+async def test_expired_trial_reverts_to_free_with_no_scheduler(api, session_factory):
+    await api.client.post("/billing/trial", json={"plan": "professional"})
+    await _expire_trial(session_factory)
+    body = await _summary(api)
+    assert body["plan"] == "free"        # effective plan fell back
+    assert body["granted"] == 25         # free allowance again
+    assert body["base_plan"] == "free"
+    t = body["trial"]
+    assert t["active"] is False
+    assert t["expired"] is True
+    assert t["used"] is True
+    assert t["available"] is False
+    assert t["days_remaining"] == 0
+
+
+async def test_expired_trial_enforces_free_allowance_at_the_ai_boundary(
+    api, session_factory, monkeypatch
+):
+    """The trial's larger allowance must not outlive the window."""
+    _install_fake(monkeypatch)
+    await _seed_ai_data(api)
+    await api.client.post("/billing/trial", json={"plan": "professional"})
+    await _expire_trial(session_factory)
+
+    from sqlalchemy import select
+    async with session_factory() as db:
+        biz = (
+            (await db.execute(select(Business).where(Business.owner_id == "user-a")))
+            .scalars()
+            .first()
+        )
+        for _ in range(25):  # drain the FREE allowance only
+            db.add(AiUsage(business_id=biz.id, model="fake-model",
+                           input_tokens=10, output_tokens=10, credits_used=1,
+                           answer_kind="fact"))
+        await db.commit()
+
+    r = await api.client.post("/ai/chat", json={"question": "How are sales?"})
+    assert r.status_code == 402, r.text
+    detail = r.json()["detail"]
+    assert detail["trial"]["expired"] is True
+    assert "free trial has ended" in detail["message"]
+
+
+async def test_converting_during_a_trial_ends_it_immediately(api, session_factory):
+    await api.client.post("/billing/trial", json={"plan": "professional"})
+    r = await api.client.post("/billing/plan", json={"plan": "starter"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["plan"] == "starter"      # the plan they now own
+    assert body["base_plan"] == "starter"
+    assert body["granted"] == 200         # starter allowance, not the trial's
+    assert body["trial"]["active"] is False
+    assert body["trial"]["used"] is True
+    sub = await _sub(session_factory)
+    assert sub.status == "active"
+
+
+async def test_trial_is_tenant_scoped(api, session_factory):
+    """One business's trial must not affect another's eligibility."""
+    await api.client.post("/billing/trial", json={"plan": "professional"})
+    api.set_user("user-b", email="b@example.com")
+    body = await _summary(api)
+    assert body["plan"] == "free"
+    assert body["trial"]["available"] is True
+    assert body["trial"]["used"] is False
+
+
+async def test_trial_start_is_audited(api):
+    await api.client.post("/billing/trial", json={"plan": "professional"})
+    r = await api.client.get("/audit")
+    assert r.status_code == 200
+    actions = [e["action"] for e in r.json()]
+    assert "trial_start" in actions
+
+
+# ---------------------------------------------------------------------------
+# Trial math (pure)
+# ---------------------------------------------------------------------------
+
+def test_trial_days_remaining_rounds_up():
+    from backend.billing import trial_days_remaining
+    from backend.models import Subscription
+
+    now = dt.datetime(2026, 9, 2, 12, 0)
+    sub = Subscription(business_id=1, plan="free", trial_plan="professional",
+                       trial_started_at=now)
+    # A partial final day still reads as a day remaining, never 0-while-active.
+    sub.trial_ends_at = now + dt.timedelta(hours=3)
+    assert trial_days_remaining(sub, now) == 1
+    sub.trial_ends_at = now + dt.timedelta(days=9, hours=12)
+    assert trial_days_remaining(sub, now) == 10
+    sub.trial_ends_at = now - dt.timedelta(seconds=1)   # expired
+    assert trial_days_remaining(sub, now) == 0
+
+
+def test_effective_plan_is_pure():
+    from backend.billing import effective_plan
+    from backend.models import Subscription
+
+    now = dt.datetime(2026, 9, 2, 12, 0)
+    sub = Subscription(business_id=1, plan="free")
+    assert effective_plan(sub, now) == "free"
+    sub.trial_plan = "professional"
+    sub.trial_started_at = now - dt.timedelta(days=1)
+    sub.trial_ends_at = now + dt.timedelta(days=9)
+    assert effective_plan(sub, now) == "professional"
+    # Same row, later clock -> base plan. No write required.
+    assert effective_plan(sub, now + dt.timedelta(days=10)) == "free"

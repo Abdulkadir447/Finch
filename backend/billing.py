@@ -24,6 +24,7 @@ Design decisions
 from __future__ import annotations
 
 import datetime as dt
+import math
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -38,6 +39,12 @@ PLAN_PROFESSIONAL = "professional"
 PLAN_ENTERPRISE = "enterprise"
 
 VALID_PLANS = (PLAN_FREE, PLAN_STARTER, PLAN_PROFESSIONAL, PLAN_ENTERPRISE)
+
+# Plans a trial can be taken on (a trial of "free" is meaningless).
+TRIALABLE_PLANS = (PLAN_STARTER, PLAN_PROFESSIONAL, PLAN_ENTERPRISE)
+
+# Fallback trial length if config is missing (mirrors config/*.json).
+DEFAULT_TRIAL_DAYS = 10
 
 # Fallback allowances if config is missing (mirrors config/*.json).
 DEFAULT_ALLOWANCES: dict[str, Optional[int]] = {
@@ -77,6 +84,26 @@ def allowance_for(plan: str) -> Optional[int]:
 
 def plan_label(plan: str) -> str:
     return plan_config().get(plan, {}).get("label") or plan.capitalize()
+
+
+def trial_config() -> dict[str, Any]:
+    """Trial policy — product configuration, not code (config/<env>.json)."""
+    try:
+        cfg = load_config().get("billing", {}).get("trial", {}) or {}
+    except Exception:  # noqa: BLE001 — config must never break billing math
+        cfg = {}
+    return cfg
+
+
+def trial_enabled() -> bool:
+    return bool(trial_config().get("enabled", True))
+
+
+def trial_days() -> int:
+    try:
+        return max(1, int(trial_config().get("days", DEFAULT_TRIAL_DAYS)))
+    except (TypeError, ValueError):
+        return DEFAULT_TRIAL_DAYS
 
 
 def min_request_credits() -> int:
@@ -120,6 +147,104 @@ async def get_or_create_subscription(db, business: Business) -> Subscription:
     return sub
 
 
+# ---------------------------------------------------------------------------
+# Free trial
+#
+# The trial is a *window*, never a mutation of ``plan``. The effective plan
+# is a pure function of (plan, trial_plan, trial_ends_at, now), so expiry is
+# evaluated lazily on every read: there is no scheduler to miss, and a
+# business whose trial lapsed while the server was down is correctly back on
+# its base plan the next time anyone looks.
+# ---------------------------------------------------------------------------
+
+class TrialError(ValueError):
+    """A trial cannot be started (already used, ineligible plan, disabled)."""
+
+
+def _now() -> dt.datetime:
+    return dt.datetime.utcnow()
+
+
+def trial_is_active(sub: Subscription, now: Optional[dt.datetime] = None) -> bool:
+    if not sub.trial_plan or not sub.trial_ends_at:
+        return False
+    return (now or _now()) < sub.trial_ends_at
+
+
+def trial_was_used(sub: Subscription) -> bool:
+    """A trial is one-per-business, for its whole lifetime."""
+    return sub.trial_started_at is not None
+
+
+def effective_plan(sub: Subscription, now: Optional[dt.datetime] = None) -> str:
+    """The plan whose allowance and features actually apply right now."""
+    if trial_is_active(sub, now):
+        return sub.trial_plan or sub.plan
+    return sub.plan
+
+
+def trial_days_remaining(sub: Subscription, now: Optional[dt.datetime] = None) -> int:
+    """Whole days left, rounded up — 0 once expired.
+
+    Rounded up so the last partial day still reads as "1 day left" rather
+    than "0 days left" while the trial is genuinely still active.
+    """
+    if not trial_is_active(sub, now):
+        return 0
+    delta = (sub.trial_ends_at or _now()) - (now or _now())
+    return max(0, math.ceil(delta.total_seconds() / 86400))
+
+
+def trial_state(sub: Subscription, now: Optional[dt.datetime] = None) -> dict[str, Any]:
+    """The trial block the UI renders — honest in one place."""
+    active = trial_is_active(sub, now)
+    used = trial_was_used(sub)
+    return {
+        "available": trial_enabled() and not used,
+        "active": active,
+        "used": used,
+        # True exactly once the window has closed (so the UI can say
+        # "your trial ended" instead of silently reverting).
+        "expired": used and not active,
+        "plan": sub.trial_plan,
+        "label": plan_label(sub.trial_plan) if sub.trial_plan else None,
+        "days": trial_days(),
+        "days_remaining": trial_days_remaining(sub, now),
+        "started_at": sub.trial_started_at.isoformat() if sub.trial_started_at else None,
+        "ends_at": sub.trial_ends_at.isoformat() if sub.trial_ends_at else None,
+    }
+
+
+async def start_trial(
+    db, business: Business, plan: str, actor: Optional[str] = None
+) -> Subscription:
+    """Begin the one free trial this business is entitled to.
+
+    Deliberately strict: a trial is a real grant of paid capability with no
+    card on file, so every refusal is explicit rather than silently
+    re-granting. The base ``plan`` is left untouched, which is what makes
+    expiry a no-op instead of a downgrade job.
+    """
+    if not trial_enabled():
+        raise TrialError("Free trials are not available.")
+    plan = (plan or "").strip().lower()
+    if plan not in TRIALABLE_PLANS:
+        raise TrialError(f"plan must be one of: {', '.join(TRIALABLE_PLANS)}")
+    sub = await get_or_create_subscription(db, business)
+    if trial_was_used(sub):
+        raise TrialError("This business has already used its free trial.")
+    if sub.plan != PLAN_FREE:
+        raise TrialError("A free trial is only available on the Free plan.")
+    now = _now()
+    sub.trial_plan = plan
+    sub.trial_started_at = now
+    sub.trial_ends_at = now + dt.timedelta(days=trial_days())
+    sub.status = "trialing"
+    sub.updated_by = actor or business.owner_id
+    await db.flush()
+    return sub
+
+
 async def used_credits(db, business_id: int, start: dt.datetime, end: dt.datetime) -> int:
     """Credits consumed in [start, end) — straight from the AI ledger."""
     return int((await db.execute(
@@ -142,9 +267,14 @@ class CreditState:
     remaining: Optional[int]
     period_start: str
     period_end: str
+    # The plan the business owns, ignoring any trial grant.
+    base_plan: str = PLAN_FREE
+    trial: Optional[dict[str, Any]] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            # ``plan`` is the EFFECTIVE plan (trial grant included) so every
+            # existing consumer keeps enforcing/rendering the right thing.
             "plan": self.plan,
             "label": self.label,
             "unlimited": self.unlimited,
@@ -152,6 +282,8 @@ class CreditState:
             "used": self.used,
             "remaining": self.remaining,
             "period": {"start": self.period_start, "end": self.period_end},
+            "base_plan": self.base_plan,
+            "trial": self.trial,
         }
 
 
@@ -160,18 +292,23 @@ async def credit_state(db, business: Business) -> CreditState:
     sub = await get_or_create_subscription(db, business)
     start, end = month_bounds()
     used = await used_credits(db, business.id, start, end)
-    allowance = allowance_for(sub.plan)
+    # A live trial grants the trialled plan's allowance; once the window
+    # closes this silently resolves back to the base plan (no job needed).
+    active_plan = effective_plan(sub)
+    allowance = allowance_for(active_plan)
     unlimited = allowance is None
     remaining = None if unlimited else max(0, (allowance or 0) - used)
     return CreditState(
-        plan=sub.plan,
-        label=plan_label(sub.plan),
+        plan=active_plan,
+        label=plan_label(active_plan),
         unlimited=unlimited,
         granted=None if unlimited else (allowance or 0),
         used=used,
         remaining=remaining,
         period_start=start.date().isoformat(),
         period_end=(end - dt.timedelta(seconds=1)).date().isoformat(),
+        base_plan=sub.plan,
+        trial=trial_state(sub),
     )
 
 
@@ -196,12 +333,26 @@ class InsufficientCredits(Exception):
             "used": s.used,
             "remaining": s.remaining,
             "required": self.required,
-            "message": (
-                f"You've used all {s.used} AI credits available on the "
-                f"{s.label} plan this month. Upgrade your plan to keep "
-                f"asking Co-op."
-            ),
+            "trial": s.trial,
+            "message": self._message(),
         }
+
+    def _message(self) -> str:
+        s = self.state
+        trial = s.trial or {}
+        if trial.get("expired"):
+            # The most common way to hit 0 after a trial: say what actually
+            # happened rather than blaming the free allowance.
+            return (
+                f"Your free trial has ended and you've used all {s.used} AI "
+                f"credits on the {s.label} plan this month. Choose a plan to "
+                f"keep asking Co-op."
+            )
+        return (
+            f"You've used all {s.used} AI credits available on the "
+            f"{s.label} plan this month. Upgrade your plan to keep "
+            f"asking Co-op."
+        )
 
 
 async def check_credits(db, business: Business) -> CreditState:
@@ -241,6 +392,11 @@ async def change_plan(
     sub = await get_or_create_subscription(db, business)
     sub.plan = plan
     sub.status = "active"
+    # Converting (or downgrading) ends any live trial immediately: the base
+    # plan now applies, and the trial stays marked as used so it can't be
+    # taken twice. The window itself is preserved as billing history.
+    if trial_is_active(sub):
+        sub.trial_ends_at = _now()
     sub.updated_by = actor or business.owner_id
     await db.flush()
     return sub
@@ -264,9 +420,15 @@ async def billing_summary(db, business: Business) -> dict[str, Any]:
     return {
         **state.to_dict(),
         "plans": [
-            {"key": p, "label": plan_label(p), "credits_per_month": allowance_for(p)}
+            {
+                "key": p,
+                "label": plan_label(p),
+                "credits_per_month": allowance_for(p),
+                "trialable": p in TRIALABLE_PLANS,
+            }
             for p in VALID_PLANS
         ],
+        "trial_days": trial_days(),
         "usage_month": {
             "requests": int(usage[0] or 0),
             "input_tokens": int(usage[1] or 0),

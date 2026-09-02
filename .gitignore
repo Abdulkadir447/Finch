@@ -51,3 +51,6 @@ electron/e2e/renderer/
 # Electron packaging
 /electron/renderer-dist/
 /electron/dist/
+
+# pnpm is the package manager (see pnpm-workspace.yaml); npm lockfiles would drift.
+package-lock.json
