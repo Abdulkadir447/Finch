@@ -4,11 +4,11 @@
  * 240px, white, 1px border-subtle right edge, flat (no shadow). Anatomy:
  *   1. Brand — Co-op mark (two partner tiles + spark) + wordmark
  *      and the "Premium SaaS" label-caps subtitle.
- *   2. Primary nav — Overview / Products / Inventory / Orders / Customers.
- *      Active = surface-container-low fill + primary text + semibold.
- *   3. "Co-op AI" module row with a "New" pill (AI module, later stages).
- *   4. Secondary nav — Settings.
- *   5. Bottom action — "Upgrade Plan" (secondary button).
+ *   2. Primary nav — Overview / Reports / Products / Inventory / Orders /
+ *      Customers / Import. Active = surface-container-low fill + primary
+ *      text + semibold.
+ *   3. Secondary nav — Settings.
+ *   4. Bottom action — "Upgrade Plan" (secondary button).
  *
  * Collapsed state (Stage 2): 72px icon rail with tooltips, toggled from the
  * rail itself; the preference persists (`coop:sidebar-collapsed`).
@@ -18,11 +18,10 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Tooltip } from 'antd';
-import { radius, shadow, spacing, transition, type, z } from '../../theme';
+import { radius, shadow, spacing, transition, z } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 import { NAV_ITEMS, NAV_SECONDARY } from './nav';
 import { CoopLogo, CoopMark } from '../brand/CoopLogo';
-import { SparkleIcon } from '../ui/icons';
 
 export const SIDEBAR_WIDTH = 240;
 export const SIDEBAR_COLLAPSED_WIDTH = 72;
@@ -87,7 +86,7 @@ const SidebarContent: React.FC<RailContentProps> = ({ collapsed, onToggleCollaps
     '--coop-nav-color': colors.onSurfaceVariant,
   } as React.CSSProperties;
 
-  const item = (item: { key: string; label: string; path: string; icon: React.ReactNode }, ai = false) => {
+  const item = (item: { key: string; label: string; path: string; icon: React.ReactNode }) => {
     const active = activeKey === item.key;
     const btn = (
       <button
@@ -98,13 +97,7 @@ const SidebarContent: React.FC<RailContentProps> = ({ collapsed, onToggleCollaps
         aria-current={active ? 'page' : undefined}
         aria-label={collapsed ? item.label : undefined}
       >
-        {ai ? (
-          <span style={{ display: 'inline-flex' }}>
-            <SparkleIcon size={19} color={colors.secondaryContainer} />
-          </span>
-        ) : (
-          <span style={{ fontSize: 18, display: 'inline-flex' }}>{item.icon}</span>
-        )}
+        <span style={{ fontSize: 18, display: 'inline-flex' }}>{item.icon}</span>
         {!collapsed && <span>{item.label}</span>}
       </button>
     );
@@ -137,51 +130,6 @@ const SidebarContent: React.FC<RailContentProps> = ({ collapsed, onToggleCollaps
         aria-label="Primary"
       >
         {NAV_ITEMS.map((i) => item(i))}
-
-        <div
-          aria-hidden
-          style={{ height: 1, background: colors.borderSubtle, margin: `${spacing.md}px ${collapsed ? 0 : spacing.sm}px` }}
-        />
-
-        {/* Co-op AI assistant (Stage 2.2) */}
-        {(() => {
-          const btn = (
-            <button
-              type="button"
-              style={navItemBase(false, collapsed)}
-              onClick={() => go('/coop-ai')}
-              aria-label="Co-op AI"
-            >
-              <span style={{ display: 'inline-flex' }}>
-                <SparkleIcon size={19} color={colors.secondaryContainer} />
-              </span>
-              {!collapsed && (
-                <>
-                  <span style={{ flex: 1 }}>Co-op AI</span>
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: radius.full,
-                      background: colors.primaryFixed,
-                      color: colors.onPrimaryFixedVariant,
-                      ...type.labelCaps,
-                      fontSize: 10,
-                    }}
-                  >
-                    New
-                  </span>
-                </>
-              )}
-            </button>
-          );
-          return collapsed ? (
-            <Tooltip title="Co-op AI" placement="right" mouseEnterDelay={0.35}>
-              {btn}
-            </Tooltip>
-          ) : (
-            btn
-          );
-        })()}
 
         <div
           aria-hidden

@@ -5,12 +5,10 @@
 import React from 'react';
 import {
   BarChartOutlined,
-  CreditCardOutlined,
   DashboardOutlined,
   InboxOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
-  SyncOutlined,
   TeamOutlined,
   UploadOutlined,
   UserOutlined,
@@ -36,7 +34,5 @@ export const NAV_ITEMS: NavItem[] = [
 
 /** Secondary section (account-level). */
 export const NAV_SECONDARY: NavItem[] = [
-  { key: 'sync', label: 'Sync', path: '/sync', icon: <SyncOutlined /> },
   { key: 'settings', label: 'Settings', path: '/settings', icon: <SettingOutlined /> },
-  { key: 'billing', label: 'Billing', path: '/billing', icon: <CreditCardOutlined /> },
 ];
