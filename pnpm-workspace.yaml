@@ -1,0 +1,16 @@
+# pnpm workspace.
+#
+# Only `frontend` is a member. `electron/` is deliberately NOT included: it
+# depends on better-sqlite3, which compiles native code and therefore needs a
+# C++ toolchain (Visual Studio Build Tools on Windows). Making it a workspace
+# member would force that build on everyone doing frontend work, and a failed
+# native build blocks every subsequent pnpm command. The desktop wrapper keeps
+# its own install step, as documented in the README:
+#
+#     cd electron && pnpm install
+#
+# Note: pnpm uses a strict, non-hoisted node_modules tree, so every import
+# must be declared in its own package.json (npm's flat tree hides missing
+# declarations). Keep dependencies explicit.
+packages:
+  - 'frontend'
