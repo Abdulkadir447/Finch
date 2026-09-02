@@ -29,11 +29,14 @@ down.
 
 ### 2.1 Payment provider — **parked (decision needed, not engineering)**
 Everything it plugs into exists: plans, allowances, ledger, remaining
-balance, 402 enforcement, and UI states that already say "nothing is
-charged yet". When the decision to charge is made, the work is: pick a
+balance, 402 enforcement, a **10-day free trial** (opt-in, one per
+business, `POST /billing/trial`, migration 0011, 14 tests), and UI states
+that already say "nothing is charged yet". When the decision to charge is made, the work is: pick a
 gateway (Stripe or Paystack, depending on market), add a
 `POST /billing/checkout` + webhook receiver, flip
-`payment_connected` to true, and remove the preview banner. **No
+`payment_connected` to true, remove the preview banner, and decide what
+the trial converts *into* (today it simply lapses back to Free — the
+honest behaviour while nothing can be charged). **No
 engineering should start until the charging decision exists.**
 
 ### 2.2 Offline / sync — **v1 commitment (ADR-002); foundation built**

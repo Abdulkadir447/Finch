@@ -39,7 +39,7 @@ const BillingPage: React.FC = () => {
   const [view, setView] = useState<'subscription' | 'pricing'>('subscription');
   const {
     plan, currentPlan, summary, localUsage, loadError, paymentConnected,
-    action, cancelToFree, dismissResult, retry, refresh,
+    trial, trialDays, action, cancelToFree, dismissResult, retry, refresh,
   } = useBilling();
   const [cancelOpen, setCancelOpen] = useState(false);
 
@@ -51,7 +51,12 @@ const BillingPage: React.FC = () => {
   const processing = action.status === 'processing';
   const result =
     action.status === 'success' || action.status === 'failure'
-      ? { target: action.target, ok: action.status === 'success', reason: action.status === 'failure' ? action.reason : undefined }
+      ? {
+          target: action.target,
+          kind: action.kind,
+          ok: action.status === 'success',
+          reason: action.status === 'failure' ? action.reason : undefined,
+        }
       : null;
 
   const stat = (label: string, value: React.ReactNode, sub?: string) => (
@@ -82,6 +87,69 @@ const BillingPage: React.FC = () => {
           </CoopButton>
         }
       />
+
+      {/* Trial state — active countdown, or an honest "it ended" notice.
+          Both read straight from the server; expiry is never computed here. */}
+      {trial?.active && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '12px 16px',
+            borderRadius: radius.lg,
+            background: 'rgba(46,158,91,0.08)',
+            border: '1px solid rgba(46,158,91,0.28)',
+            marginBottom: 16,
+            ...type.bodyCompact,
+            color: colors.onSurfaceVariant,
+          }}
+        >
+          <SparkleIcon size={16} color={colors.success} />
+          <span style={{ flex: 1 }}>
+            <strong style={{ color: colors.onSurface }}>
+              {trial.days_remaining} {trial.days_remaining === 1 ? 'day' : 'days'} left in your free{' '}
+              {trial.label} trial.
+            </strong>{' '}
+            You have the full {trial.label} credit allowance until{' '}
+            {new Date(trial.ends_at ?? '').toLocaleDateString()}. Nothing is charged — when the
+            trial ends you go back to Free unless you choose a plan.
+          </span>
+          <CoopButton size="sm" onClick={() => setView('pricing')} disabled={processing}>
+            Choose a plan
+          </CoopButton>
+        </div>
+      )}
+      {trial?.expired && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '12px 16px',
+            borderRadius: radius.lg,
+            background: colors.surfaceContainerLow,
+            border: `1px solid ${colors.outlineVariant}`,
+            marginBottom: 16,
+            ...type.bodyCompact,
+            color: colors.onSurfaceVariant,
+          }}
+        >
+          <InfoCircleFilled style={{ color: colors.outline }} />
+          <span style={{ flex: 1 }}>
+            <strong style={{ color: colors.onSurface }}>
+              Your free {trial.label} trial has ended.
+            </strong>{' '}
+            You're back on the Free plan and your business data is untouched — only the AI credit
+            allowance changed.
+          </span>
+          <CoopButton size="sm" onClick={() => setView('pricing')} disabled={processing}>
+            View plans
+          </CoopButton>
+        </div>
+      )}
 
       {/* Payment honesty banner (hidden once a provider is connected) */}
       {!paymentConnected && (
@@ -131,10 +199,14 @@ const BillingPage: React.FC = () => {
           )}
           <div style={{ flex: 1, ...type.bodyCompact, color: colors.onSurfaceVariant }}>
             {result.ok
-              ? result.target === 'free'
-                ? 'Subscription cancelled — you are on the Free plan. Your credits follow the free allowance.'
-                : `You are now on the ${result.target} plan. Your credit allowance updated immediately. ${!paymentConnected ? 'No payment was taken.' : ''}`
-              : `Plan change failed: ${result.reason ?? 'unknown reason'}`}
+              ? result.kind === 'trial'
+                ? `Your ${trialDays}-day free trial of the ${result.target} plan has started. No card, nothing charged — you keep the full allowance until it ends.`
+                : result.target === 'free'
+                  ? 'Subscription cancelled — you are on the Free plan. Your credits follow the free allowance.'
+                  : `You are now on the ${result.target} plan. Your credit allowance updated immediately. ${!paymentConnected ? 'No payment was taken.' : ''}`
+              : result.kind === 'trial'
+                ? `Couldn't start the free trial: ${result.reason ?? 'unknown reason'}`
+                : `Plan change failed: ${result.reason ?? 'unknown reason'}`}
           </div>
           {!result.ok && (
             <CoopButton size="sm" variant="secondary" icon={<ReloadOutlined />} onClick={retry}>
@@ -167,8 +239,16 @@ const BillingPage: React.FC = () => {
               title={
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                   {plan.name} Plan
-                  <CoopBadge variant={currentPlan === 'free' ? 'neutral' : 'primary'}>
-                    {currentPlan === 'free' ? 'Free' : 'Active'}
+                  <CoopBadge
+                    variant={
+                      trial?.active ? 'success' : currentPlan === 'free' ? 'neutral' : 'primary'
+                    }
+                  >
+                    {trial?.active
+                      ? `Trial — ${trial.days_remaining}d left`
+                      : currentPlan === 'free'
+                        ? 'Free'
+                        : 'Active'}
                   </CoopBadge>
                 </span>
               }
@@ -232,7 +312,15 @@ const BillingPage: React.FC = () => {
               >
                 {stat('Credits used', summary.used, `of ${summary.granted ?? '∞'} this month`)}
                 {stat('AI requests', summary.usage_month.requests, 'metered')}
-                {stat('Plan', plan.name, paymentConnected ? 'billed' : 'preview — not charged')}
+                {stat(
+                  'Plan',
+                  plan.name,
+                  trial?.active
+                    ? `free trial — ${trial.days_remaining}d left`
+                    : paymentConnected
+                      ? 'billed'
+                      : 'preview — not charged',
+                )}
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', flexWrap: 'wrap' }}>
                 <CoopButton icon={<CreditCardOutlined />} onClick={() => setView('pricing')} disabled={processing}>

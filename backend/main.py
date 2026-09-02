@@ -2256,6 +2256,10 @@ class BillingPlanRequest(BaseModel):
     plan: str
 
 
+class BillingTrialRequest(BaseModel):
+    plan: str
+
+
 @app.get("/billing/summary", tags=["Billing"])
 async def billing_summary_route(
     business: Business = Depends(get_current_business),
@@ -2289,6 +2293,38 @@ async def billing_change_plan(
     await audit_mod.record_audit(
         db, business.id, "subscriptions", None, "plan",
         change={"plan": req.plan}, actor=business.owner_id,
+    )
+    return await billing_mod.billing_summary(db, business)
+
+
+@app.post("/billing/trial", tags=["Billing"])
+async def billing_start_trial(
+    req: BillingTrialRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Start this business's one free trial of a paid plan.
+
+    The trial grants the paid plan's allowance for a fixed window without
+    touching the base plan, so it expires on its own — no scheduler, and
+    nothing is charged (a payment provider is still deliberately unplugged).
+    409 when the trial was already used or the business isn't eligible.
+    """
+    from . import billing as billing_mod
+    from .billing import TrialError
+
+    try:
+        sub = await billing_mod.start_trial(db, business, req.plan, actor=business.owner_id)
+    except TrialError as e:
+        raise HTTPException(status_code=409, detail={"error": "trial_unavailable",
+                                                     "message": str(e)})
+    await audit_mod.record_audit(
+        db, business.id, "subscriptions", None, "trial_start",
+        change={
+            "trial_plan": sub.trial_plan,
+            "ends_at": sub.trial_ends_at.isoformat() if sub.trial_ends_at else None,
+        },
+        actor=business.owner_id,
     )
     return await billing_mod.billing_summary(db, business)
 

@@ -427,6 +427,15 @@ class Subscription(Base):
     plan = Column(String(20), nullable=False, default="free")
     status = Column(String(20), nullable=False, default="active")
     updated_by = Column(String(255), nullable=True)
+    # --- Free trial (one per business, opt-in) -----------------------------
+    # The trial NEVER overwrites ``plan``: it grants ``trial_plan`` for a
+    # fixed window. Expiry is therefore lazy and needs no scheduler — once
+    # ``trial_ends_at`` is in the past the effective plan is ``plan`` again
+    # (free, unless the owner converted). ``trial_started_at`` doubles as the
+    # "already used" marker, so a trial can never be restarted.
+    trial_plan = Column(String(20), nullable=True)
+    trial_started_at = Column(DateTime, nullable=True)
+    trial_ends_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

@@ -36,8 +36,11 @@ const PlanCard: React.FC<{
   annual: boolean;
   currentPlan: PlanId;
   onSelect: (plan: PlanId) => void;
+  /** Start the free trial on this plan (only passed when one is available). */
+  onTrial?: (plan: PlanId) => void;
+  trialDays: number;
   processing: boolean;
-}> = ({ plan, annual, currentPlan, onSelect, processing }) => {
+}> = ({ plan, annual, currentPlan, onSelect, onTrial, trialDays, processing }) => {
   const { colors, isDark } = useCoopTheme();
   const price = displayPrice(plan, annual);
   const isCurrent = currentPlan === plan.id;
@@ -97,6 +100,37 @@ const PlanCard: React.FC<{
           <CoopButton variant="secondary" block disabled>
             Current Plan
           </CoopButton>
+        ) : onTrial ? (
+          /* A trial is still available: leading with it is the honest CTA —
+             nothing can be charged yet, so "buy" would be a lie. */
+          <>
+            <CoopButton
+              block
+              loading={processing}
+              onClick={() => onTrial(plan.id)}
+              icon={plan.id === 'professional' ? <SparkleIcon size={14} color={colors.onPrimary} /> : undefined}
+            >
+              {`Start ${trialDays}-Day Free Trial`}
+            </CoopButton>
+            <button
+              type="button"
+              onClick={() => onSelect(plan.id)}
+              disabled={processing}
+              style={{
+                display: 'block',
+                width: '100%',
+                marginTop: 8,
+                border: 'none',
+                background: 'transparent',
+                color: colors.outline,
+                ...type.bodyCompact,
+                fontSize: 12.5,
+                cursor: processing ? 'default' : 'pointer',
+              }}
+            >
+              Switch to {plan.name} without a trial
+            </button>
+          </>
         ) : (
           <CoopButton
             block
@@ -106,6 +140,11 @@ const PlanCard: React.FC<{
           >
             {plan.cta}
           </CoopButton>
+        )}
+        {onTrial && (
+          <div style={{ ...type.bodyCompact, fontSize: 11.5, color: colors.outline, marginTop: 8, textAlign: 'center' }}>
+            No card required · cancel anytime
+          </div>
         )}
       </div>
 
@@ -148,12 +187,15 @@ const PlanCard: React.FC<{
  */
 const ResultPanel: React.FC<{
   target: PlanId | 'free';
+  /** 'trial' = the free trial was started, not a paid plan change. */
+  kind: 'plan' | 'trial';
+  trialDays: number;
   ok: boolean;
   reason?: string;
   paymentConnected: boolean;
   onRetry?: () => void;
   onClose: () => void;
-}> = ({ target, ok, reason, paymentConnected, onRetry, onClose }) => {
+}> = ({ target, kind, trialDays, ok, reason, paymentConnected, onRetry, onClose }) => {
   const { colors } = useCoopTheme();
   const planName = target === 'free' ? 'Free' : target.charAt(0).toUpperCase() + target.slice(1);
 
@@ -187,7 +229,15 @@ const ResultPanel: React.FC<{
         {ok ? <CheckCircleFilled /> : <CloseCircleFilled />}
       </span>
       <div style={{ ...type.sectionHeading, fontSize: 20, color: colors.onSurface }}>
-        {ok ? (target === 'free' ? 'Subscription cancelled' : `Moved to ${planName}`) : 'Plan change failed'}
+        {ok
+          ? kind === 'trial'
+            ? `Your ${trialDays}-day ${planName} trial has started`
+            : target === 'free'
+              ? 'Subscription cancelled'
+              : `Moved to ${planName}`
+          : kind === 'trial'
+            ? 'Could not start your free trial'
+            : 'Plan change failed'}
       </div>
       <p style={{ margin: '8px auto 0', maxWidth: 420, ...type.bodyCompact, color: colors.onSurfaceVariant }}>
         {ok
@@ -212,12 +262,20 @@ export interface PricingViewProps {
 
 const PricingView: React.FC<PricingViewProps> = ({ onBack }) => {
   const { colors } = useCoopTheme();
-  const { plans, currentPlan, action, selectPlan, dismissResult, retry, paymentConnected } = useBilling();
+  const {
+    plans, currentPlan, action, selectPlan, dismissResult, retry, paymentConnected,
+    trial, trialDays, startTrial,
+  } = useBilling();
   const [annual, setAnnual] = useState(true);
 
   const result =
     action.status === 'success' || action.status === 'failure'
-      ? { target: action.target, ok: action.status === 'success', reason: action.status === 'failure' ? action.reason : undefined }
+      ? {
+          target: action.target,
+          kind: action.kind,
+          ok: action.status === 'success',
+          reason: action.status === 'failure' ? action.reason : undefined,
+        }
       : null;
   const processing = action.status === 'processing';
 
@@ -308,6 +366,8 @@ const PricingView: React.FC<PricingViewProps> = ({ onBack }) => {
         <div style={{ maxWidth: 560, margin: '0 auto', width: '100%' }}>
           <ResultPanel
             target={result.target}
+            kind={result.kind}
+            trialDays={trialDays}
             ok={result.ok}
             reason={result.reason}
             paymentConnected={paymentConnected}
@@ -333,6 +393,14 @@ const PricingView: React.FC<PricingViewProps> = ({ onBack }) => {
             annual={annual}
             currentPlan={currentPlan}
             processing={processing}
+            trialDays={trialDays}
+            // Enterprise is a sales conversation, and the current plan needs
+            // no CTA — everything else can start the one free trial.
+            onTrial={
+              trial?.available && p.id !== 'enterprise' && p.id !== currentPlan
+                ? (id) => void startTrial(id)
+                : undefined
+            }
             onSelect={(id) => {
               if (id === 'enterprise') {
                 contactSales();
