@@ -107,16 +107,18 @@ const AppShell: React.FC<AppShellProps> = ({ children, user, onSignOut }) => {
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
-      {/* Floating Co-op AI entry (bottom-left; hidden on the assistant page) */}
+      {/* Floating Co-op AI entry (bottom-right; hidden on the assistant page).
+          Kept off the left edge so it never covers the sidebar rail. */}
       {location.pathname !== '/coop-ai' && (
         <button
           type="button"
           onClick={() => navigate('/coop-ai')}
           aria-label="Open Co-op AI assistant"
           title="Ask Co-op"
+          className="coop-ai-fab"
           style={{
             position: 'fixed',
-            left: 20,
+            right: 20,
             bottom: 24,
             width: 48,
             height: 48,
