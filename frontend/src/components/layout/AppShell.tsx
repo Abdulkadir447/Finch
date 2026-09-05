@@ -5,29 +5,28 @@
  *   ┌────────────┬────────────────────────────────────────┐
  *   │            │  TopBar (sticky: search · AI · alerts · │
  *   │  Sidebar   │          theme · account)               │
- *   │  240/72px  ├────────────────────────────────────────┤
+ *   │   72px     ├────────────────────────────────────────┤
  *   │  (fixed)   │  Page content (transition on route)     │
  *   └────────────────────────────────────────────────────┘
  *
+ * The sidebar is a permanent 72px icon rail — hovering an icon reveals its
+ * name, so there is no expand/collapse state to manage.
+ *
  * Stage-2 additions:
- *   - Collapsed sidebar (72px icon rail, persisted preference).
  *   - Command palette (⌘K / Ctrl+K anywhere, or click the search field).
  *   - Notifications + theme toggle in the TopBar.
  *   - Window title follows the active module ("<Module> · Co-op").
- *   - Global transitions: page fade/rise on route change, sidebar width
- *     and theme cross-fades.
+ *   - Global transitions: page fade/rise on route change, theme cross-fades.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { radius, spacing } from '../../theme';
 import { useCoopTheme } from '../../theme-provider';
 import { NAV_ITEMS, NAV_SECONDARY } from './nav';
-import Sidebar, { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from './Sidebar';
+import Sidebar, { SIDEBAR_WIDTH } from './Sidebar';
 import TopBar from './TopBar';
 import CommandPalette from './CommandPalette';
 import { CoopMark } from '../brand/CoopLogo';
-
-const COLLAPSE_KEY = 'coop:sidebar-collapsed';
 
 export interface AppShellProps {
   children: React.ReactNode;
@@ -49,24 +48,6 @@ const AppShell: React.FC<AppShellProps> = ({ children, user, onSignOut }) => {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      return window.localStorage.getItem(COLLAPSE_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-
-  const toggleCollapse = useCallback(() => {
-    setCollapsed((c) => {
-      try {
-        window.localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1');
-      } catch {
-        /* persistence is a nicety */
-      }
-      return !c;
-    });
-  }, []);
 
   // Global ⌘K / Ctrl+K — open or close the command palette from anywhere.
   useEffect(() => {
@@ -94,25 +75,17 @@ const AppShell: React.FC<AppShellProps> = ({ children, user, onSignOut }) => {
     document.title = active ? `${active.label} · Co-op` : 'Co-op';
   }, [location.pathname]);
 
-  const railWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
-
   return (
     <div style={{ minHeight: '100vh', background: colors.surface, transition: 'background-color 300ms' }}>
-      <Sidebar
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapse}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
+      <Sidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <div
         className="coop-main-col"
         style={{
-          marginLeft: railWidth,
+          marginLeft: SIDEBAR_WIDTH,
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'margin-left 300ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         <TopBar
