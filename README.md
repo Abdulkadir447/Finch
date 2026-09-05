@@ -262,3 +262,10 @@ Postgres URL to additionally run the true-concurrency stock test.
 Product documentation (PRD, TRD, BSD, AFD, IPD, UXDS) lives in
 `Documents/`; engineering docs (branch protection, ADRs, coding standards)
 in `docs/`; current readiness status in `docs/PRODUCT_READINESS.md`.
+
+## Licence
+
+Proprietary — All Rights Reserved. See [LICENSE](LICENSE): the codebase is
+not open source, and access is granted per business through an activation
+key (`tools/generate_license.py` → Settings → Licence). Third-party libraries
+keep their own licences.
