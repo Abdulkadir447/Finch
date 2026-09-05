@@ -342,8 +342,21 @@ acts copy in the AI composer. Residual ERP-feel:
       channels stay beyond v1 scope.
 - [ ] Payment provider integration (after the charging decision — still
       parked, nothing is charged)
-- [ ] Licensing decision — Settings → About states the project is
-      unlicensed (version/environment info is shown)
+- [x] Licence activation (PRD Ch7 §7.19 / Ch8 §8.15) — `backend/licensing.py`
+      issues self-contained HMAC-SHA256 signed activation strings (business
+      id + plan + seats + expiry, 16-byte packed payload → a 66-character
+      `COOP-…` key); the team mints them offline with
+      `tools/generate_license.py` or via the team-only
+      `POST /admin/generate-license` (`X-Admin-Token`, constant-time compare,
+      503 when unconfigured); the owner activates through
+      `POST /licenses/activate` (owner-only; a key for another business, a
+      revoked key and an already-activated key are all explicit refusals).
+      The grant is a window on the subscription — same shape as the trial —
+      so expiry is a pure function of (`license_ends_at`, now) with no
+      scheduler, and `POST /admin/licenses/revoke` withdraws it immediately.
+      `licenses` (migration 0012) stores the SHA-256 fingerprint, never the
+      key. 25 tests (service + routes). **Still open:** the *codebase* licence
+      (Settings → About correctly says the project itself is unlicensed).
 
 ## 5. Pre-release checklist
 

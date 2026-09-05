@@ -177,10 +177,59 @@ def trial_was_used(sub: Subscription) -> bool:
 
 
 def effective_plan(sub: Subscription, now: Optional[dt.datetime] = None) -> str:
-    """The plan whose allowance and features actually apply right now."""
+    """The plan whose allowance and features actually apply right now.
+
+    Precedence: an unexpired licence (a real grant) > an active free trial >
+    the plan the business owns. All three are pure functions of the row and
+    the clock, so nothing needs a scheduler to expire.
+    """
+    if license_is_active(sub, now):
+        return sub.license_plan or sub.plan
     if trial_is_active(sub, now):
         return sub.trial_plan or sub.plan
     return sub.plan
+
+
+def license_is_active(sub: Subscription, now: Optional[dt.datetime] = None) -> bool:
+    """True while an activated licence is inside its window.
+
+    ``license_ends_at IS NULL`` means perpetual (a key minted with no expiry).
+    Revocation clears the window on the subscription, so a revoked licence
+    stops granting the moment the team revokes it — no cache to invalidate.
+    """
+    if not sub.license_plan:
+        return False
+    if sub.license_ends_at is None:
+        return True
+    return (now or _now()) < sub.license_ends_at
+
+
+def license_days_remaining(sub: Subscription, now: Optional[dt.datetime] = None) -> int:
+    """Whole days left on the licence, rounded up — 0 once expired."""
+    if not license_is_active(sub, now) or sub.license_ends_at is None:
+        return 0
+    delta = sub.license_ends_at - (now or _now())
+    return max(0, math.ceil(delta.total_seconds() / 86400))
+
+
+def license_state(sub: Subscription, now: Optional[dt.datetime] = None) -> dict[str, Any]:
+    """The licence block the UI renders — honest in one place."""
+    licensed = bool(sub.license_plan)
+    active = license_is_active(sub, now) if licensed else False
+    return {
+        "licensed": licensed,
+        "active": active,
+        "plan": sub.license_plan if licensed else None,
+        "label": plan_label(sub.license_plan) if licensed else None,
+        "seats": sub.license_seats if licensed else None,
+        "started_at": sub.license_started_at.isoformat() if sub.license_started_at else None,
+        "ends_at": sub.license_ends_at.isoformat() if sub.license_ends_at else None,
+        "days_remaining": license_days_remaining(sub, now),
+        "fingerprint": sub.license_fingerprint if licensed else None,
+        # True exactly once the window has closed (or the key was revoked),
+        # so the UI can say "your licence ended" instead of silently reverting.
+        "expired": licensed and not active,
+    }
 
 
 def trial_days_remaining(sub: Subscription, now: Optional[dt.datetime] = None) -> int:
@@ -270,6 +319,7 @@ class CreditState:
     # The plan the business owns, ignoring any trial grant.
     base_plan: str = PLAN_FREE
     trial: Optional[dict[str, Any]] = None
+    license: Optional[dict[str, Any]] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -284,6 +334,7 @@ class CreditState:
             "period": {"start": self.period_start, "end": self.period_end},
             "base_plan": self.base_plan,
             "trial": self.trial,
+            "license": self.license,
         }
 
 
@@ -309,6 +360,7 @@ async def credit_state(db, business: Business) -> CreditState:
         period_end=(end - dt.timedelta(seconds=1)).date().isoformat(),
         base_plan=sub.plan,
         trial=trial_state(sub),
+        license=license_state(sub),
     )
 
 

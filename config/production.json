@@ -80,6 +80,11 @@
       "https://app.coop.example"
     ]
   },
+  "licensing": {
+    "_comment": "Signed activation keys (PRD Ch7 §7.19). The signing key lives ONLY in LICENSE_SIGNING_KEY and admin tokens in LICENSE_ADMIN_TOKENS — neither belongs in this file.",
+    "enabled": true,
+    "default_days": 365
+  },
   "notifications": {
     "smtp": {
       "host": "",

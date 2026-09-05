@@ -436,11 +436,55 @@ class Subscription(Base):
     trial_plan = Column(String(20), nullable=True)
     trial_started_at = Column(DateTime, nullable=True)
     trial_ends_at = Column(DateTime, nullable=True)
+    # --- Licence (PRD Ch7 §7.19 / Ch8 §8.15) -------------------------------
+    # Same shape as the trial, for the same reason: an activated licence
+    # grants ``license_plan`` for a fixed window WITHOUT overwriting ``plan``,
+    # so expiry is a pure function of (license_ends_at, now) — no scheduler,
+    # no downgrade job. ``license_fingerprint`` links back to the ``licenses``
+    # row (the key itself is never stored — see License below).
+    license_plan = Column(String(20), nullable=True)
+    license_seats = Column(Integer, nullable=True)
+    license_started_at = Column(DateTime, nullable=True)
+    license_ends_at = Column(DateTime, nullable=True)
+    license_fingerprint = Column(String(64), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Subscription business={self.business_id} plan={self.plan!r}>"
+
+
+class License(Base):
+    """One issued Co-op licence (PRD Ch8 §8.15, activation per Ch7 §7.19).
+
+    The ledger of every activation string the team has minted and what became
+    of it. The key itself is NOT stored — only its SHA-256 ``fingerprint`` —
+    so a database leak cannot be replayed as activation strings. A licence is
+    bound to exactly one business, and ``revoked_at`` wins over a valid
+    signature (see ``backend/licensing.py``).
+    """
+
+    __tablename__ = "licenses"
+    __table_args__ = (
+        Index("uq_licenses_fingerprint", "fingerprint", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    fingerprint = Column(String(64), nullable=False)
+    plan = Column(String(20), nullable=False)
+    seats = Column(Integer, nullable=False, default=1)
+    issued_at = Column(DateTime, nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+    activated_by = Column(String(255), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_reason = Column(String(255), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<License business={self.business_id} plan={self.plan!r}>"
 
 
 class Profile(Base):

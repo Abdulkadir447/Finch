@@ -71,6 +71,15 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
   downgrade job to fail. Trial length lives in `config/<env>.json`
   (`billing.trial`). Payment collection is the one deliberately unplugged
   part — the UI says so.
+- **Licensing** — a licence is a self-contained HMAC-SHA256 signed activation
+  string binding a business id + plan + seats + expiry (`COOP-XXXXX-…`, 66
+  characters). The team mints keys offline with `tools/generate_license.py`
+  (no database needed) or via the team-only `/admin/generate-license` route;
+  the owner pastes one into Settings → Licence, the signature is verified,
+  and the plan is granted as a *window* on the subscription — never an
+  overwrite of the owned plan — so expiry needs no scheduler and revocation
+  withdraws the grant immediately. The server stores only the key's SHA-256
+  fingerprint, never the key.
 - **Audit log** — every mutation (create/update/delete, stock adjustments,
   order status changes, imports, plan changes, restores, and offline-synced
   operations) writes an append-only, tenant-scoped audit row; Settings →
@@ -198,6 +207,13 @@ AI          POST /ai/chat   (verified context, structured answer, 402 when out
             GET /ai/usage
 Billing     GET /billing/summary   POST /billing/plan
             POST /billing/trial (start the one 10-day free trial; 409 if used)
+Licensing   GET /licenses          POST /licenses/activate
+            (the owner pastes the signed key the team sent; the plan is
+            granted as a window, so expiry needs no scheduler)
+Admin       POST /admin/generate-license   GET /admin/licenses
+            POST /admin/licenses/revoke
+            (team only — X-Admin-Token, not Clerk; or mint keys offline with
+            tools/generate_license.py)
 Backup      GET /backups/export (download JSON snapshot)
             POST /backups/restore (into an EMPTY business only — 409 otherwise)
 Audit       GET /audit   (append-only activity trail, tenant-scoped)

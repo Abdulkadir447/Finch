@@ -65,6 +65,7 @@ from .models import (
     BusinessInvitation,
     BusinessMember,
     Customer,
+    License,
     Order,
     OrderItem,
     Product,
@@ -2325,6 +2326,231 @@ async def billing_start_trial(
             "ends_at": sub.trial_ends_at.isoformat() if sub.trial_ends_at else None,
         },
         actor=business.owner_id,
+    )
+    return await billing_mod.billing_summary(db, business)
+
+
+# ---------------------------------------------------------------------------
+# Licensing (PRD Ch7 §7.19 activation flow, Ch8 §8.15 License table)
+#
+# A licence is a self-contained HMAC-signed activation string binding a
+# business id + plan + seats + expiry. The team mints them (script or the
+# admin route below); the owner pastes one into Settings -> Licence, the
+# signature is verified, and the plan is granted as a WINDOW on the
+# subscription — never an overwrite of the owned plan — so expiry needs no
+# scheduler (same design as the free trial).
+#
+# Two audiences, two gates:
+#   /admin/*   — the Co-op team only: a shared secret in X-Admin-Token,
+#                compared in constant time. This is the one surface in the
+#                API that is not Clerk-authenticated, because keys are minted
+#                from a script with no user session. No token configured =>
+#                the routes are closed (503), never open.
+#   /licenses* — the customer: Clerk-authenticated, owner-only, and a key
+#                issued to another business is a 403 rather than a re-grant.
+# ---------------------------------------------------------------------------
+
+class AdminGenerateLicenseRequest(BaseModel):
+    business_id: int
+    plan: str
+    days: Optional[int] = None
+    seats: int = 1
+    expires_at: Optional[date] = None
+
+
+class AdminRevokeLicenseRequest(BaseModel):
+    fingerprint: Optional[str] = None
+    license_key: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class LicenseActivateRequest(BaseModel):
+    key: str
+
+
+async def require_admin_token(request: Request) -> str:
+    """Team-only gate for the licence-issuing routes (see block comment)."""
+    from . import licensing as licensing_mod
+
+    tokens = licensing_mod.admin_tokens()
+    if not tokens:
+        raise HTTPException(
+            status_code=503,
+            detail="Licence issuing is not configured on this server",
+        )
+    presented = request.headers.get("x-admin-token", "")
+    if not presented or not any(secrets.compare_digest(presented, t) for t in tokens):
+        raise HTTPException(status_code=403, detail="Admin token rejected")
+    return "admin-token"
+
+
+def _license_audit_change(row: License) -> dict:
+    """Never the key itself — the fingerprint is the reference."""
+    return {
+        "fingerprint": row.fingerprint,
+        "plan": row.plan,
+        "seats": row.seats,
+        "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+    }
+
+
+@app.post("/admin/generate-license", tags=["Admin"])
+async def admin_generate_license(
+    req: AdminGenerateLicenseRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: str = Depends(require_admin_token),
+) -> dict:
+    """Mint a signed activation string for one business (team only).
+
+    The business must exist: minting against a typo'd id would produce a key
+    nobody can ever activate. The response carries the key exactly once —
+    the server keeps only its fingerprint.
+    """
+    from . import licensing as licensing_mod
+
+    business = (await db.execute(
+        select(Business).where(Business.id == req.business_id, Business.deleted_at.is_(None))
+    )).scalars().first()
+    if business is None:
+        raise HTTPException(status_code=404, detail="No such business")
+
+    expires = datetime.combine(req.expires_at, time.min) if req.expires_at else None
+    try:
+        issued = licensing_mod.issue(
+            business.id, req.plan, seats=req.seats, days=req.days, expires_at=expires
+        )
+    except licensing_mod.LicenseError as e:
+        raise HTTPException(status_code=422, detail={"error": e.reason, "message": e.message})
+
+    row = License(
+        business_id=business.id,
+        fingerprint=issued.fingerprint,
+        plan=issued.plan,
+        seats=issued.seats,
+        issued_at=issued.issued_at,
+        expires_at=issued.expires_at,
+    )
+    db.add(row)
+    await db.flush()
+    await audit_mod.record_audit(
+        db, business.id, "licenses", row.id, "license_issue",
+        change=_license_audit_change(row), actor=_admin,
+    )
+    return issued.to_dict()
+
+
+@app.get("/admin/licenses", tags=["Admin"])
+async def admin_list_licenses(
+    business_id: Optional[int] = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    _admin: str = Depends(require_admin_token),
+) -> dict:
+    """Every licence the team has minted — the support view (team only)."""
+    stmt = select(License).order_by(License.id.desc()).limit(limit)
+    if business_id is not None:
+        stmt = stmt.where(License.business_id == business_id)
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "licenses": [
+            {
+                "id": r.id,
+                "business_id": r.business_id,
+                "fingerprint": r.fingerprint,
+                "plan": r.plan,
+                "seats": r.seats,
+                "issued_at": r.issued_at.isoformat() if r.issued_at else None,
+                "activated_at": r.activated_at.isoformat() if r.activated_at else None,
+                "activated_by": r.activated_by,
+                "expires_at": r.expires_at.isoformat() if r.expires_at else None,
+                "revoked_at": r.revoked_at.isoformat() if r.revoked_at else None,
+                "revoked_reason": r.revoked_reason,
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.post("/admin/licenses/revoke", tags=["Admin"])
+async def admin_revoke_license(
+    req: AdminRevokeLicenseRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: str = Depends(require_admin_token),
+) -> dict:
+    """Revoke a licence by fingerprint (or by the key itself) — team only.
+
+    Revocation wins over a valid signature and withdraws the granted plan
+    immediately, because the grant lives on the subscription window.
+    """
+    from . import licensing as licensing_mod
+
+    fp = req.fingerprint
+    if not fp and req.license_key:
+        try:
+            fp = licensing_mod.fingerprint(req.license_key)
+        except licensing_mod.LicenseError:
+            fp = None
+    if not fp:
+        raise HTTPException(status_code=422, detail="Provide fingerprint or license_key")
+    try:
+        row = await licensing_mod.revoke(db, fp, reason=req.reason, actor=_admin)
+    except licensing_mod.LicenseError as e:
+        raise HTTPException(
+            status_code=404, detail={"error": e.reason, "message": e.message}
+        )
+    await audit_mod.record_audit(
+        db, row.business_id, "licenses", row.id, "license_revoke",
+        change={**_license_audit_change(row), "reason": row.revoked_reason}, actor=_admin,
+    )
+    return {
+        "revoked": True,
+        "fingerprint": row.fingerprint,
+        "business_id": row.business_id,
+        "revoked_at": row.revoked_at.isoformat() if row.revoked_at else None,
+    }
+
+
+@app.get("/licenses", tags=["Licensing"])
+async def license_status(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """This business's licence position (Settings -> Licence)."""
+    from . import billing as billing_mod
+
+    sub = await billing_mod.get_or_create_subscription(db, business)
+    return {
+        "license": billing_mod.license_state(sub),
+        "effective_plan": billing_mod.effective_plan(sub),
+    }
+
+
+@app.post("/licenses/activate", tags=["Licensing"])
+async def license_activate(
+    req: LicenseActivateRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    user: ClerkUser = Depends(verify_clerk_token),
+    _owner: str = Depends(team_mod.require_owner),
+) -> dict:
+    """Activate a licence key for the caller's own business (owner only).
+
+    Honest refusals: a key issued to another business (403), a revoked key
+    (403), a key already activated elsewhere (403), and an invalid/expired
+    key (422) each carry a machine-readable ``error`` the UI can explain.
+    """
+    from . import billing as billing_mod
+    from . import licensing as licensing_mod
+
+    try:
+        row = await licensing_mod.activate(db, business, req.key, actor=business.owner_id)
+    except licensing_mod.LicenseError as e:
+        code = 403 if e.reason in ("wrong_business", "already_activated", "revoked") else 422
+        raise HTTPException(status_code=code, detail={"error": e.reason, "message": e.message})
+
+    await audit_mod.record_audit(
+        db, business.id, "licenses", row.id, "license_activate",
+        change=_license_audit_change(row), actor=business.owner_id,
     )
     return await billing_mod.billing_summary(db, business)
 
