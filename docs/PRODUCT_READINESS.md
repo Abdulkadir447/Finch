@@ -21,7 +21,7 @@ down.
 | Intelligent Import | 5-endpoint flow, deterministic mapper (LLM seam), read-only validate, commit with provenance + `source_order_ref` idempotency | `backend/importer.py`, `frontend/src/imports/` |
 | Day 1 Briefing + first-run onboarding | Verified deterministic insights; `/onboarding/state` + Welcome gate | `backend/briefing.py`, `frontend/src/pages/Welcome/` |
 | Reports + exports | One engine, one filter contract; Sales / P&L / Inventory / Customers; CSV/XLSX/PDF of exactly what's on screen | `backend/reports/`, `backend/exports/`, `frontend/src/pages/Reports/` |
-| Co-op AI (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
+| Zeno (real model) | Verified-context architecture; strict answer contract; fixed validated action registry; graceful fallback when the model is unreachable; deterministic revenue forecast (`/ai/forecast`, transparent trend — never ML, never negative) and owner-visible AI activity ledger (`ai_history`, `/ai/history`) — both tenant-scoped, tested, no model call | `backend/ai/`, `frontend/src/ai/`, `frontend/src/components/ai/` |
 | Billing + credits | Real plan state, computed (never stored) credit balance from the `ai_usage` ledger, enforcement (402) on every AI request; payment collection unplugged by design | `backend/billing.py`, `frontend/src/pages/Billing/` |
 | Tests | 155 backend tests (incl. frontend↔backend contract test; 7 forecast, 6 AI history, 2 report-chart/route regressions, 9 OFFLINE 4 conflict tests, 6 rate-limit, 4 CORS, 6 audit, 7 backup, 5 AI-style) + 15 local-analytics port tests + 34 Electron data-layer/sync/backup Node tests + the OFFLINE 6 real-runtime E2E harness (46 scenarios: SIGKILL survival, exactly-once sync, conflict resolution, cold offline start) + tsc/build gates, all green locally. **CI fixed and committed on the working branch — activates once merged to `master` (see §4.1)** | `backend/tests/`, `frontend/test/`, `electron/test/`, `electron/e2e/`, `.github/workflows/ci.yml` |
 
@@ -258,8 +258,8 @@ mailer — none exists in the repo).
 
 ### 2.5 Product positioning — **mostly there; polish the last mile**
 The advisor/operator identity is already visible: Welcome screen, Day 1
-Briefing, "Co-op AI · Live Insights" on the Dashboard, "Ask Co-op"
-throughout, Reports with "Ask Co-op about this report", and drafts-never-
+Briefing, "Zeno · Live Insights" on the Dashboard, "Ask Zeno"
+throughout, Reports with "Ask Zeno about this report", and drafts-never-
 acts copy in the AI composer. Residual ERP-feel:
 - **Settings** shows 7 "coming soon" sections (appearance, AI prefs,
   notifications, security, backup, sync, about). Honest, but prominent —

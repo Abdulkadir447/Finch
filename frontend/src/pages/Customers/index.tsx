@@ -227,7 +227,7 @@ const CustomersPage: React.FC = () => {
           <AiNoticeBox
             compact
             title="Up next: engagement analysis"
-            description="Ask Co-op and Live Insights are available now. Automatically flagging customers whose order cadence is changing — with suggested check-ins — is still on the roadmap."
+            description="Ask Zeno and Live Insights are available now. Automatically flagging customers whose order cadence is changing — with suggested check-ins — is still on the roadmap."
           />
 
           {loading ? (

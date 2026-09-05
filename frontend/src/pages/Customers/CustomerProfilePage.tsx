@@ -374,7 +374,7 @@ const CustomerProfilePage: React.FC = () => {
             {/* Recent activity insights (honest AI placeholder) */}
             <AiNoticeBox
               title="Up next: profile-level signals"
-              description="Ask Co-op is available now. Per-customer engagement signals — order cadence, churn risk and suggested check-ins — are still on the roadmap."
+              description="Ask Zeno is available now. Per-customer engagement signals — order cadence, churn risk and suggested check-ins — are still on the roadmap."
             />
           </div>
         </Col>

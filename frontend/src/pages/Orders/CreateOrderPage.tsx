@@ -64,7 +64,7 @@ interface AiOrderDraft {
 }
 
 /**
- * Co-op AI handoff: an AI-drafted order (Stage 2.2 action boundary) opens
+ * Zeno handoff: an AI-drafted order (Stage 2.2 action boundary) opens
  * here PRE-FILLED for review. The AI never created it — the user still
  * reviews the lines and presses Confirm Order, at which point the existing
  * POST /orders executes.
@@ -116,7 +116,7 @@ const CreateOrderPage: React.FC = () => {
   const [failureMessage, setFailureMessage] = useState('');
   const [aiDraftNote, setAiDraftNote] = useState<string | null>(null);
 
-  // Co-op AI draft handoff (runs once, on mount).
+  // Zeno draft handoff (runs once, on mount).
   useEffect(() => {
     const draft = readAiDraft();
     if (!draft) return;
@@ -150,7 +150,7 @@ const CreateOrderPage: React.FC = () => {
         if (nextLines.length > 0) {
           setLines(nextLines);
           setAiDraftNote(
-            `Drafted with Co-op AI — ${nextLines.map((l) => `${l.quantity} × ${l.product.name}`).join(', ')}. Review and confirm to create the order.`,
+            `Drafted with Zeno — ${nextLines.map((l) => `${l.quantity} × ${l.product.name}`).join(', ')}. Review and confirm to create the order.`,
           );
         }
       });
@@ -614,7 +614,7 @@ const CreateOrderPage: React.FC = () => {
         </div>
 
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Co-op AI draft notice (action boundary: drafted, not created) */}
+          {/* Zeno draft notice (action boundary: drafted, not created) */}
           {aiDraftNote && (
             <div
               role="status"

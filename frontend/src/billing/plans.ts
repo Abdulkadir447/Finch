@@ -64,7 +64,7 @@ export const PLAN_CATALOG: Plan[] = [
     includesLabel: 'Everything in Starter, plus:',
     features: [
       { label: 'Unlimited users', included: true },
-      { label: 'Co-op AI Insights', included: true, ai: true },
+      { label: 'Zeno Insights', included: true, ai: true },
       { label: 'Advanced integrations', included: true },
       { label: 'Priority support', included: true },
     ],
@@ -97,7 +97,7 @@ export const FREE_PLAN: Plan = {
   features: [
     { label: 'Products, inventory & orders', included: true },
     { label: 'Customers & dashboard', included: true },
-    { label: 'Co-op AI (basic usage)', included: true, ai: true },
+    { label: 'Zeno (basic usage)', included: true, ai: true },
   ],
 };
 

@@ -4,7 +4,7 @@
  * Translucent blurred bar + 1px border-subtle bottom edge. Anatomy:
  *   mobile  — hamburger (opens the sidebar drawer)
  *   left    — global search field (opens the ⌘K command palette)
- *   right   — AI Assistant pill · notifications (real inventory alerts) ·
+ *   right   — Zeno pill · notifications (real inventory alerts) ·
  *             theme toggle (light/dark) · account menu (profile + sign out)
  *
  * Stage-2 notes: global search is a REAL command palette (pages + live
@@ -143,11 +143,11 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
 
       <div style={{ flex: 1 }} />
 
-      {/* AI Assistant pill */}
+      {/* Zeno pill */}
       <button
         type="button"
         onClick={() => navigate('/coop-ai')}
-        aria-label="Open Co-op AI assistant"
+        aria-label="Open the Zeno assistant"
         className="coop-topbar-ai"
         style={{
           display: 'inline-flex',
@@ -168,7 +168,7 @@ const TopBar: React.FC<TopBarProps> = ({ user, onSignOut, onMenuClick, onOpenPal
         onMouseLeave={(e) => (e.currentTarget.style.background = isDark ? 'rgba(122, 127, 255, 0.14)' : 'rgba(225, 224, 255, 0.45)')}
       >
         <SparkleIcon size={15} color={colors.secondaryContainer} />
-        <span className="coop-topbar-ai-label">AI Assistant</span>
+        <span className="coop-topbar-ai-label">Zeno</span>
       </button>
 
       {/* Sync state (offline-first, ADR-002) — never hidden */}

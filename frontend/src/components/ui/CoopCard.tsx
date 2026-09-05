@@ -24,7 +24,7 @@ export interface CoopCardProps {
   extra?: React.ReactNode;
   /** Marks the card as AI-powered: gradient top border + sparkle mark. */
   ai?: boolean;
-  /** AI module label, e.g. "Co-op AI Insight" (gradient text). */
+  /** AI module label, e.g. "Zeno Insight" (gradient text). */
   aiLabel?: string;
   /** Hover lift (Level 2). */
   hoverable?: boolean;

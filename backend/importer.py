@@ -1,7 +1,7 @@
 """
 Co-op Intelligent Importer (v1) — flat-file ingestion + schema mapping.
 
-Trust model (same philosophy as Co-op AI actions):
+Trust model (same philosophy as Zeno actions):
     upload -> parse/validate -> SUGGESTED mapping (with confidence)
            -> USER reviews/edits mapping in the UI
            -> server executes the import -> reported result

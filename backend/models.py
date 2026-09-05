@@ -63,7 +63,7 @@ class Business(Base):
     tax_id = Column(String(100))
     website = Column(String(255))
     timezone = Column(String(64))
-    # Ask Co-op answer style preference (0009): concise | standard | detailed.
+    # Ask Zeno answer style preference (0009): concise | standard | detailed.
     ai_response_style = Column(
         String(20), default="standard", server_default="standard", nullable=False
     )

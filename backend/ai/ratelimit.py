@@ -21,7 +21,7 @@ from ..clerk_auth import ClerkUser, verify_clerk_token
 from ..config import load_config
 
 _RATE_LIMIT_DETAIL = (
-    "You're asking Co-op AI too quickly. Wait a moment, then try again."
+    "You're asking Zeno too quickly. Wait a moment, then try again."
 )
 
 

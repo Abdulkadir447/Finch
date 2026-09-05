@@ -107,14 +107,14 @@ const AppShell: React.FC<AppShellProps> = ({ children, user, onSignOut }) => {
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
-      {/* Floating Co-op AI entry (bottom-right; hidden on the assistant page).
+      {/* Floating Zeno entry (bottom-right; hidden on the assistant page).
           Kept off the left edge so it never covers the sidebar rail. */}
       {location.pathname !== '/coop-ai' && (
         <button
           type="button"
           onClick={() => navigate('/coop-ai')}
-          aria-label="Open Co-op AI assistant"
-          title="Ask Co-op"
+          aria-label="Open the Zeno assistant"
+          title="Ask Zeno"
           className="coop-ai-fab"
           style={{
             position: 'fixed',
@@ -137,7 +137,7 @@ const AppShell: React.FC<AppShellProps> = ({ children, user, onSignOut }) => {
           onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.06)')}
           onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         >
-          <CoopMark size={30} title="Co-op AI" />
+          <CoopMark size={30} title="Zeno" />
         </button>
       )}
     </div>

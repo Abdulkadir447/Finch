@@ -49,7 +49,7 @@ INGEST → UNDERSTAND → OPERATE → REPORT → EXPLAIN → DRAFT → CONFIRM �
   Profit & Loss, Inventory, Customers) with shared filters and comparison
   periods, powering the Reports UI and CSV / Excel / PDF exports of exactly
   what's on screen.
-- **Co-op AI (real model, verified context)** — Ask Co-op answers from a
+- **Zeno (real model, verified context)** — Ask Zeno answers from a
   verified business context the backend rebuilds per request: the model
   never queries the database and never invents numbers. It can explain any
   report you're looking at and propose *drafts* from a fixed, validated
@@ -129,7 +129,7 @@ Documents/  Product documentation (PRD, TRD, BSD, AFD, IPD, UXDS chapters)
   for the backend)
 - A Supabase/Postgres database
 - (Optional) an OpenAI API key for the real AI assistant — without it,
-  Ask Co-op gracefully falls back to the deterministic data engine
+  Ask Zeno gracefully falls back to the deterministic data engine
 
 ## Environment variables
 

@@ -294,7 +294,7 @@ body .ant-table-thead > tr > td {
   .coop-main {
     padding: 16px 16px 40px !important;
   }
-  /* The Co-op AI entry floats bottom-right; below md the module "+" FABs
+  /* The Zeno entry floats bottom-right; below md the module "+" FABs
      (right:20/bottom:24, 54px) live there, so stack the AI entry above them. */
   .coop-ai-fab {
     bottom: 90px !important;

@@ -41,7 +41,7 @@ import {
  *
  *   Order #ORD-XXXX [status pill] · placed-on line
  *   Items Ordered card (real line items + totals)
- *   Co-op AI Insights (honest placeholder)
+ *   Zeno Insights (honest placeholder)
  *   Update Status card — the backend-published legal transitions
  *   Customer Details card — links to the customer profile
  *   Timeline — derived from real timestamps + status position
@@ -385,7 +385,7 @@ const OrderDetailsPage: React.FC = () => {
           {/* AI insights (honest placeholder) */}
           <AiNoticeBox
             title="Up next: order-level analysis"
-            description="Ask Co-op is available now. Order-level analysis — delivery risk, customer LTV and fulfillment route — is still on the roadmap."
+            description="Ask Zeno is available now. Order-level analysis — delivery risk, customer LTV and fulfillment route — is still on the roadmap."
           />
         </div>
 

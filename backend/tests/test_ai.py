@@ -206,7 +206,7 @@ async def test_chat_empty_business_gets_honest_clarify(api, fake_provider):
 
 
 async def test_chat_report_context_is_verified_and_attached(api):
-    """'Ask Co-op about this report': the server rebuilds the verified report
+    """'Ask Zeno about this report': the server rebuilds the verified report
     from the FILTERS and attaches it to the model's context — the client
     never supplies the numbers themselves."""
     captured = {}
