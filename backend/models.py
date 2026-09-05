@@ -487,6 +487,45 @@ class License(Base):
         return f"<License business={self.business_id} plan={self.plan!r}>"
 
 
+class Invoice(Base):
+    """A saved invoice for one order (PRD "Invoice generation").
+
+    Numbered per business (INV-0001, INV-0002, ...) so the paperwork a
+    customer receives matches what the owner sees in the list. The money is
+    deliberately NOT duplicated here: an invoice points at its order, and the
+    order stays the single source of truth for the amounts — there is no
+    total column that can drift.
+
+    Lifecycle is a document lifecycle (draft -> sent -> void). Recording
+    money received is the payments phase and lives elsewhere.
+    """
+
+    __tablename__ = "invoices"
+    __table_args__ = (
+        Index("uq_invoices_business_number", "business_id", "number", unique=True),
+        Index("uq_invoices_business_order", "business_id", "order_id", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, index=True, nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    number = Column(String(20), nullable=False)
+    issue_date = Column(DateTime, nullable=False)
+    due_date = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+    # draft | sent | void
+    status = Column(String(10), nullable=False, default="draft")
+    created_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
+    updated_by = Column(String(255), nullable=True)   # BSD Ch2.7 universal structure
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    order = relationship("Order")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Invoice {self.number} order={self.order_id} status={self.status!r}>"
+
+
 class Profile(Base):
     """Local user profile, linked to the Clerk identity.
 

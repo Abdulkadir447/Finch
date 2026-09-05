@@ -6,6 +6,7 @@ import React from 'react';
 import {
   BarChartOutlined,
   DashboardOutlined,
+  FileTextOutlined,
   InboxOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
@@ -28,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'products', label: 'Products', path: '/products', icon: <ShoppingCartOutlined /> },
   { key: 'inventory', label: 'Inventory', path: '/inventory', icon: <InboxOutlined /> },
   { key: 'orders', label: 'Orders', path: '/orders', icon: <TeamOutlined /> },
+  { key: 'invoices', label: 'Invoices', path: '/invoices', icon: <FileTextOutlined /> },
   { key: 'customers', label: 'Customers', path: '/customers', icon: <UserOutlined /> },
   { key: 'import', label: 'Import', path: '/import', icon: <UploadOutlined /> },
 ];

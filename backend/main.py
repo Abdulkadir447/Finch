@@ -2556,6 +2556,155 @@ async def license_activate(
 
 
 # ---------------------------------------------------------------------------
+# Invoicing (PRD "Invoice generation")
+#
+# A saved invoice per order, numbered per business (INV-0001, ...). The money
+# is never duplicated: the invoice points at its order, which stays the single
+# source of truth for amounts. Lifecycle is draft -> sent -> void; recording
+# money received belongs to the payments phase.
+# ---------------------------------------------------------------------------
+
+class InvoiceCreateRequest(BaseModel):
+    order_id: int
+    issue_date: Optional[date] = None
+    due_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+class InvoiceUpdateRequest(BaseModel):
+    issue_date: Optional[date] = None
+    due_date: Optional[date] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+
+def _invoice_http_error(e) -> HTTPException:
+    code = {"order_not_found": 404, "not_found": 404,
+            "already_invoiced": 409}.get(e.reason, 422)
+    return HTTPException(status_code=code, detail={"error": e.reason, "message": e.message})
+
+
+@app.post("/invoices", status_code=status.HTTP_201_CREATED, tags=["Invoices"])
+async def create_invoice(
+    req: InvoiceCreateRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create the invoice for one of this business's orders.
+
+    One invoice per order (409 on a second attempt) and one number per
+    business, both enforced by unique indexes rather than by convention.
+    """
+    from . import invoicing as invoicing_mod
+
+    try:
+        row = await invoicing_mod.create_for_order(
+            db, business, req.order_id,
+            issue_date=datetime.combine(req.issue_date, time.min) if req.issue_date else None,
+            due_date=datetime.combine(req.due_date, time.min) if req.due_date else None,
+            notes=req.notes,
+            actor=business.owner_id,
+        )
+    except invoicing_mod.InvoiceError as e:
+        raise _invoice_http_error(e)
+    await audit_mod.record_audit(
+        db, business.id, "invoices", row.id, "create",
+        change={"number": row.number, "order_id": row.order_id}, actor=business.owner_id,
+    )
+    return await invoicing_mod.detail(db, business, row.id)
+
+
+@app.get("/invoices", tags=["Invoices"])
+async def list_invoices_route(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    search: Optional[str] = Query(None),
+    status_: Optional[str] = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> dict:
+    """The Invoices list — number, customer, dates, status and order total."""
+    from . import invoicing as invoicing_mod
+
+    try:
+        return await invoicing_mod.list_invoices(
+            db, business, search=search, status=status_, page=page, limit=limit
+        )
+    except invoicing_mod.InvoiceError as e:
+        raise _invoice_http_error(e)
+
+
+@app.get("/invoices/export", tags=["Invoices"])
+async def export_invoices(
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+    format: str = Query("csv", alias="format"),
+    search: Optional[str] = Query(None),
+    status_: Optional[str] = Query(None, alias="status"),
+) -> Response:
+    """CSV of exactly the invoices the list is showing (same filters)."""
+    from . import invoicing as invoicing_mod
+
+    if format.strip().lower() != "csv":
+        raise HTTPException(status_code=422, detail="format must be: csv")
+    try:
+        data = await invoicing_mod.list_invoices(
+            db, business, search=search, status=status_, page=1, limit=1000
+        )
+    except invoicing_mod.InvoiceError as e:
+        raise _invoice_http_error(e)
+    return Response(
+        content=invoicing_mod.render_csv(business, data["items"]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="coop_invoices.csv"'},
+    )
+
+
+@app.get("/invoices/{invoice_id}", tags=["Invoices"])
+async def invoice_detail(
+    invoice_id: int,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """One invoice with its order and customer."""
+    from . import invoicing as invoicing_mod
+
+    try:
+        return await invoicing_mod.detail(db, business, invoice_id)
+    except invoicing_mod.InvoiceError as e:
+        raise _invoice_http_error(e)
+
+
+@app.patch("/invoices/{invoice_id}", tags=["Invoices"])
+async def update_invoice_route(
+    invoice_id: int,
+    req: InvoiceUpdateRequest,
+    business: Business = Depends(get_current_business),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Edit dates/notes or move draft -> sent -> void. A void invoice is
+    terminal: it is paperwork the customer may already hold."""
+    from . import invoicing as invoicing_mod
+
+    try:
+        row = await invoicing_mod.update_invoice(
+            db, business, invoice_id,
+            issue_date=datetime.combine(req.issue_date, time.min) if req.issue_date else None,
+            due_date=datetime.combine(req.due_date, time.min) if req.due_date else None,
+            notes=req.notes,
+            status=req.status,
+            actor=business.owner_id,
+        )
+    except invoicing_mod.InvoiceError as e:
+        raise _invoice_http_error(e)
+    await audit_mod.record_audit(
+        db, business.id, "invoices", row.id, "update",
+        change={"number": row.number, "status": row.status}, actor=business.owner_id,
+    )
+    return await invoicing_mod.detail(db, business, row.id)
+
+
+# ---------------------------------------------------------------------------
 # Notifications (v1: in-app daily business summary)
 #
 # Computed on demand from the existing reporting/briefing layer — no second

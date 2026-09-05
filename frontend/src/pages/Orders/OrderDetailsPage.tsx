@@ -7,6 +7,7 @@ import {
   FileTextOutlined,
   MailOutlined,
   PrinterOutlined,
+  FileDoneOutlined,
   ShoppingCartOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -612,6 +613,31 @@ interface InvoiceModalProps {
 }
 
 const InvoiceModal: React.FC<InvoiceModalProps> = ({ open, onClose, order, business }) => {
+  const api = useApiClient();
+  const navigate = useNavigate();
+  const [savingInvoice, setSavingInvoice] = useState(false);
+
+  /**
+   * Save this printable invoice as a numbered, tracked document (POST /invoices,
+   * team-only). Amounts are not sent — the server reads them off the order — so
+   * the record cannot drift from what was printed.
+   */
+  const saveAsInvoice = useCallback(async () => {
+    setSavingInvoice(true);
+    try {
+      const { data } = await api.post<{ number: string }>('/invoices', { order_id: order.id });
+      message.success(`Saved as ${data.number}`);
+      onClose();
+      navigate('/invoices');
+    } catch (e) {
+      // The api client already lifts `detail.message` onto ApiError.message,
+      // so "This order is already invoiced as INV-0001." arrives as-is.
+      message.error(e instanceof Error ? e.message : 'Could not save the invoice.');
+    } finally {
+      setSavingInvoice(false);
+    }
+  }, [api, navigate, onClose, order.id]);
+
   if (!open) return null;
 
   return (
@@ -713,6 +739,16 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ open, onClose, order, busin
 
         {/* Actions (hidden in print) */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }} className="coop-invoice-actions">
+          {!isLocalModeActive && (
+            <CoopButton
+              variant="secondary"
+              icon={<FileDoneOutlined />}
+              loading={savingInvoice}
+              onClick={() => void saveAsInvoice()}
+            >
+              Save as invoice
+            </CoopButton>
+          )}
           <CoopButton variant="secondary" onClick={onClose}>
             Close
           </CoopButton>
